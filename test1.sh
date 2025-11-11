@@ -67,7 +67,7 @@ sleep 1
 
 echo -e "${GREEN}[5/6] 启动 USB 串口通信节点...${NC}"
 gnome-terminal --title="USB-Serial-Comm" -- bash -c "$SOURCE_CMD && \
-    ros2 launch serial_comm serial_comm_launch.py; \
+    ros2 launch serial_comm serial_comm.launch.py; \
     exec bash"
 
 sleep 2
