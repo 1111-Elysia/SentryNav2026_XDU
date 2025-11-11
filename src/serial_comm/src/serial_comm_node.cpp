@@ -7,7 +7,7 @@ class SerialCommNode : public rclcpp::Node
 public:
   SerialCommNode() : Node("serial_comm_node")
   {
-    this->declare_parameter("port", "/dev/ttyUSB0");
+    this->declare_parameter("port", "/dev/ttyACM0");
     this->declare_parameter("baudrate", 115200);
     
     std::string port = this->get_parameter("port").as_string();
