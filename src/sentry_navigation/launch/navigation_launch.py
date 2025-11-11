@@ -16,7 +16,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     use_rviz = LaunchConfiguration('use_rviz', default='false')
     map_yaml_file = LaunchConfiguration('map', 
-        default=os.path.join('/home/pgd/SentryNav2026_XDU/data/new_map', 'map.yaml'))
+        default=os.path.join('./data/new_map', 'map.yaml'))
     params_file = LaunchConfiguration('params_file',
         default=os.path.join(sentry_nav_dir, 'config', 'nav2_params.yaml'))
     rviz_config_file = LaunchConfiguration('rviz_config',

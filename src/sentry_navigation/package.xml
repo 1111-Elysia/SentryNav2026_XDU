@@ -1,50 +1,30 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <!-- ===== 基本信息 ===== -->
   <name>sentry_navigation</name>
   <version>0.0.1</version>
   <description>Sentry navigation package for Nav2 with Lightning-LM integration</description>
   <maintainer email="pgd@xidian.edu.cn">PGD</maintainer>
   <license>Apache-2.0</license>
 
-  <!-- ===== 构建工具依赖 ===== -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- ===== ROS2 核心依赖 ===== -->
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
-
-  <!-- ===== Nav2 依赖 ===== -->
   <depend>nav2_bringup</depend>
   <depend>nav2_common</depend>
   <depend>nav2_msgs</depend>
-
-  <!-- ===== 消息类型依赖 ===== -->
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
-
-  <!-- ===== TF 相关依赖 ===== -->
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>tf2_msgs</depend>
 
-  <!-- ===== 第三方库依赖 ===== -->
-  <depend>yaml-cpp-vendor</depend>
-
-  <!-- ===== 构建依赖 ===== -->
-  <build_depend>yaml-cpp</build_depend>
-  
-  <!-- ===== 执行依赖 ===== -->
-  <exec_depend>yaml-cpp</exec_depend>
-
-  <!-- ===== 测试依赖 ===== -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <!-- ===== 导出信息 ===== -->
   <export>
     <build_type>ament_cmake</build_type>
   </export>

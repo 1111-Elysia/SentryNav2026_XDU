@@ -7,8 +7,6 @@
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-#include <yaml-cpp/yaml.h>
-#include <filesystem>
 
 class TfOdomPublisher : public rclcpp::Node
 {
@@ -18,93 +16,46 @@ public:
                         tf_listener_(tf_buffer_)
     {
         // ===== 声明参数 =====
-        this->declare_parameter<std::string>("map_yaml_path", "");
-        this->declare_parameter<bool>("auto_compensate_origin", true);
         this->declare_parameter<double>("base_link_to_livox_x", 0.1);
         this->declare_parameter<double>("base_link_to_livox_y", 0.0);
         this->declare_parameter<double>("base_link_to_livox_z", 0.0);
+        this->declare_parameter<double>("publish_rate", 50.0);  // 发布频率
         
         // ===== 获取参数 =====
-        std::string map_yaml_path;
-        this->get_parameter("map_yaml_path", map_yaml_path);
-        this->get_parameter("auto_compensate_origin", auto_compensate_origin_);
         this->get_parameter("base_link_to_livox_x", livox_offset_x_);
         this->get_parameter("base_link_to_livox_y", livox_offset_y_);
         this->get_parameter("base_link_to_livox_z", livox_offset_z_);
         
-        // ===== 加载地图原点 =====
-        if (!map_yaml_path.empty() && std::filesystem::exists(map_yaml_path)) {
-            loadMapOrigin(map_yaml_path);
-        } else if (auto_compensate_origin_) {
-            RCLCPP_WARN(this->get_logger(), 
-                "地图 YAML 路径未指定或文件不存在,禁用原点补偿");
-            auto_compensate_origin_ = false;
-        }
+        double publish_rate;
+        this->get_parameter("publish_rate", publish_rate);
         
         // ===== 初始化发布器和订阅器 =====
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
         static_tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
         
-        odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+        odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
         
-        odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        // 订阅 Fast-LIO 的里程计 (仅用于获取速度)
+        fastlio_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/Odometry", 10,
-            std::bind(&TfOdomPublisher::odometryCallback, this, std::placeholders::_1));
+            std::bind(&TfOdomPublisher::fastlioCallback, this, std::placeholders::_1));
         
-        tf_subscriber_ = this->create_subscription<tf2_msgs::msg::TFMessage>(
-            "/tf", 10,
-            std::bind(&TfOdomPublisher::tfCallback, this, std::placeholders::_1));
-        
-        // ===== 定时检查重定位状态 =====
-        check_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(500),
-            std::bind(&TfOdomPublisher::checkRelocalizationStatus, this));
+        // ===== 定时器：发布 TF 和 odom 话题 =====
+        auto period = std::chrono::duration<double>(1.0 / publish_rate);
+        timer_ = this->create_wall_timer(
+            std::chrono::duration_cast<std::chrono::milliseconds>(period),
+            std::bind(&TfOdomPublisher::timerCallback, this));
         
         // ===== 发布静态变换 =====
         publishStaticTransform();
         
         RCLCPP_INFO(this->get_logger(), "TF Odom Publisher 初始化完成");
-        RCLCPP_INFO(this->get_logger(), "  地图原点偏移: [%.2f, %.2f]", 
-                    map_origin_x_, map_origin_y_);
-        RCLCPP_INFO(this->get_logger(), "  自动补偿: %s", 
-                    auto_compensate_origin_ ? "启用" : "禁用");
+        RCLCPP_INFO(this->get_logger(), "  发布频率: %.1f Hz", publish_rate);
+        RCLCPP_INFO(this->get_logger(), "  位置来源: Lightning-LM (map→odom)");
+        RCLCPP_INFO(this->get_logger(), "  速度来源: Fast-LIO (/Odometry)");
     }
 
 private:
-    // ===== 加载地图原点 =====
-    void loadMapOrigin(const std::string& yaml_path)
-    {
-        try {
-            YAML::Node config = YAML::LoadFile(yaml_path);
-            auto origin = config["origin"].as<std::vector<double>>();
-            
-            map_origin_x_ = origin[0];
-            map_origin_y_ = origin[1];
-            map_origin_loaded_ = true;
-            
-            RCLCPP_INFO(this->get_logger(), 
-                "成功加载地图原点: [%.2f, %.2f]", map_origin_x_, map_origin_y_);
-            
-            // ===== 判断是否需要补偿 =====
-            if (std::abs(map_origin_x_) > 0.05 || std::abs(map_origin_y_) > 0.05) {
-                RCLCPP_WARN(this->get_logger(), 
-                    "⚠️ 地图原点偏移较大,将启用自动补偿");
-                needs_compensation_ = true;
-            } else {
-                RCLCPP_INFO(this->get_logger(), 
-                    "✓ 地图原点接近(0,0),无需补偿");
-                needs_compensation_ = false;
-                auto_compensate_origin_ = false;
-            }
-            
-        } catch (const std::exception& e) {
-            RCLCPP_ERROR(this->get_logger(), 
-                "加载地图 YAML 失败: %s", e.what());
-            map_origin_loaded_ = false;
-            auto_compensate_origin_ = false;
-        }
-    }
-    
     // ===== 发布静态变换: base_link → livox_frame =====
     void publishStaticTransform()
     {
@@ -128,105 +79,133 @@ private:
             livox_offset_x_, livox_offset_y_, livox_offset_z_);
     }
 
-    // ===== 检查重定位状态 =====
-    void checkRelocalizationStatus()
+    // ===== Fast-LIO 回调：仅提取速度信息 =====
+    void fastlioCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        if (is_relocalized_) return;
+        // 保存速度信息
+        latest_twist_ = msg->twist.twist;
+        twist_received_ = true;
+        
+        // 调试输出 (节流)
+        auto now = this->now();
+        if ((now - last_velocity_log_time_).seconds() > 2.0) {
+            RCLCPP_DEBUG(this->get_logger(), 
+                "Fast-LIO 速度: linear=[%.2f, %.2f, %.2f] angular=[%.2f, %.2f, %.2f]",
+                latest_twist_.linear.x, latest_twist_.linear.y, latest_twist_.linear.z,
+                latest_twist_.angular.x, latest_twist_.angular.y, latest_twist_.angular.z);
+            last_velocity_log_time_ = now;
+        }
+    }
+
+    // ===== 定时器回调：发布 TF 和 odom =====
+    void timerCallback()
+    {
+        auto now = this->now();
         
         try {
-            // 尝试查询 map→odom 变换
-            auto transform = tf_buffer_.lookupTransform(
-                "map", "odom", tf2::TimePointZero);
+            // ===== 1. 检查 Lightning-LM 是否已重定位 =====
+            geometry_msgs::msg::TransformStamped map_to_odom;
+            bool has_relocalized = false;
             
-            // 检查变换是否有效(非单位变换)
-            double tx = transform.transform.translation.x;
-            double ty = transform.transform.translation.y;
-            
-            if (std::abs(tx) > 0.01 || std::abs(ty) > 0.01) {
-                is_relocalized_ = true;
-                RCLCPP_INFO(this->get_logger(), 
-                    "✓ 检测到重定位成功,禁用原点补偿");
-                RCLCPP_INFO(this->get_logger(), 
-                    "  map→odom: [%.2f, %.2f]", tx, ty);
-            }
-            
-        } catch (const tf2::TransformException& ex) {
-            // map→odom 还未发布,继续等待
-        }
-    }
-
-    // ===== 里程计回调 =====
-    void odometryCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
-    {
-        // ===== 1. 转发里程计话题 =====
-        auto odom_msg = *msg;
-        odom_msg.header.frame_id = "odom";
-        odom_msg.child_frame_id = "base_link";
-        odom_publisher_->publish(odom_msg);
-        
-        // ===== 2. 提取位姿信息 =====
-        double x = msg->pose.pose.position.x;
-        double y = msg->pose.pose.position.y;
-        double z = msg->pose.pose.position.z;
-        
-        auto q = msg->pose.pose.orientation;
-        
-        // ===== 3. 构建 odom→base_link 变换 =====
-        geometry_msgs::msg::TransformStamped odom_to_baselink;
-        odom_to_baselink.header.stamp = msg->header.stamp;
-        odom_to_baselink.header.frame_id = "odom";
-        odom_to_baselink.child_frame_id = "base_link";
-        
-        // ===== 4. 根据重定位状态决定是否补偿 =====
-        if (!is_relocalized_ && auto_compensate_origin_ && 
-            needs_compensation_ && map_origin_loaded_) {
-            // 未重定位且需要补偿:减去地图原点偏移
-            odom_to_baselink.transform.translation.x = x - map_origin_x_;
-            odom_to_baselink.transform.translation.y = y - map_origin_y_;
-            odom_to_baselink.transform.translation.z = z;
-            
-            // 每秒输出一次调试信息
-            auto now = this->now();
-            if ((now - last_log_time_).seconds() > 1.0) {
-                RCLCPP_INFO(this->get_logger(), 
-                    "补偿模式: Fast-LIO [%.2f, %.2f] → base_link [%.2f, %.2f]",
-                    x, y, 
-                    x - map_origin_x_, y - map_origin_y_);
-                last_log_time_ = now;
-            }
-        } else {
-            // 已重定位或无需补偿:直接使用里程计数据
-            odom_to_baselink.transform.translation.x = x;
-            odom_to_baselink.transform.translation.y = y;
-            odom_to_baselink.transform.translation.z = z;
-        }
-        
-        odom_to_baselink.transform.rotation = q;
-        
-        // ===== 5. 发布 TF =====
-        tf_broadcaster_->sendTransform(odom_to_baselink);
-    }
-
-    // ===== TF 消息回调(监听 map→odom) =====
-    void tfCallback(const tf2_msgs::msg::TFMessage::SharedPtr msg)
-    {
-        for (const auto& transform : msg->transforms) {
-            if (transform.header.frame_id == "map" && 
-                transform.child_frame_id == "odom") {
+            try {
+                // ===== 修正: 使用正确的 API =====
+                map_to_odom = tf_buffer_.lookupTransform(
+                    "map", "odom", tf2::TimePointZero);
                 
-                if (!is_relocalized_) {
-                    double tx = transform.transform.translation.x;
-                    double ty = transform.transform.translation.y;
+                double tx = map_to_odom.transform.translation.x;
+                double ty = map_to_odom.transform.translation.y;
+                
+                if (std::abs(tx) > 0.01 || std::abs(ty) > 0.01) {
+                    has_relocalized = true;
                     
-                    if (std::abs(tx) > 0.01 || std::abs(ty) > 0.01) {
+                    if (!is_relocalized_) {
                         is_relocalized_ = true;
                         RCLCPP_INFO(this->get_logger(), 
-                            "✓ 通过 /tf 检测到重定位: map→odom [%.2f, %.2f]",
-                            tx, ty);
+                            "✓ 检测到 Lightning-LM 重定位成功!");
+                        RCLCPP_INFO(this->get_logger(), 
+                            "  map→odom: [%.2f, %.2f]", tx, ty);
                     }
                 }
-                break;
+            } catch (const tf2::TransformException& ex) {
+                // map→odom 还未发布
+                if (!warning_printed_ && (now - start_time_).seconds() > 5.0) {
+                    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                        "等待 Lightning-LM 重定位... (map→odom 未检测到)");
+                    warning_printed_ = true;
+                }
             }
+            
+            // ===== 2. 发布 odom→base_link (单位变换) =====
+            geometry_msgs::msg::TransformStamped odom_to_baselink;
+            odom_to_baselink.header.stamp = now;
+            odom_to_baselink.header.frame_id = "odom";
+            odom_to_baselink.child_frame_id = "base_link";
+            
+            // 单位变换: base_link 在 odom 原点
+            odom_to_baselink.transform.translation.x = 0.0;
+            odom_to_baselink.transform.translation.y = 0.0;
+            odom_to_baselink.transform.translation.z = 0.0;
+            odom_to_baselink.transform.rotation.x = 0.0;
+            odom_to_baselink.transform.rotation.y = 0.0;
+            odom_to_baselink.transform.rotation.z = 0.0;
+            odom_to_baselink.transform.rotation.w = 1.0;
+            
+            tf_broadcaster_->sendTransform(odom_to_baselink);
+            
+            // ===== 3. 发布 /odom 话题 =====
+            nav_msgs::msg::Odometry odom_msg;
+            odom_msg.header.stamp = now;
+            odom_msg.header.frame_id = "odom";
+            odom_msg.child_frame_id = "base_link";
+            
+            // 位置：在 odom 系中为 (0,0,0)
+            odom_msg.pose.pose.position.x = 0.0;
+            odom_msg.pose.pose.position.y = 0.0;
+            odom_msg.pose.pose.position.z = 0.0;
+            odom_msg.pose.pose.orientation.x = 0.0;
+            odom_msg.pose.pose.orientation.y = 0.0;
+            odom_msg.pose.pose.orientation.z = 0.0;
+            odom_msg.pose.pose.orientation.w = 1.0;
+            
+            // 速度：来自 Fast-LIO
+            if (twist_received_) {
+                odom_msg.twist.twist = latest_twist_;
+            } else {
+                // 如果还没收到 Fast-LIO 数据，速度设为 0
+                odom_msg.twist.twist.linear.x = 0.0;
+                odom_msg.twist.twist.linear.y = 0.0;
+                odom_msg.twist.twist.linear.z = 0.0;
+                odom_msg.twist.twist.angular.x = 0.0;
+                odom_msg.twist.twist.angular.y = 0.0;
+                odom_msg.twist.twist.angular.z = 0.0;
+            }
+            
+            // 协方差
+            // 位置协方差：低 (因为有重定位修正)
+            odom_msg.pose.covariance[0] = 0.01;   // x
+            odom_msg.pose.covariance[7] = 0.01;   // y
+            odom_msg.pose.covariance[35] = 0.01;  // yaw
+            
+            // 速度协方差：取决于 Fast-LIO
+            odom_msg.twist.covariance[0] = 0.05;   // vx
+            odom_msg.twist.covariance[7] = 0.05;   // vy
+            odom_msg.twist.covariance[35] = 0.05;  // vyaw
+            
+            odom_publisher_->publish(odom_msg);
+            
+            // ===== 4. 周期性状态输出 =====
+            if (has_relocalized && (now - last_status_log_time_).seconds() > 5.0) {
+                RCLCPP_INFO(this->get_logger(),
+                    "状态: 重定位✓ | 速度来源: Fast-LIO%s | "
+                    "机器人在 map 中位置: [%.2f, %.2f]",
+                    twist_received_ ? "✓" : "✗",
+                    map_to_odom.transform.translation.x,
+                    map_to_odom.transform.translation.y);
+                last_status_log_time_ = now;
+            }
+            
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "定时器回调异常: %s", e.what());
         }
     }
 
@@ -239,29 +218,27 @@ private:
     
     // ===== 发布器和订阅器 =====
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
-    rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf_subscriber_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr fastlio_subscriber_;
     
     // ===== 定时器 =====
-    rclcpp::TimerBase::SharedPtr check_timer_;
+    rclcpp::TimerBase::SharedPtr timer_;
     
     // ===== 状态变量 =====
-    bool is_relocalized_ = false;           // 是否已重定位
-    bool map_origin_loaded_ = false;        // 地图原点是否加载成功
-    bool needs_compensation_ = false;       // 是否需要补偿
-    bool auto_compensate_origin_ = true;    // 是否启用自动补偿
+    bool is_relocalized_ = false;
+    bool warning_printed_ = false;
+    bool twist_received_ = false;
     
-    // ===== 地图原点偏移 =====
-    double map_origin_x_ = 0.0;
-    double map_origin_y_ = 0.0;
+    rclcpp::Time start_time_{this->now()};
+    rclcpp::Time last_status_log_time_{0, 0, RCL_ROS_TIME};
+    rclcpp::Time last_velocity_log_time_{0, 0, RCL_ROS_TIME};
     
-    // ===== 雷达偏移 =====
+    // ===== 速度数据 =====
+    geometry_msgs::msg::Twist latest_twist_;
+    
+    // ===== Livox 偏移 =====
     double livox_offset_x_ = 0.1;
     double livox_offset_y_ = 0.0;
     double livox_offset_z_ = 0.0;
-    
-    // ===== 日志控制 =====
-    rclcpp::Time last_log_time_{0, 0, RCL_ROS_TIME};
 };
 
 int main(int argc, char** argv)

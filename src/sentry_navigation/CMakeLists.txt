@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.8)
 project(sentry_navigation)
 
-# ===== 编译选项 =====
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# C++17 标准
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -24,14 +22,7 @@ find_package(nav2_bringup REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(nav2_msgs REQUIRED)
 
-# ===== 查找 yaml-cpp (新增) =====
-find_package(yaml-cpp REQUIRED)
-
-# ===== 包含目录 =====
-include_directories(
-  include
-  ${YAML_CPP_INCLUDE_DIRS}
-)
+include_directories(include)
 
 # ===== 构建 TF Odom Publisher 节点 =====
 add_executable(tf_odom_publisher 
@@ -48,41 +39,28 @@ ament_target_dependencies(tf_odom_publisher
   tf2
 )
 
-# 链接 yaml-cpp 库
-target_link_libraries(tf_odom_publisher
-  yaml-cpp
-)
-
 # ===== 安装可执行文件 =====
 install(TARGETS
   tf_odom_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# ===== 安装 launch 文件 =====
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
-)
+# ===== 安装其他文件 =====
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
+  install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
+endif()
 
-# ===== 安装配置文件 =====
-install(DIRECTORY
-  config
-  DESTINATION share/${PROJECT_NAME}/
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+  install(DIRECTORY config DESTINATION share/${PROJECT_NAME}/)
+endif()
 
-# ===== 安装 RViz 配置 =====
-install(DIRECTORY
-  rviz
-  DESTINATION share/${PROJECT_NAME}/
-  OPTIONAL
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rviz")
+  install(DIRECTORY rviz DESTINATION share/${PROJECT_NAME}/)
+endif()
 
-# ===== 测试 =====
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-# ===== ament 打包 =====
 ament_package()
