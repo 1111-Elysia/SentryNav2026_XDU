@@ -36,19 +36,17 @@ gnome-terminal --title="Fast-LIO" -- bash -c "$SOURCE_CMD && \
 
 sleep 2
 
-# 修改 [3/5] 部分
-echo -e "${GREEN}[3/5] 启动 TF & Odom 发布节点 (Lightning-LM + 坐标校正)...${NC}"
+echo -e "${GREEN}[3/5] 启动 TF & Odom 发布节点...${NC}"
 gnome-terminal --title="TF-Odom-Publisher" -- bash -c "$SOURCE_CMD && \
     ros2 run sentry_navigation tf_odom_publisher \
     --ros-args \
     -p publish_rate:=50.0 \
-    -p use_correction:=true \
-    -p correction_x:=-13.4 \
-    -p correction_y:=-11.0 \
-    -p correction_z:=0.0 \
-    -p base_link_to_livox_x:=0.1 \
+    -p base_link_to_livox_x:=0.117 \
     -p base_link_to_livox_y:=0.0 \
-    -p base_link_to_livox_z:=0.0; \
+    -p base_link_to_livox_z:=0.0 \
+    -p base_link_to_livox_roll:=0.0 \
+    -p base_link_to_livox_pitch:=0.0 \
+    -p base_link_to_livox_yaw:=0.0; \
     exec bash"
 
 sleep 1
@@ -73,16 +71,23 @@ echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}所有节点已在独立终端启动${NC}"
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${YELLOW}系统架构:${NC}"
-echo -e "  位置: Lightning-LM 重定位 (map→odom)"
-echo -e "  速度: Fast-LIO (/Odometry twist)"
-echo -e "  TF树: map → odom → base_link → livox_frame"
+echo -e "  • TF 树: map → odom → base_link → livox_frame"
+echo -e "  • 位置: Lightning-LM (map→odom)"
+echo -e "  • 速度: Fast-LIO (/Odometry twist)"
+echo -e "  • /odom 格式: pose=[0,0,0], twist=Fast-LIO"
 echo -e ""
-echo -e "${YELLOW}调试命令:${NC}"
-echo -e "  1. 检查 TF 树:"
-echo -e "     ${GREEN}ros2 run tf2_tools view_frames${NC}"
-echo -e "  2. 查看机器人位置 (应在地图上):"
+echo -e "${YELLOW}验证命令:${NC}"
+echo -e "  1. 查看 TF 树:"
+echo -e "     ${GREEN}ros2 run tf2_tools view_frames && evince frames.pdf${NC}"
+echo -e ""
+echo -e "  2. 检查机器人位置 (从 TF):"
 echo -e "     ${GREEN}ros2 run tf2_ros tf2_echo map base_link${NC}"
-echo -e "  3. 查看 odom 话题 (位置=0, 速度≠0):"
+echo -e ""
+echo -e "  3. 检查 /odom 话题 (pose应为0, twist应有速度):"
 echo -e "     ${GREEN}ros2 topic echo /odom${NC}"
-echo -e "  4. 监控速度来源:"
-echo -e "     ${GREEN}ros2 topic echo /Odometry/twist/twist${NC}"
+echo -e ""
+echo -e "  4. 监控各组件频率:"
+echo -e "     ${GREEN}ros2 topic hz /tf${NC}"
+echo -e "     ${GREEN}ros2 topic hz /odom${NC}"
+echo -e "     ${GREEN}ros2 topic hz /Odometry${NC}"
+echo -e "     ${GREEN}ros2 topic hz /scan${NC}"
