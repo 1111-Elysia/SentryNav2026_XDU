@@ -36,11 +36,16 @@ gnome-terminal --title="Fast-LIO" -- bash -c "$SOURCE_CMD && \
 
 sleep 2
 
-echo -e "${GREEN}[3/5] 启动 TF & Odom 发布节点 (位置+速度融合)...${NC}"
+# 修改 [3/5] 部分
+echo -e "${GREEN}[3/5] 启动 TF & Odom 发布节点 (Lightning-LM + 坐标校正)...${NC}"
 gnome-terminal --title="TF-Odom-Publisher" -- bash -c "$SOURCE_CMD && \
     ros2 run sentry_navigation tf_odom_publisher \
     --ros-args \
     -p publish_rate:=50.0 \
+    -p use_correction:=true \
+    -p correction_x:=-13.4 \
+    -p correction_y:=-11.0 \
+    -p correction_z:=0.0 \
     -p base_link_to_livox_x:=0.1 \
     -p base_link_to_livox_y:=0.0 \
     -p base_link_to_livox_z:=0.0; \
