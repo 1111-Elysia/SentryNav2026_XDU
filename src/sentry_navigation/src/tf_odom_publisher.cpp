@@ -67,6 +67,7 @@ public:
         RCLCPP_WARN(this->get_logger(), "  车体坐标系: X=右, Y=前, Z=上");
         RCLCPP_WARN(this->get_logger(), "  ROS 坐标系: X=前, Y=左, Z=上");
         RCLCPP_WARN(this->get_logger(), "  转换方式: 绕Z轴旋转-90度");
+        RCLCPP_WARN(this->get_logger(), "  雷达修正: 额外旋转180度");
         RCLCPP_INFO(this->get_logger(), "============================================");
     }
 
@@ -129,9 +130,11 @@ private:
         static_transform.transform.translation.y = livox_y_ros;
         static_transform.transform.translation.z = livox_z_ros;
         
-        // 雷达姿态（车体系→ROS系）
+        // ===== 修改：雷达姿态需要额外旋转180度 =====
+        // 原来: livox_yaw_ - M_PI/2.0
+        // 现在: livox_yaw_ - M_PI/2.0 + M_PI = livox_yaw_ + M_PI/2.0
         tf2::Quaternion q_lidar;
-        q_lidar.setRPY(livox_roll_, livox_pitch_, livox_yaw_ - M_PI/2.0);
+        q_lidar.setRPY(livox_roll_, livox_pitch_, livox_yaw_ + M_PI/2.0);
         
         static_transform.transform.rotation.x = q_lidar.x();
         static_transform.transform.rotation.y = q_lidar.y();
@@ -141,8 +144,8 @@ private:
         static_tf_broadcaster_->sendTransform(static_transform);
         
         RCLCPP_INFO(this->get_logger(), 
-            "静态TF: base_link→livox_frame (ROS系): [%.3f, %.3f, %.3f]",
-            livox_x_ros, livox_y_ros, livox_z_ros);
+            "静态TF: base_link→livox_frame (ROS系): [%.3f, %.3f, %.3f], yaw=%.2f rad",
+            livox_x_ros, livox_y_ros, livox_z_ros, livox_yaw_ + M_PI/2.0);
     }
 
     // ===== Fast-LIO 回调 =====

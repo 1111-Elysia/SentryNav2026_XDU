@@ -50,22 +50,18 @@ public:
     RCLCPP_INFO(this->get_logger(), "  距离过滤: [%.2f, %.2f] m", range_min_, range_max_);
     RCLCPP_INFO(this->get_logger(), "  角度范围: [%.2f, %.2f] rad", angle_min_, angle_max_);
     RCLCPP_INFO(this->get_logger(), "");
-    RCLCPP_WARN(this->get_logger(), "坐标系设定:");
-    RCLCPP_WARN(this->get_logger(), "  Livox雷达已是标准ROS坐标系");
-    RCLCPP_WARN(this->get_logger(), "  X=前方, Y=左侧, Z=上方");
-    RCLCPP_WARN(this->get_logger(), "  不进行坐标转换");
+    RCLCPP_WARN(this->get_logger(), "坐标系转换: 绕Z轴旋转180度");
     RCLCPP_INFO(this->get_logger(), "============================================");
   }
 
 private:
-  // ===== 坐标系转换函数（不转换）=====
   void transformPointToROS(float x_lidar, float y_lidar, float z_lidar,
                            float& x_ros, float& y_ros, float& z_ros)
   {
-    // Livox 雷达已经是标准 ROS 坐标系，不需要转换
-    x_ros = x_lidar;   // 前方
-    y_ros = y_lidar;   // 左侧
-    z_ros = z_lidar;   // 上方
+    // 绕Z轴旋转180度
+    x_ros = -x_lidar;
+    y_ros = -y_lidar;
+    z_ros = z_lidar;
   }
 
   void cloudCallback(const livox_ros_driver2::msg::CustomMsg::SharedPtr livox_msg)
@@ -103,14 +99,12 @@ private:
       float x_ros, y_ros, z_ros;
       transformPointToROS(x_lidar, y_lidar, z_lidar, x_ros, y_ros, z_ros);
 
-      // 高度过滤
       if (z_ros < min_height_ || z_ros > max_height_)
       {
         filtered_height++;
         continue;
       }
 
-      // 距离过滤
       float range = std::sqrt(x_ros * x_ros + y_ros * y_ros);
       if (range < range_min_ || range > range_max_)
       {
@@ -118,7 +112,6 @@ private:
         continue;
       }
 
-      // 角度计算（ROS标准：0°=X轴正向=前方）
       float angle = std::atan2(y_ros, x_ros);
       
       if (angle < angle_min_ || angle > angle_max_)
@@ -140,8 +133,8 @@ private:
         if (debug_count < debug_points_)
         {
           RCLCPP_INFO(this->get_logger(),
-                      "点[%d]: (%.3f前, %.3f左, %.3f上) | 角度=%.1f° | 距离=%.3fm",
-                      debug_count, x_ros, y_ros, z_ros,
+                      "点[%d]: 原始(%.3f, %.3f, %.3f) → 转换(%.3f, %.3f, %.3f) | 角度=%.1f° | 距离=%.3fm",
+                      debug_count, x_lidar, y_lidar, z_lidar, x_ros, y_ros, z_ros,
                       angle * 180.0 / M_PI, range);
           debug_count++;
         }
