@@ -133,11 +133,11 @@ controller_server:
       PathAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 2.0                  # 路径角度权重
+        cost_weight: 8.0                  # 路径角度权重
         offset_from_furthest: 4           # 从最远点的偏移
-        threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
-        max_angle_to_furthest: 1.0        # 最大角度 (rad)
-        mode: 0                           # 模式：0=前向，1=偏好前向，2=无偏好
+        threshold_to_consider: 0.8        # 考虑的距离阈值 (m)
+        max_angle_to_furthest: 0.4        # 最大角度 (rad)
+        mode: 1                           # 模式：0=前向，1=偏好前向，2=无偏好
       
       # ----- 噪声生成器 -----
       # MPPI 使用随机采样生成轨迹
