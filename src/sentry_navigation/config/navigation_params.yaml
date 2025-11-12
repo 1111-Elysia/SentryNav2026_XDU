@@ -391,6 +391,7 @@ lifecycle_manager_navigation:
       'smoother_server',                  # 平滑器服务器
       'planner_server',                   # 规划器服务器
       'behavior_server',                  # 行为服务器
+      'bt_navigator',                     # 行为树导航器
       'waypoint_follower',                # 路径点跟随器
       'velocity_smoother'                 # 速度平滑器
     ]
