@@ -81,8 +81,8 @@ private:
         float vy_ros = msg->linear.y;   // ROS左移
         float vyaw_ros = msg->angular.z;
         
-        vx_ = -vy_ros / 10.0;   // 车体右移 = -ROS左移
-        vy_ = vx_ros / 10.0;    // 车体前进 = ROS前进
+        vx_ = vx_ros / 10.0;  
+        vy_ = vy_ros / 10.0;    
         vyaw_ = vyaw_ros / 25.0;
     }
 
