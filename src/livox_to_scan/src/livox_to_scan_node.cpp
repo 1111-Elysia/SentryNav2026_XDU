@@ -41,24 +41,19 @@ public:
 
     scan_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>(output_topic_, queue_size_);
 
-    RCLCPP_INFO(this->get_logger(), "Livox to Scan 节点已启动 (雷达数据旋转180度)");
+    RCLCPP_INFO(this->get_logger(), "============================================");
+    RCLCPP_INFO(this->get_logger(), "Livox to Scan 节点已启动");
+    RCLCPP_WARN(this->get_logger(), "  不转换坐标！直接使用雷达原始坐标系");
+    RCLCPP_WARN(this->get_logger(), "  frame_id = livox_frame");
+    RCLCPP_INFO(this->get_logger(), "============================================");
   }
 
 private:
-  void transformPointToROS(float x_lidar, float y_lidar, float z_lidar,
-                           float& x_ros, float& y_ros, float& z_ros)
-  {
-    // 雷达坐标系旋转180度
-    x_ros = -x_lidar;
-    y_ros = -y_lidar;
-    z_ros = z_lidar;
-  }
-
   void cloudCallback(const livox_ros_driver2::msg::CustomMsg::SharedPtr livox_msg)
   {
     auto scan_msg = sensor_msgs::msg::LaserScan();
     scan_msg.header.stamp = this->get_clock()->now();
-    scan_msg.header.frame_id = "base_link";
+    scan_msg.header.frame_id = livox_msg->header.frame_id;  // 使用雷达原始 frame_id
     scan_msg.angle_min = angle_min_;
     scan_msg.angle_max = angle_max_;
     scan_msg.angle_increment = angle_increment_;
@@ -71,26 +66,19 @@ private:
     scan_msg.ranges.assign(ranges_size, std::numeric_limits<float>::infinity());
     scan_msg.intensities.assign(ranges_size, 0.0);
 
-    int total_points = 0;
-    int accepted_points = 0;
-
     for (const auto& point : livox_msg->points)
     {
-      total_points++;
+      // 直接使用雷达原始坐标，不转换
+      float x = point.x;
+      float y = point.y;
+      float z = point.z;
 
-      float x_lidar = point.x;
-      float y_lidar = point.y;
-      float z_lidar = point.z;
+      if (z < min_height_ || z > max_height_) continue;
 
-      float x_ros, y_ros, z_ros;
-      transformPointToROS(x_lidar, y_lidar, z_lidar, x_ros, y_ros, z_ros);
-
-      if (z_ros < min_height_ || z_ros > max_height_) continue;
-
-      float range = std::sqrt(x_ros * x_ros + y_ros * y_ros);
+      float range = std::sqrt(x * x + y * y);
       if (range < range_min_ || range > range_max_) continue;
 
-      float angle = std::atan2(y_ros, x_ros);
+      float angle = std::atan2(y, x);
       if (angle < angle_min_ || angle > angle_max_) continue;
 
       int index = static_cast<int>(std::round((angle - angle_min_) / angle_increment_));
@@ -100,7 +88,6 @@ private:
         {
           scan_msg.ranges[index] = range;
           scan_msg.intensities[index] = point.reflectivity;
-          accepted_points++;
         }
       }
     }
