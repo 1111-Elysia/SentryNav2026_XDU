@@ -35,9 +35,8 @@ public:
 
     RCLCPP_INFO(this->get_logger(), "========================================");
     RCLCPP_INFO(this->get_logger(), "Livox to Scan 启动");
-    RCLCPP_INFO(this->get_logger(), "  雷达系: X=右, Y=前 → ROS系: X=前, Y=左");
-    RCLCPP_INFO(this->get_logger(), "  转换: 绕Z轴旋转-90度");
-    RCLCPP_INFO(this->get_logger(), "  frame_id: base_link");
+    RCLCPP_INFO(this->get_logger(), "  雷达坐标系旋转180度修正");
+    RCLCPP_INFO(this->get_logger(), "  frame_id: livox_frame (通过TF变换)");
     RCLCPP_INFO(this->get_logger(), "========================================");
   }
 
@@ -47,8 +46,8 @@ private:
     auto scan = sensor_msgs::msg::LaserScan();
     scan.header.stamp = this->get_clock()->now();
     
-    // ===== 关键修改1: frame_id 改为 base_link =====
-    scan.header.frame_id = "base_link";
+    // ===== 使用 livox_frame，让 TF 树处理坐标变换 =====
+    scan.header.frame_id = "livox_frame";
     
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;
@@ -64,23 +63,17 @@ private:
 
     for (const auto& pt : msg->points)
     {
-      // 雷达坐标系: X=右, Y=前
-      float x_lidar = pt.x;
-      float y_lidar = pt.y;
-      float z_lidar = pt.z;
+      // ===== 雷达坐标旋转180度修正 =====
+      float x = -pt.x;
+      float y = -pt.y;
+      float z = pt.z;
 
-      if (z_lidar < min_height_ || z_lidar > max_height_) continue;
+      if (z < min_height_ || z > max_height_) continue;
 
-      // ===== 关键修改2: 转换到ROS坐标系（绕Z轴旋转-90度）=====
-      // ROS系: X=前, Y=左
-      float x_ros = y_lidar;    // ROS前 = 雷达前
-      float y_ros = -x_lidar;   // ROS左 = -雷达右
-
-      float range = std::sqrt(x_ros*x_ros + y_ros*y_ros);
+      float range = std::sqrt(x*x + y*y);
       if (range < range_min_ || range > range_max_) continue;
 
-      // 在ROS坐标系下计算角度
-      float angle = std::atan2(y_ros, x_ros);
+      float angle = std::atan2(y, x);
       if (angle < angle_min_ || angle > angle_max_) continue;
 
       int idx = std::round((angle - angle_min_) / angle_increment_);

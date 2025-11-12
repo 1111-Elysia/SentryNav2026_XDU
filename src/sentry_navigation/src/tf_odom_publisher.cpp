@@ -47,22 +47,20 @@ public:
         RCLCPP_INFO(this->get_logger(), "  车体系: X=右, Y=前, Z=上");
         RCLCPP_INFO(this->get_logger(), "  ROS系: X=前, Y=左, Z=上");
         RCLCPP_INFO(this->get_logger(), "  转换: 绕Z轴旋转-90度");
+        RCLCPP_INFO(this->get_logger(), "  雷达: 额外旋转180度修正");
         RCLCPP_INFO(this->get_logger(), "========================================");
     }
 
 private:
-    // 车体系 → ROS系：绕Z轴旋转-90度
     void vehicleToROS(double x_v, double y_v, double z_v,
                       double qx_v, double qy_v, double qz_v, double qw_v,
                       double& x_r, double& y_r, double& z_r,
                       double& qx_r, double& qy_r, double& qz_r, double& qw_r)
     {
-        // 位置转换
-        x_r = y_v;      // ROS前 = 车体前
-        y_r = -x_v;     // ROS左 = -车体右
+        x_r = y_v;
+        y_r = -x_v;
         z_r = z_v;
         
-        // 姿态转换
         tf2::Quaternion q_v(qx_v, qy_v, qz_v, qw_v);
         tf2::Quaternion q_rot;
         q_rot.setRPY(0, 0, -M_PI/2.0);
@@ -80,8 +78,8 @@ private:
                          double& vx_r, double& vy_r, double& vz_r,
                          double& wx_r, double& wy_r, double& wz_r)
     {
-        vx_r = vy_v;    // ROS前进 = 车体前进
-        vy_r = -vx_v;   // ROS左移 = -车体右移
+        vx_r = vy_v;
+        vy_r = -vx_v;
         vz_r = vz_v;
         wx_r = wy_v;
         wy_r = -wx_v;
@@ -95,14 +93,13 @@ private:
         tf.header.frame_id = "base_link";
         tf.child_frame_id = "livox_frame";
         
-        // 雷达安装位置（车体系→ROS系）
-        tf.transform.translation.x = livox_offset_y_;   // ROS前 = 车体前
-        tf.transform.translation.y = -livox_offset_x_;  // ROS左 = -车体右
+        tf.transform.translation.x = livox_offset_y_;
+        tf.transform.translation.y = -livox_offset_x_;
         tf.transform.translation.z = livox_offset_z_;
         
-        // 雷达姿态：无额外旋转（雷达和车体同向）
+        // 雷达姿态：旋转180度
         tf2::Quaternion q;
-        q.setRPY(0, 0, 0);
+        q.setRPY(0, 0, M_PI);
         tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
@@ -111,8 +108,7 @@ private:
         static_tf_broadcaster_->sendTransform(tf);
         
         RCLCPP_INFO(this->get_logger(), 
-            "静态TF: base_link→livox_frame [%.3f, %.3f, %.3f]",
-            tf.transform.translation.x, tf.transform.translation.y, tf.transform.translation.z);
+            "静态TF: base_link→livox_frame + 180度旋转");
     }
 
     void fastlioCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -139,7 +135,6 @@ private:
     {
         auto now = this->now();
         
-        // 检查Lightning-LM
         bool has_lm = false;
         try {
             auto tf = tf_buffer_.lookupTransform("map", "odom", tf2::TimePointZero);
@@ -159,7 +154,6 @@ private:
             }
         }
         
-        // 发布odom→base_link
         geometry_msgs::msg::TransformStamped tf_odom;
         tf_odom.header.stamp = now;
         tf_odom.header.frame_id = "odom";
@@ -186,19 +180,16 @@ private:
         
         tf_broadcaster_->sendTransform(tf_odom);
         
-        // 发布/odom话题
         nav_msgs::msg::Odometry odom_msg;
         odom_msg.header.stamp = now;
         odom_msg.header.frame_id = "odom";
         odom_msg.child_frame_id = "base_link";
         
-        // Pose: 固定在原点
         odom_msg.pose.pose.position.x = 0;
         odom_msg.pose.pose.position.y = 0;
         odom_msg.pose.pose.position.z = 0;
         odom_msg.pose.pose.orientation.w = 1;
         
-        // Twist: 来自Fast-LIO，转换到ROS系
         if (has_fastlio_) {
             double vx, vy, vz, wx, wy, wz;
             vehicleVelToROS(vel_vx_, vel_vy_, vel_vz_, vel_wx_, vel_wy_, vel_wz_,
