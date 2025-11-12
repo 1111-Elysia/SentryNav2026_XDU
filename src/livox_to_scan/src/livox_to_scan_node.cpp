@@ -41,24 +41,14 @@ public:
 
     scan_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>(output_topic_, queue_size_);
 
-    RCLCPP_INFO(this->get_logger(), "============================================");
-    RCLCPP_INFO(this->get_logger(), "Livox to Scan 节点已启动");
-    RCLCPP_INFO(this->get_logger(), "============================================");
-    RCLCPP_INFO(this->get_logger(), "  输入话题: %s", input_topic_.c_str());
-    RCLCPP_INFO(this->get_logger(), "  输出话题: %s", output_topic_.c_str());
-    RCLCPP_INFO(this->get_logger(), "  高度过滤: [%.2f, %.2f] m", min_height_, max_height_);
-    RCLCPP_INFO(this->get_logger(), "  距离过滤: [%.2f, %.2f] m", range_min_, range_max_);
-    RCLCPP_INFO(this->get_logger(), "  角度范围: [%.2f, %.2f] rad", angle_min_, angle_max_);
-    RCLCPP_INFO(this->get_logger(), "");
-    RCLCPP_WARN(this->get_logger(), "坐标系转换: 绕Z轴旋转180度");
-    RCLCPP_INFO(this->get_logger(), "============================================");
+    RCLCPP_INFO(this->get_logger(), "Livox to Scan 节点已启动 (雷达数据旋转180度)");
   }
 
 private:
   void transformPointToROS(float x_lidar, float y_lidar, float z_lidar,
                            float& x_ros, float& y_ros, float& z_ros)
   {
-    // 绕Z轴旋转180度
+    // 雷达坐标系旋转180度
     x_ros = -x_lidar;
     y_ros = -y_lidar;
     z_ros = z_lidar;
@@ -81,11 +71,7 @@ private:
     scan_msg.ranges.assign(ranges_size, std::numeric_limits<float>::infinity());
     scan_msg.intensities.assign(ranges_size, 0.0);
 
-    int debug_count = 0;
     int total_points = 0;
-    int filtered_height = 0;
-    int filtered_range = 0;
-    int filtered_angle = 0;
     int accepted_points = 0;
 
     for (const auto& point : livox_msg->points)
@@ -99,26 +85,13 @@ private:
       float x_ros, y_ros, z_ros;
       transformPointToROS(x_lidar, y_lidar, z_lidar, x_ros, y_ros, z_ros);
 
-      if (z_ros < min_height_ || z_ros > max_height_)
-      {
-        filtered_height++;
-        continue;
-      }
+      if (z_ros < min_height_ || z_ros > max_height_) continue;
 
       float range = std::sqrt(x_ros * x_ros + y_ros * y_ros);
-      if (range < range_min_ || range > range_max_)
-      {
-        filtered_range++;
-        continue;
-      }
+      if (range < range_min_ || range > range_max_) continue;
 
       float angle = std::atan2(y_ros, x_ros);
-      
-      if (angle < angle_min_ || angle > angle_max_)
-      {
-        filtered_angle++;
-        continue;
-      }
+      if (angle < angle_min_ || angle > angle_max_) continue;
 
       int index = static_cast<int>(std::round((angle - angle_min_) / angle_increment_));
       if (index >= 0 && index < static_cast<int>(ranges_size))
@@ -129,32 +102,7 @@ private:
           scan_msg.intensities[index] = point.reflectivity;
           accepted_points++;
         }
-
-        if (debug_count < debug_points_)
-        {
-          RCLCPP_INFO(this->get_logger(),
-                      "点[%d]: 原始(%.3f, %.3f, %.3f) → 转换(%.3f, %.3f, %.3f) | 角度=%.1f° | 距离=%.3fm",
-                      debug_count, x_lidar, y_lidar, z_lidar, x_ros, y_ros, z_ros,
-                      angle * 180.0 / M_PI, range);
-          debug_count++;
-        }
       }
-    }
-
-    static int frame_count = 0;
-    if (++frame_count % 100 == 0)
-    {
-      RCLCPP_INFO(this->get_logger(),
-                  "统计: 总=%d, 高度过滤=%d, 距离过滤=%d, 角度过滤=%d, 接受=%d",
-                  total_points, filtered_height, filtered_range, filtered_angle, accepted_points);
-      
-      int valid_ranges = 0;
-      for (const auto& r : scan_msg.ranges) {
-        if (std::isfinite(r)) valid_ranges++;
-      }
-      RCLCPP_INFO(this->get_logger(),
-                  "  LaserScan: %d/%d 有效 (%.1f%%)",
-                  valid_ranges, ranges_size, 100.0 * valid_ranges / ranges_size);
     }
 
     scan_pub_->publish(scan_msg);

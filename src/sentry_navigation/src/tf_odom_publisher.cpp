@@ -134,7 +134,7 @@ private:
         // 原来: livox_yaw_ - M_PI/2.0
         // 现在: livox_yaw_ - M_PI/2.0 + M_PI = livox_yaw_ + M_PI/2.0
         tf2::Quaternion q_lidar;
-        q_lidar.setRPY(livox_roll_, livox_pitch_, livox_yaw_ + M_PI/2.0);
+        q_lidar.setRPY(livox_roll_, livox_pitch_, livox_yaw_ - M_PI/2.0);
         
         static_transform.transform.rotation.x = q_lidar.x();
         static_transform.transform.rotation.y = q_lidar.y();
