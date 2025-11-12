@@ -64,10 +64,10 @@ public:
         RCLCPP_INFO(this->get_logger(), "====================================");
         RCLCPP_INFO(this->get_logger(), "串口通信节点初始化完成");
         RCLCPP_INFO(this->get_logger(), "  发送频率: %d Hz", send_freq);
-        RCLCPP_WARN(this->get_logger(), "坐标系转换:");
-        RCLCPP_WARN(this->get_logger(), "  Nav2输出(ROS系): vx=前进, vy=左移");
-        RCLCPP_WARN(this->get_logger(), "  底盘期望(车体系): vx=右移, vy=前进");
-        RCLCPP_WARN(this->get_logger(), "  转换: vx_chassis=-vy_ros, vy_chassis=vx_ros");
+        RCLCPP_WARN(this->get_logger(), "底盘控制:");
+        RCLCPP_WARN(this->get_logger(), "  输入: /cmd_vel (ROS标准坐标系)");
+        RCLCPP_WARN(this->get_logger(), "  输出: 直接转发，不做坐标转换");
+        RCLCPP_WARN(this->get_logger(), "  原因: 坐标转换已在 Controller 层完成");
         RCLCPP_INFO(this->get_logger(), "====================================");
     }
 
@@ -89,35 +89,17 @@ public:
     }
 
 private:
-    // ===== /cmd_vel 回调：ROS坐标系 → 车体坐标系 =====
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         
-        // Nav2 输出（ROS坐标系）
-        float vx_ros = static_cast<float>(msg->linear.x);   // 前进速度
-        float vy_ros = static_cast<float>(msg->linear.y);   // 左移速度
-        float vyaw_ros = static_cast<float>(msg->angular.z); // 旋转速度
-        
-        // 转换到车体坐标系（X=右，Y=前）
-        // ROS系 → 车体系: 绕Z轴旋转+90度（逆转换）
-        // vx_chassis = -vy_ros  (右移 = -左移)
-        // vy_chassis = vx_ros   (前进 = 前进)
-        current_vx_ = -vy_ros / 10.0;   // 车体X（右移）
-        current_vy_ = vx_ros / 10.0;    // 车体Y（前进）
-        current_vyaw_ = vyaw_ros / 25.0; // yaw不变
-        
-        // 周期性日志
-        auto now = this->now();
-        if ((now - last_log_time_).seconds() > 0.5) {
-            RCLCPP_DEBUG(this->get_logger(), 
-                "ROS系 [%.2f前, %.2f左] → 车体系 [%.2f右, %.2f前]",
-                vx_ros, vy_ros, current_vx_, current_vy_);
-            last_log_time_ = now;
-        }
+        // 直接使用ROS坐标系的值，不做转换
+        // 因为 Controller 输出的 /cmd_vel 已经是考虑了坐标系的
+        current_vx_ = static_cast<float>(msg->linear.x) / 10.0;
+        current_vy_ = static_cast<float>(msg->linear.y) / 10.0;
+        current_vyaw_ = static_cast<float>(msg->angular.z) / 25.0;
     }
 
-    // ===== 发送控制帧 =====
     void sendControlFrame()
     {
         NucControlFrame frame;
@@ -126,8 +108,8 @@ private:
         
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            frame.vx = current_vx_;    // 车体X（右移）
-            frame.vy = current_vy_;    // 车体Y（前进）
+            frame.vx = current_vx_;
+            frame.vy = current_vy_;
             frame.vyaw = current_vyaw_;
         }
         
@@ -150,7 +132,7 @@ private:
             if ((now - last_stats_time_).seconds() >= 1.0) {
                 double actual_freq = send_count_ / (now - last_stats_time_).seconds();
                 RCLCPP_INFO(this->get_logger(),
-                    "发送统计: %.1f Hz | 车体系: vx=%.2f(右) vy=%.2f(前) vyaw=%.2f",
+                    "发送: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f",
                     actual_freq, frame.vx, frame.vy, frame.vyaw);
                 send_count_ = 0;
                 last_stats_time_ = now;
@@ -170,8 +152,8 @@ private:
     rclcpp::TimerBase::SharedPtr control_timer_;
     
     std::mutex mutex_;
-    float current_vx_ = 0.0f;    // 车体X（右移）
-    float current_vy_ = 0.0f;    // 车体Y（前进）
+    float current_vx_ = 0.0f;
+    float current_vy_ = 0.0f;
     float current_vyaw_ = 0.0f;
     
     size_t send_count_ = 0;
