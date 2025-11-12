@@ -164,13 +164,13 @@ private:
             vehicleToROS(pose_x_, pose_y_, pose_z_, pose_qx_, pose_qy_, pose_qz_, pose_qw_,
                         x, y, z, qx, qy, qz, qw);
             
-            tf_odom.transform.translation.x = x;
-            tf_odom.transform.translation.y = y;
-            tf_odom.transform.translation.z = z;
-            tf_odom.transform.rotation.x = qx;
-            tf_odom.transform.rotation.y = qy;
-            tf_odom.transform.rotation.z = qz;
-            tf_odom.transform.rotation.w = qw;
+            tf_odom.transform.translation.x = 0;
+            tf_odom.transform.translation.y = 0;
+            tf_odom.transform.translation.z = 0;
+            tf_odom.transform.rotation.x = 0.0;
+            tf_odom.transform.rotation.y = 0.0;
+            tf_odom.transform.rotation.z = 0.0;
+            tf_odom.transform.rotation.w = 1.0;
         } else {
             tf_odom.transform.translation.x = 0;
             tf_odom.transform.translation.y = 0;
