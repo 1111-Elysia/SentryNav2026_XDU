@@ -100,7 +100,7 @@ private:
         // 雷达姿态：旋转180度
         tf2::Quaternion q;
         q.setRPY(0, 0, -M_PI/2.0);
-        tf.transform.rotation.x = q.x
+        tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
         tf.transform.rotation.w = q.w();
