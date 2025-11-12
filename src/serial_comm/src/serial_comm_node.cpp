@@ -111,9 +111,9 @@ private:
         std::lock_guard<std::mutex> lock(mutex_);
         
         // 提取速度数据
-        current_vx_ = static_cast<float>(msg->linear.x) / 5.0;   // 前后速度
-        current_vy_ = static_cast<float>(msg->linear.y) / 5.0;   // 左右速度
-        current_vyaw_ = static_cast<float>(msg->angular.z) / 20.0; // 旋转速度
+        current_vx_ = static_cast<float>(msg->linear.x) / 10.0;   // 前后速度
+        current_vy_ = static_cast<float>(msg->linear.y) / 10.0;   // 左右速度
+        current_vyaw_ = static_cast<float>(msg->angular.z) / 25.0; // 旋转速度
         
         // 周期性输出日志（节流到 2Hz）
         auto now = this->now();
