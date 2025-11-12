@@ -106,9 +106,9 @@ controller_server:
         critical_weight: 20.0             # 关键障碍物权重（很近的障碍）
         consider_footprint: true          # 考虑机器人轮廓
         collision_cost: 10000.0           # 碰撞代价
-        collision_margin_distance: 0.1    # 碰撞边界 (m)
-        near_goal_distance: 0.5           # 接近目标距离 (m)
-        inflation_radius: 0.55            # 膨胀半径 (m)
+        collision_margin_distance: 0.08    # 碰撞边界 (m)
+        near_goal_distance: 0.4           # 接近目标距离 (m)
+        inflation_radius: 0.45            # 膨胀半径 (m)
         cost_scaling_factor: 10.0         # 代价缩放因子
       
       PathAlignCritic:
@@ -167,14 +167,17 @@ local_costmap:
       width: 15                           # 地图宽度 (m) - 机器人周围15米
       height: 15                          # 地图高度 (m)
       resolution: 0.05                    # 地图分辨率 (m/cell) - 5cm精度
-      robot_radius: 0.30                  # 机器人半径 (m) - 根据实际车体调整！
+      # robot_radius: 0.25                  # 机器人半径 (m) - 根据实际车体调整！
+      footprint: "[[0.175, 0.175], [0.175, -0.175], [-0.175, -0.175], [-0.175, 0.175]]"
+      footprint_padding: 0.01
+      # 开了mppi只能用footprint参数，robot_radius无效
       plugins: ["voxel_layer", "inflation_layer"]  # 使用的层插件列表
 
       # ----- 膨胀层：在障碍物周围创建安全距离 -----
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"    # 膨胀层插件
         cost_scaling_factor: 3.0          # 代价衰减因子 - 越大衰减越慢
-        inflation_radius: 0.5             # 膨胀半径 (m) - 障碍物周围0.5米不可通行
+        inflation_radius: 0.35             # 膨胀半径 (m) - 障碍物周围0.35米不可通行
 
       # ----- 体素层：3D障碍物检测和清除 -----
       voxel_layer:
@@ -211,7 +214,9 @@ global_costmap:
       global_frame: map                   # 全局坐标系 - 在map系中构建
       robot_base_frame: base_link         # 机器人本体坐标系
       use_sim_time: false                  # 使用仿真时间
-      robot_radius: 0.30                  # 机器人半径 (m) - 必须与局部地图一致
+      # robot_radius: 0.25                  # 机器人半径 (m) - 必须与局部地图一致
+      footprint: "[[0.175, 0.175], [0.175, -0.175], [-0.175, -0.175], [-0.175, 0.175]]"
+      footprint_padding: 0.01
       resolution: 0.05                    # 地图分辨率 (m/cell)
       track_unknown_space: true           # 跟踪未知区域（用于探索）
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]  # 层插件列表
@@ -241,7 +246,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.5
+        inflation_radius: 0.35
 
       always_send_full_costmap: True      # 始终发布完整地图
 
