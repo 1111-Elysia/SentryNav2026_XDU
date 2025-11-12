@@ -47,8 +47,7 @@ private:
     auto scan = sensor_msgs::msg::LaserScan();
     scan.header.stamp = this->get_clock()->now();
     
-    // ===== frame_id 必须是 base_link =====
-    scan.header.frame_id = "map";
+    scan.header.frame_id = "base_link";
     
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;

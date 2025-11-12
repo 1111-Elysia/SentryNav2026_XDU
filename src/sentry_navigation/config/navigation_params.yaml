@@ -30,8 +30,8 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.15             # MPPI 可以更精确
-      yaw_goal_tolerance: 0.15            # ≈ 8.6度
+      xy_goal_tolerance: 0.3             # MPPI 可以更精确
+      yaw_goal_tolerance: 0.3            
 
     # ===== MPPI 控制器配置 =====
     FollowPath:
@@ -92,7 +92,7 @@ controller_server:
       GoalAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.0                  # 目标角度偏差代价
+        cost_weight: 5.0                  # 目标角度偏差代价
         threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
       
       PreferForwardCritic:
@@ -160,8 +160,8 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0               # 地图更新频率 (Hz)
-      publish_frequency: 2.0              # 地图发布频率 (Hz)
+      update_frequency: 20.0               # 地图更新频率 (Hz)
+      publish_frequency: 10.0              # 地图发布频率 (Hz)
       global_frame: odom                  # 全局坐标系 - 在odom系中构建
       robot_base_frame: base_link         # 机器人本体坐标系
       use_sim_time: True                  # 使用仿真时间
