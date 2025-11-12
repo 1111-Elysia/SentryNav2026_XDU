@@ -9,6 +9,7 @@ class LivoxToScanNode : public rclcpp::Node
 public:
   LivoxToScanNode() : Node("livox_to_scan_node")
   {
+    // 参数
     this->declare_parameter("min_height", -0.5);
     this->declare_parameter("max_height", 2.0);
     this->declare_parameter("angle_min", -M_PI);
@@ -28,31 +29,28 @@ public:
     range_max_ = this->get_parameter("range_max").as_double();
 
     cloud_sub_ = this->create_subscription<livox_ros_driver2::msg::CustomMsg>(
-        "/livox/lidar", 50,
+        "/livox/lidar", 10,
         std::bind(&LivoxToScanNode::cloudCallback, this, std::placeholders::_1));
 
-    scan_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>("/scan", 50);
+    scan_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>("/scan", 10);
 
     RCLCPP_INFO(this->get_logger(), "========================================");
-    RCLCPP_INFO(this->get_logger(), "Livox to Scan 启动");
-    RCLCPP_INFO(this->get_logger(), "  雷达系(X=右,Y=前) → ROS系(X=前,Y=左)");
-    RCLCPP_INFO(this->get_logger(), "  转换: 旋转-90度 + 翻转180度");
-    RCLCPP_INFO(this->get_logger(), "  frame_id: base_link");
+    RCLCPP_INFO(this->get_logger(), "Livox → LaserScan 启动");
+    RCLCPP_INFO(this->get_logger(), "坐标: 车体X=右,Y=前,Z=上 → ROS X=前,Y=左,Z=上");
+    RCLCPP_INFO(this->get_logger(), "frame_id: base_link");
     RCLCPP_INFO(this->get_logger(), "========================================");
   }
 
 private:
   void cloudCallback(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg)
   {
-    auto scan = sensor_msgs::msg::LaserScan();
+    sensor_msgs::msg::LaserScan scan;
     scan.header.stamp = this->get_clock()->now();
-    
-    scan.header.frame_id = "livox_frame";
-    
+    scan.header.frame_id = "base_link"; // 固定在机器人主坐标系
+
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;
     scan.angle_increment = angle_increment_;
-    scan.time_increment = 0.0;
     scan.scan_time = scan_time_;
     scan.range_min = range_min_;
     scan.range_max = range_max_;
@@ -61,35 +59,31 @@ private:
     scan.ranges.assign(size, std::numeric_limits<float>::infinity());
     scan.intensities.assign(size, 0.0);
 
-    for (const auto& pt : msg->points)
+    for (const auto &pt : msg->points)
     {
-      // 雷达坐标系: X=右, Y=前
-      float x_lidar = pt.x;
-      float y_lidar = pt.y;
-      float z_lidar = pt.z;
+      // Livox 点云在车体系下：X=右, Y=前, Z=上
+      float x_v = pt.x;
+      float y_v = pt.y;
+      float z_v = pt.z;
 
-      if (z_lidar < min_height_ || z_lidar > max_height_) continue;
+      if (z_v < min_height_ || z_v > max_height_)
+        continue;
 
-      // ===== 完整转换到 base_link (ROS系: X=前, Y=左) =====
-      // 步骤1: 旋转180度（因为雷达坐标系反了）
-      float x_flipped = -x_lidar;
-      float y_flipped = -y_lidar;
-      
-      // 步骤2: 旋转-90度 (车体系 → ROS系)
-      // [X_ros]   [ 0  1] [X_flipped]   [ Y_flipped]
-      // [Y_ros] = [-1  0] [Y_flipped] = [-X_flipped]
-      float x_ros = y_flipped;
-      float y_ros = -x_flipped;
+      // === 转到 ROS 坐标 ===
+      // 绕Z轴旋转 -90°: (x_ros = y_v, y_ros = -x_v)
+      float x_ros = y_v;
+      float y_ros = -x_v;
 
-      float range = std::sqrt(x_ros*x_ros + y_ros*y_ros);
-      if (range < range_min_ || range > range_max_) continue;
+      float range = std::sqrt(x_ros * x_ros + y_ros * y_ros);
+      if (range < range_min_ || range > range_max_)
+        continue;
 
-      // 在ROS坐标系下计算角度
       float angle = std::atan2(y_ros, x_ros);
-      if (angle < angle_min_ || angle > angle_max_) continue;
+      if (angle < angle_min_ || angle > angle_max_)
+        continue;
 
-      int idx = std::round((angle - angle_min_) / angle_increment_);
-      if (idx >= 0 && idx < (int)size)
+      int idx = static_cast<int>((angle - angle_min_) / angle_increment_);
+      if (idx >= 0 && idx < static_cast<int>(size))
       {
         if (range < scan.ranges[idx])
         {
@@ -102,13 +96,16 @@ private:
     scan_pub_->publish(scan);
   }
 
+  // 成员变量
   rclcpp::Subscription<livox_ros_driver2::msg::CustomMsg>::SharedPtr cloud_sub_;
   rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_pub_;
-  double min_height_, max_height_, angle_min_, angle_max_;
-  double angle_increment_, scan_time_, range_min_, range_max_;
+  double min_height_, max_height_;
+  double angle_min_, angle_max_;
+  double angle_increment_, scan_time_;
+  double range_min_, range_max_;
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<LivoxToScanNode>());
