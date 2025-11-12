@@ -18,7 +18,7 @@ def generate_launch_description():
     map_yaml_file = LaunchConfiguration('map', 
         default=os.path.join('./data/new_map', 'map.yaml'))
     params_file = LaunchConfiguration('params_file',
-        default=os.path.join(sentry_nav_dir, 'config', 'nav2_params.yaml'))
+        default=os.path.join(sentry_nav_dir, 'config', 'navigation_params.yaml'))
     rviz_config_file = LaunchConfiguration('rviz_config',
         default=os.path.join(sentry_nav_dir, 'config', 'nav2_default_view.rviz'))
 

@@ -12,7 +12,7 @@ find_package(std_msgs REQUIRED)
 
 include_directories(include)
 
-add_executable(serial_comm_node src/serial_comm_node.cpp src/serial_port.cpp)
+add_executable(serial_comm_node src/serial_comm_node.cpp)
 ament_target_dependencies(serial_comm_node
   rclcpp
   geometry_msgs

@@ -6,108 +6,151 @@
 #     ... (已注释掉，不使用粒子滤波定位)
 
 # =======================================================================================
-# Controller Server (控制器服务器) - 负责根据全局路径生成速度命令
+# Controller Server (控制器服务器) - 使用 MPPI 控制器
 # =======================================================================================
 controller_server:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间（实际部署改为 False）
-    controller_frequency: 20.0            # 控制器运行频率 (Hz)，决定 /cmd_vel 发布频率
+    use_sim_time: False
+    controller_frequency: 60.0            # MPPI 推荐更高频率 (Hz)
     
-    # ===== 速度阈值：低于此值认为机器人已停止 =====
-    min_x_velocity_threshold: 0.001       # X方向最小速度阈值 (m/s)
-    min_y_velocity_threshold: 0.001       # Y方向最小速度阈值 (m/s) - 全向轮关键参数
-    min_theta_velocity_threshold: 0.001   # 旋转最小速度阈值 (rad/s)
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
     
-    # ===== 容错和检查插件配置 =====
-    failure_tolerance: 0.3                # 允许的失败容忍度（控制周期数）
-    progress_checker_plugin: "progress_checker"           # 进度检查插件名称
-    goal_checker_plugins: ["general_goal_checker"]        # 目标到达检查插件列表
-    controller_plugins: ["FollowPath"]                    # 控制器插件列表
+    failure_tolerance: 0.3
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]    # 使用 MPPI
 
-    # ----- 进度检查器：检测机器人是否卡住 -----
     progress_checker:
-      plugin: "nav2_controller::SimpleProgressChecker"    # 简单进度检查器插件
-      required_movement_radius: 0.5       # 要求的最小移动半径 (m)
-      movement_time_allowance: 10.0       # 允许的最大静止时间 (s)
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
 
-    # ----- 目标检查器：判断是否到达目标点 -----
     general_goal_checker:
-      stateful: True                      # 有状态检查（记录历史）
-      plugin: "nav2_controller::SimpleGoalChecker"        # 简单目标检查器
-      xy_goal_tolerance: 0.3              # XY平面位置容差 (m) - 全向轮精度更高
-      yaw_goal_tolerance: 0.25            # 角度容差 (rad) ≈ 14度
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.15             # MPPI 可以更精确
+      yaw_goal_tolerance: 0.15            # ≈ 8.6度
 
-    # ===== DWB 局部路径规划器：全向轮专用配置 =====
+    # ===== MPPI 控制器配置 =====
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"               # DWB 动态窗口方法规划器
-      debug_trajectory_details: True      # 输出详细的轨迹调试信息
+      plugin: "nav2_mppi_controller::MPPIController"  # ← 关键修改
       
-      # ----- 速度限制（全向轮运动学） -----
-      min_vel_x: -1.0                     # X方向最小速度 (m/s) - 负值允许后退
-      min_vel_y: -1.0                     # Y方向最小速度 (m/s) - 负值允许左移
-      max_vel_x: 1.0                      # X方向最大速度 (m/s) - 前进上限
-      max_vel_y: 1.0                      # Y方向最大速度 (m/s) - 横移上限 ← 全向轮关键！
-      max_vel_theta: 2.0                  # 最大旋转速度 (rad/s) ≈ 115度/秒
+      # ----- 基本参数 -----
+      time_steps: 56                      # 预测时间步数（越多越精确但计算量大）
+      model_dt: 0.05                      # 模型时间步长 (s) = 50ms
+      batch_size: 2000                    # 采样轨迹数量（越多越优但计算量大）
       
-      min_speed_xy: 0.0                   # XY平面最小合成速度 (m/s)
-      max_speed_xy: 1.0                   # XY平面最大合成速度 (m/s) - 限制总速度
-      min_speed_theta: 0.0                # 最小旋转速度 (rad/s)
+      # 总预测时长 = time_steps × model_dt = 56 × 0.05 = 2.8秒
       
-      # ----- 加速度限制（全向轮动力学） -----
-      acc_lim_x: 2.0                      # X方向最大加速度 (m/s²)
-      acc_lim_y: 2.0                      # Y方向最大加速度 (m/s²) ← 全向轮关键！
-      acc_lim_theta: 3.2                  # 最大角加速度 (rad/s²)
+      # ----- 速度限制（全向轮） -----
+      vx_std: 0.2                         # X速度标准差（采样范围）
+      vy_std: 0.2                         # Y速度标准差 ← 全向轮关键
+      wz_std: 0.4                         # 角速度标准差
       
-      decel_lim_x: -2.0                   # X方向最大减速度 (m/s²) - 负值表示减速
-      decel_lim_y: -2.0                   # Y方向最大减速度 (m/s²) ← 全向轮关键！
-      decel_lim_theta: -3.2               # 最大角减速度 (rad/s²)
+      vx_max: 1.0                         # X最大速度 (m/s)
+      vx_min: -1.0                        # X最小速度 (m/s)
+      vy_max: 1.0                         # Y最大速度 (m/s) ← 全向轮
+      wz_max: 2.0                         # 最大角速度 (rad/s)
       
-      # ----- 速度空间采样（决定轨迹搜索精度） -----
-      vx_samples: 20                      # X方向速度采样点数 - 越多越精细但计算量大
-      vy_samples: 20                      # Y方向速度采样点数 ← 全向轮必须>10！
-      vtheta_samples: 20                  # 旋转速度采样点数
+      # ----- 加速度限制 -----
+      ax_max: 2.0                         # X最大加速度 (m/s²)
+      ax_min: -2.0                        # X最大减速度 (m/s²)
+      ay_max: 2.0                         # Y最大加速度 (m/s²) ← 全向轮
+      az_max: 3.2                         # 最大角加速度 (rad/s²)
       
-      # ----- 轨迹仿真参数 -----
-      sim_time: 1.5                       # 轨迹前瞻仿真时长 (s) - 预测未来1.5秒
-      linear_granularity: 0.05            # 轨迹点间线性间距 (m) - 越小越平滑
-      angular_granularity: 0.025          # 轨迹点间角度间距 (rad)
+      # ----- 代价函数权重（决定行为） -----
+      # 这些权重需要根据实际情况调整
+      motion_model: "Omni"                # 运动模型：Omni = 全向轮 ⭐关键
       
-      # ----- 容差和性能参数 -----
-      transform_tolerance: 0.2            # TF变换容忍延迟 (s)
-      xy_goal_tolerance: 0.3              # 到达目标的XY容差 (m)
-      trans_stopped_velocity: 0.1         # 认为平移已停止的速度阈值 (m/s)
-      short_circuit_trajectory_evaluation: True  # 提前终止评估（性能优化）
-      stateful: True                      # 有状态规划（记忆上次状态）
-      
-      # ===== 轨迹评分函数（Critics）：决定选择哪条轨迹 =====
       critics: [
-        "RotateToGoal",       # 评估转向目标的效率
-        "Oscillation",        # 惩罚震荡（左右摇摆）
-        "BaseObstacle",       # 基础障碍物避障
-        "GoalAlign",          # 评估与目标点的对齐度
-        "PathAlign",          # 评估与全局路径的对齐度
-        "PathDist",           # 评估距离全局路径的远近
-        "GoalDist",           # 评估距离目标点的远近
-        "ObstacleFootprint"   # 精确车体轮廓避障 ← 全向轮推荐
+        "ConstraintCritic",               # 约束评分（速度/加速度限制）
+        "ObstaclesCritic",                # 障碍物评分
+        "GoalCritic",                     # 目标评分
+        "GoalAngleCritic",                # 目标角度评分
+        "PathAlignCritic",                # 路径对齐评分
+        "PathFollowCritic",               # 路径跟随评分
+        "PathAngleCritic",                # 路径角度评分
+        "PreferForwardCritic",            # 前进偏好评分
       ]
       
-      # ----- 各评分函数的权重 -----
-      BaseObstacle.scale: 0.02            # 障碍物代价权重
-      PathAlign.scale: 32.0               # 路径对齐权重（越高越倾向跟随路径）
-      PathAlign.forward_point_distance: 0.325  # 前向参考点距离 (m)
-      GoalAlign.scale: 24.0               # 目标对齐权重
-      GoalAlign.forward_point_distance: 0.325  # 前向参考点距离 (m)
-      PathDist.scale: 32.0                # 路径距离权重
-      GoalDist.scale: 24.0                # 目标距离权重
-      RotateToGoal.scale: 32.0            # 转向目标权重
-      RotateToGoal.slowing_factor: 5.0    # 接近目标时的减速因子
-      RotateToGoal.lookahead_time: -1.0   # 前瞻时间（-1表示自动）
+      # ----- 各评分权重 -----
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.0                  # 约束违反的惩罚
       
-      # ===== 全向轮特有配置 =====
-      prefer_forward: false               # 不强制前进 ← 允许倒退和横移！
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0                  # 距离目标的代价
+        threshold_to_consider: 1.4        # 考虑目标的距离阈值 (m)
       
-      # ----- 轨迹生成器 -----
-      trajectory_generator_name: "dwb_plugins::LimitedAccelGenerator"  # 限制加速度的轨迹生成器
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0                  # 目标角度偏差代价
+        threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
+      
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0                  # 前进偏好权重
+        threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
+      
+      ObstaclesCritic:
+        enabled: true
+        cost_power: 1
+        repulsion_weight: 1.5             # 障碍物排斥权重
+        critical_weight: 20.0             # 关键障碍物权重（很近的障碍）
+        consider_footprint: true          # 考虑机器人轮廓
+        collision_cost: 10000.0           # 碰撞代价
+        collision_margin_distance: 0.1    # 碰撞边界 (m)
+        near_goal_distance: 0.5           # 接近目标距离 (m)
+        inflation_radius: 0.55            # 膨胀半径 (m)
+        cost_scaling_factor: 10.0         # 代价缩放因子
+      
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 14.0                 # 路径对齐权重
+        max_path_occupancy_ratio: 0.05    # 最大路径占用率
+        trajectory_point_step: 3          # 轨迹点步长
+        threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
+        offset_from_furthest: 20          # 从最远点的偏移
+        use_path_orientations: false      # 不使用路径方向
+      
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0                  # 路径跟随权重
+        offset_from_furthest: 5           # 从最远点的偏移
+        threshold_to_consider: 1.4        # 考虑的距离阈值 (m)
+      
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 2.0                  # 路径角度权重
+        offset_from_furthest: 4           # 从最远点的偏移
+        threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
+        max_angle_to_furthest: 1.0        # 最大角度 (rad)
+        mode: 0                           # 模式：0=前向，1=偏好前向，2=无偏好
+      
+      # ----- 噪声生成器 -----
+      # MPPI 使用随机采样生成轨迹
+      temperature: 0.3                    # 温度参数（越小越贪婪，越大越探索）
+      gamma: 0.015                        # 折扣因子
+      
+      # ----- 可视化（调试用）-----
+      visualize: false                    # 是否可视化采样轨迹（影响性能）
+      
+      # ----- TF 参数 -----
+      transform_tolerance: 0.1            # TF容差 (s)
+      
+      # ----- 全向轮特定优化 -----
+      # MPPI 会自动利用全向轮的横向移动能力
+      # motion_model: "Omni" 已启用
 
 # =======================================================================================
 # Local Costmap (局部代价地图) - 用于避障和局部路径规划
@@ -167,7 +210,7 @@ global_costmap:
       publish_frequency: 1.0              # 地图发布频率 (Hz)
       global_frame: map                   # 全局坐标系 - 在map系中构建
       robot_base_frame: base_link         # 机器人本体坐标系
-      use_sim_time: True                  # 使用仿真时间
+      use_sim_time: false                  # 使用仿真时间
       robot_radius: 0.30                  # 机器人半径 (m) - 必须与局部地图一致
       resolution: 0.05                    # 地图分辨率 (m/cell)
       track_unknown_space: true           # 跟踪未知区域（用于探索）
@@ -207,7 +250,7 @@ global_costmap:
 # =======================================================================================
 map_server:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     yaml_filename: ""                     # 地图YAML文件路径（由launch文件传入）
 
 # =======================================================================================
@@ -216,7 +259,7 @@ map_server:
 planner_server:
   ros__parameters:
     expected_planner_frequency: 20.0      # 期望的规划频率 (Hz)
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     planner_plugins: ["GridBased"]        # 规划器插件列表
 
     # ----- NavFn 规划器：基于Dijkstra/A*的网格规划器 -----
@@ -238,7 +281,7 @@ planner_server:
 # =======================================================================================
 smoother_server:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     smoother_plugins: ["simple_smoother"] # 平滑器插件列表
 
     # ----- 简单平滑器：基于优化的路径平滑 -----
@@ -259,8 +302,8 @@ behavior_server:
     
     # ===== 行为插件列表 =====
     behavior_plugins: [
-      "spin",              # 原地旋转
-      "backup",            # 后退
+      # "spin",              # 原地旋转
+      # "backup",            # 后退
       "drive_on_heading",  # 沿固定方向前进
       "strafe",            # 横向移动 ← 全向轮特有
       "assisted_teleop",   # 辅助手动控制
@@ -268,10 +311,10 @@ behavior_server:
     ]
 
     # ----- 各行为插件配置 -----
-    spin:
-      plugin: "nav2_behaviors/Spin"                  # 原地旋转行为
-    backup:
-      plugin: "nav2_behaviors/BackUp"                # 后退行为
+    # spin:
+    #   plugin: "nav2_behaviors/Spin"                  # 原地旋转行为
+    # backup:
+    #   plugin: "nav2_behaviors/BackUp"                # 后退行为
     drive_on_heading:
       plugin: "nav2_behaviors/DriveOnHeading"        # 定向行驶行为
     strafe:
@@ -285,7 +328,7 @@ behavior_server:
     global_frame: odom                    # 全局坐标系
     robot_base_frame: base_link           # 机器人坐标系
     transform_tolerance: 0.1              # TF变换容差 (s)
-    use_sim_time: true                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     simulate_ahead_time: 2.0              # 前瞻仿真时间 (s)
     max_rotational_vel: 1.0               # 最大旋转速度 (rad/s)
     min_rotational_vel: 0.4               # 最小旋转速度 (rad/s)
@@ -296,10 +339,10 @@ behavior_server:
 # =======================================================================================
 velocity_smoother:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: False                    # 使用仿真时间
     smoothing_frequency: 20.0             # 平滑频率 (Hz)
     scale_velocities: False               # 不按比例缩放速度
-    feedback: "OPEN_LOOP"                 # 开环反馈（不依赖里程计）
+    feedback: "CLOSED_LOOP"                 # 闭环反馈（依赖里程计）
     
     # ===== 全向轮速度限制 [vx, vy, vtheta] =====
     max_velocity: [1.0, 1.0, 2.0]         # 最大速度 [m/s, m/s, rad/s]
@@ -318,7 +361,7 @@ velocity_smoother:
 # =======================================================================================
 waypoint_follower:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     loop_rate: 20                         # 循环频率 (Hz)
     stop_on_failure: false                # 失败时不停止（继续下一个点）
     waypoint_task_executor_plugin: "wait_at_waypoint"  # 到达路径点后的任务
@@ -336,7 +379,7 @@ waypoint_follower:
 # ----- 导航栈生命周期管理器 -----
 lifecycle_manager_navigation:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     autostart: True                       # 自动启动所有节点
     node_names: [                         # 管理的节点列表
       'controller_server',                # 控制器服务器
@@ -350,7 +393,7 @@ lifecycle_manager_navigation:
 # ----- 定位栈生命周期管理器 -----
 lifecycle_manager_localization:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
     autostart: True                       # 自动启动
     node_names: ['map_server']            # 只管理地图服务器（AMCL已移除）
 
@@ -359,4 +402,4 @@ lifecycle_manager_localization:
 # =======================================================================================
 robot_state_publisher:
   ros__parameters:
-    use_sim_time: True                    # 使用仿真时间
+    use_sim_time: false                    # 使用仿真时间
