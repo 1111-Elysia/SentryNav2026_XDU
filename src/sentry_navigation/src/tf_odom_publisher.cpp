@@ -99,7 +99,7 @@ private:
         
         // 雷达姿态：旋转180度
         tf2::Quaternion q;
-        q.setRPY(0, 0, M_PI);
+        q.setRPY(0, 0, 0);
         tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
@@ -108,7 +108,7 @@ private:
         static_tf_broadcaster_->sendTransform(tf);
         
         RCLCPP_INFO(this->get_logger(), 
-            "静态TF: base_link→livox_frame + 180度旋转");
+            "静态TF: base_link→livox_frame");
     }
 
     void fastlioCallback(const nav_msgs::msg::Odometry::SharedPtr msg)

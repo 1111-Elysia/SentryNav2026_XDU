@@ -35,8 +35,9 @@ public:
 
     RCLCPP_INFO(this->get_logger(), "========================================");
     RCLCPP_INFO(this->get_logger(), "Livox to Scan 启动");
-    RCLCPP_INFO(this->get_logger(), "  雷达坐标系旋转180度修正");
-    RCLCPP_INFO(this->get_logger(), "  frame_id: livox_frame (通过TF变换)");
+    RCLCPP_INFO(this->get_logger(), "  雷达系(X=右,Y=前) → ROS系(X=前,Y=左)");
+    RCLCPP_INFO(this->get_logger(), "  转换: 旋转-90度 + 翻转180度");
+    RCLCPP_INFO(this->get_logger(), "  frame_id: base_link");
     RCLCPP_INFO(this->get_logger(), "========================================");
   }
 
@@ -46,8 +47,8 @@ private:
     auto scan = sensor_msgs::msg::LaserScan();
     scan.header.stamp = this->get_clock()->now();
     
-    // ===== 使用 livox_frame，让 TF 树处理坐标变换 =====
-    scan.header.frame_id = "livox_frame";
+    // ===== frame_id 必须是 base_link =====
+    scan.header.frame_id = "base_link";
     
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;
@@ -63,17 +64,29 @@ private:
 
     for (const auto& pt : msg->points)
     {
-      // ===== 雷达坐标旋转180度修正 =====
-      float x = -pt.x;
-      float y = -pt.y;
-      float z = pt.z;
+      // 雷达坐标系: X=右, Y=前
+      float x_lidar = pt.x;
+      float y_lidar = pt.y;
+      float z_lidar = pt.z;
 
-      if (z < min_height_ || z > max_height_) continue;
+      if (z_lidar < min_height_ || z_lidar > max_height_) continue;
 
-      float range = std::sqrt(x*x + y*y);
+      // ===== 完整转换到 base_link (ROS系: X=前, Y=左) =====
+      // 步骤1: 旋转180度（因为雷达坐标系反了）
+      float x_flipped = -x_lidar;
+      float y_flipped = -y_lidar;
+      
+      // 步骤2: 旋转-90度 (车体系 → ROS系)
+      // [X_ros]   [ 0  1] [X_flipped]   [ Y_flipped]
+      // [Y_ros] = [-1  0] [Y_flipped] = [-X_flipped]
+      float x_ros = y_flipped;
+      float y_ros = -x_flipped;
+
+      float range = std::sqrt(x_ros*x_ros + y_ros*y_ros);
       if (range < range_min_ || range > range_max_) continue;
 
-      float angle = std::atan2(y, x);
+      // 在ROS坐标系下计算角度
+      float angle = std::atan2(y_ros, x_ros);
       if (angle < angle_min_ || angle > angle_max_) continue;
 
       int idx = std::round((angle - angle_min_) / angle_increment_);
