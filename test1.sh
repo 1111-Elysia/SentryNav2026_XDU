@@ -26,7 +26,14 @@ echo -e "${YELLOW}使用地图: $MAP_YAML${NC}"
 echo ""
 
 # ===== 启动节点 =====
-echo -e "${GREEN}[1/6] 启动 Lightning-LM 定位节点...${NC}"
+echo -e "${GREEN}[1/7] 启动 Livox MID360 雷达驱动...${NC}"
+gnome-terminal --title="Livox-Driver" -- bash -c "$SOURCE_CMD && \
+    ros2 launch livox_ros_driver2 msg_MID360_launch.py; \
+    exec bash"
+
+sleep 3  # 等待雷达初始化
+
+echo -e "${GREEN}[2/7] 启动 Lightning-LM 定位节点...${NC}"
 gnome-terminal --title="Lightning-LM" -- bash -c "$SOURCE_CMD && \
     ros2 run lightning run_loc_online \
     --config ./src/lightning-lm/config/default_nclt.yaml; \
@@ -34,14 +41,14 @@ gnome-terminal --title="Lightning-LM" -- bash -c "$SOURCE_CMD && \
 
 sleep 2
 
-echo -e "${GREEN}[2/6] 启动 Fast-LIO (用于速度估计)...${NC}"
+echo -e "${GREEN}[3/7] 启动 Fast-LIO (用于速度估计)...${NC}"
 gnome-terminal --title="Fast-LIO" -- bash -c "$SOURCE_CMD && \
     ros2 launch fast_lio mapping.launch.py; \
     exec bash"
 
 sleep 2
 
-echo -e "${GREEN}[3/6] 启动 TF & Odom 发布节点...${NC}"
+echo -e "${GREEN}[4/7] 启动 TF & Odom 发布节点...${NC}"
 gnome-terminal --title="TF-Odom-Publisher" -- bash -c "$SOURCE_CMD && \
     ros2 run sentry_navigation tf_odom_publisher \
     --ros-args \
@@ -56,7 +63,7 @@ gnome-terminal --title="TF-Odom-Publisher" -- bash -c "$SOURCE_CMD && \
 
 sleep 1
 
-echo -e "${GREEN}[4/6] 启动 Livox 转 LaserScan 节点...${NC}"
+echo -e "${GREEN}[5/7] 启动 Livox 转 LaserScan 节点...${NC}"
 gnome-terminal --title="Livox-to-Scan" -- bash -c "$SOURCE_CMD && \
     ros2 run livox_to_scan livox_to_scan_node \
     --ros-args \
@@ -65,14 +72,14 @@ gnome-terminal --title="Livox-to-Scan" -- bash -c "$SOURCE_CMD && \
 
 sleep 1
 
-echo -e "${GREEN}[5/6] 启动 USB 串口通信节点...${NC}"
+echo -e "${GREEN}[6/7] 启动 USB 串口通信节点...${NC}"
 gnome-terminal --title="USB-Serial-Comm" -- bash -c "$SOURCE_CMD && \
     ros2 launch serial_comm serial_comm.launch.py; \
     exec bash"
 
 sleep 2
 
-echo -e "${GREEN}[6/6] 启动导航栈和 RViz...${NC}"
+echo -e "${GREEN}[7/7] 启动导航栈和 RViz...${NC}"
 gnome-terminal --title="Navigation-Stack" -- bash -c "$SOURCE_CMD && \
     ros2 launch sentry_navigation navigation_launch.py \
     map:='$MAP_YAML' \
@@ -88,6 +95,9 @@ echo ""
 
 # ===== 系统架构说明 =====
 echo -e "${YELLOW}系统架构:${NC}"
+echo -e "  ${GREEN}[硬件驱动]${NC}"
+echo -e "    • Livox MID360  → 点云数据发布"
+echo -e ""
 echo -e "  ${GREEN}[定位]${NC}"
 echo -e "    • Lightning-LM   → map→odom (视觉重定位)"
 echo -e "    • TF Publisher   → odom→base_link (单位变换)"
@@ -107,13 +117,21 @@ echo -e ""
 
 # ===== 数据流说明 =====
 echo -e "${YELLOW}数据流:${NC}"
+echo -e "  ${GREEN}硬件层:${NC} Livox MID360 → /livox/lidar (点云)"
 echo -e "  ${GREEN}TF 树:${NC} map → odom → base_link → livox_frame"
 echo -e "  ${GREEN}/odom:${NC} pose=[0,0,0], twist=Fast-LIO"
+echo -e "  ${GREEN}/scan:${NC} livox_to_scan 转换的2D激光"
 echo -e "  ${GREEN}/cmd_vel:${NC} Nav2 → USB Serial → 底盘电机"
 echo ""
 
 # ===== 验证命令 =====
 echo -e "${YELLOW}验证命令:${NC}"
+echo ""
+echo -e "  ${GREEN}0. 检查 Livox 雷达数据:${NC}"
+echo -e "     ros2 topic list | grep livox"
+echo -e "     ros2 topic echo /livox/lidar --once"
+echo -e "     ros2 topic hz /livox/lidar"
+echo -e "     ${YELLOW}# 应该看到点云数据${NC}"
 echo ""
 echo -e "  ${GREEN}1. 查看 TF 树:${NC}"
 echo -e "     ros2 run tf2_tools view_frames && evince frames.pdf"
@@ -130,11 +148,12 @@ echo -e "     ros2 topic echo /cmd_vel"
 echo -e "     ${YELLOW}# Nav2 输出的速度命令 (含 vx, vy, vtheta)${NC}"
 echo ""
 echo -e "  ${GREEN}5. 监控各组件频率:${NC}"
-echo -e "     ros2 topic hz /tf          ${YELLOW}# 应约 50Hz (tf_odom_publisher)${NC}"
-echo -e "     ros2 topic hz /odom        ${YELLOW}# 应约 50Hz${NC}"
+echo -e "     ros2 topic hz /livox/lidar ${YELLOW}# Livox 点云${NC}"
+echo -e "     ros2 topic hz /tf          ${YELLOW}# (tf_odom_publisher)${NC}"
+echo -e "     ros2 topic hz /odom        ${YELLOW}# ${NC}"
 echo -e "     ros2 topic hz /Odometry    ${YELLOW}# Fast-LIO 输出${NC}"
 echo -e "     ros2 topic hz /scan        ${YELLOW}# 激光扫描数据${NC}"
-echo -e "     ros2 topic hz /cmd_vel     ${YELLOW}# 应约 20Hz (controller)${NC}"
+echo -e "     ros2 topic hz /cmd_vel     ${YELLOW}# 应约 (controller)${NC}"
 echo ""
 echo -e "  ${GREEN}6. 查看所有节点:${NC}"
 echo -e "     ros2 node list"
@@ -146,8 +165,9 @@ echo ""
 # ===== 调试命令 =====
 echo -e "${YELLOW}调试命令:${NC}"
 echo ""
-echo -e "  ${GREEN}查看 USB 串口通信状态:${NC}"
-echo -e "     ros2 topic echo /serial_status    ${YELLOW}# 如果有此话题${NC}"
+echo -e "  ${GREEN}检查 Livox 雷达连接:${NC}"
+echo -e "     ros2 topic info /livox/lidar"
+echo -e "     ${YELLOW}# 应该显示点云数据类型和发布者${NC}"
 echo ""
 echo -e "  ${GREEN}手动发送测试速度:${NC}"
 echo -e "     ros2 topic pub /cmd_vel geometry_msgs/Twist \\"

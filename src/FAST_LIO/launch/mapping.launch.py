@@ -19,8 +19,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     config_path = LaunchConfiguration('config_path')
     config_file = LaunchConfiguration('config_file')
-    rviz_use = LaunchConfiguration('rviz')
-    rviz_cfg = LaunchConfiguration('rviz_cfg')
+    # rviz_use = LaunchConfiguration('rviz')  # ← 注释掉
+    # rviz_cfg = LaunchConfiguration('rviz_cfg')  # ← 注释掉
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         'use_sim_time', default_value='false',
@@ -34,14 +34,14 @@ def generate_launch_description():
         'config_file', default_value='mid360.yaml',
         description='Config file'
     )
-    declare_rviz_cmd = DeclareLaunchArgument(
-        'rviz', default_value='true',
-        description='Use RViz to monitor results'
-    )
-    declare_rviz_config_path_cmd = DeclareLaunchArgument(
-        'rviz_cfg', default_value=default_rviz_config_path,
-        description='RViz config file path'
-    )
+    # declare_rviz_cmd = DeclareLaunchArgument(  # ← 注释掉
+    #     'rviz', default_value='true',
+    #     description='Use RViz to monitor results'
+    # )
+    # declare_rviz_config_path_cmd = DeclareLaunchArgument(  # ← 注释掉
+    #     'rviz_cfg', default_value=default_rviz_config_path,
+    #     description='RViz config file path'
+    # )
 
     fast_lio_node = Node(
         package='fast_lio',
@@ -50,21 +50,23 @@ def generate_launch_description():
                     {'use_sim_time': use_sim_time}],
         output='screen'
     )
-    rviz_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        arguments=['-d', rviz_cfg],
-        condition=IfCondition(rviz_use)
-    )
+    
+    # ===== RViz 节点已禁用 =====
+    # rviz_node = Node(
+    #     package='rviz2',
+    #     executable='rviz2',
+    #     arguments=['-d', rviz_cfg],
+    #     condition=IfCondition(rviz_use)
+    # )
 
     ld = LaunchDescription()
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_config_path_cmd)
     ld.add_action(decalre_config_file_cmd)
-    ld.add_action(declare_rviz_cmd)
-    ld.add_action(declare_rviz_config_path_cmd)
+    # ld.add_action(declare_rviz_cmd)  # ← 注释掉
+    # ld.add_action(declare_rviz_config_path_cmd)  # ← 注释掉
 
     ld.add_action(fast_lio_node)
-    ld.add_action(rviz_node)
+    # ld.add_action(rviz_node)  # ← 注释掉
 
     return ld
