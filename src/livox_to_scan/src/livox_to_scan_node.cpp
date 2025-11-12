@@ -17,10 +17,6 @@ public:
     this->declare_parameter("scan_time", 0.1);
     this->declare_parameter("range_min", 0.1);
     this->declare_parameter("range_max", 100.0);
-    this->declare_parameter("input_topic", "/livox/lidar");
-    this->declare_parameter("output_topic", "/scan");
-    this->declare_parameter("queue_size", 50);
-    this->declare_parameter("debug_points", 10);
 
     min_height_ = this->get_parameter("min_height").as_double();
     max_height_ = this->get_parameter("max_height").as_double();
@@ -30,78 +26,71 @@ public:
     scan_time_ = this->get_parameter("scan_time").as_double();
     range_min_ = this->get_parameter("range_min").as_double();
     range_max_ = this->get_parameter("range_max").as_double();
-    input_topic_ = this->get_parameter("input_topic").as_string();
-    output_topic_ = this->get_parameter("output_topic").as_string();
-    queue_size_ = this->get_parameter("queue_size").as_int();
-    debug_points_ = this->get_parameter("debug_points").as_int();
 
     cloud_sub_ = this->create_subscription<livox_ros_driver2::msg::CustomMsg>(
-        input_topic_, queue_size_,
+        "/livox/lidar", 50,
         std::bind(&LivoxToScanNode::cloudCallback, this, std::placeholders::_1));
 
-    scan_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>(output_topic_, queue_size_);
+    scan_pub_ = this->create_publisher<sensor_msgs::msg::LaserScan>("/scan", 50);
 
-    RCLCPP_INFO(this->get_logger(), "============================================");
-    RCLCPP_INFO(this->get_logger(), "Livox to Scan 节点已启动");
-    RCLCPP_WARN(this->get_logger(), "  不转换坐标！直接使用雷达原始坐标系");
-    RCLCPP_WARN(this->get_logger(), "  frame_id = livox_frame");
-    RCLCPP_INFO(this->get_logger(), "============================================");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "Livox to Scan 启动");
+    RCLCPP_INFO(this->get_logger(), "  雷达坐标系: X=右, Y=前 (与车体系相同)");
+    RCLCPP_INFO(this->get_logger(), "  frame_id: livox_frame (通过TF变换到map)");
+    RCLCPP_INFO(this->get_logger(), "========================================");
   }
 
 private:
-  void cloudCallback(const livox_ros_driver2::msg::CustomMsg::SharedPtr livox_msg)
+  void cloudCallback(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg)
   {
-    auto scan_msg = sensor_msgs::msg::LaserScan();
-    scan_msg.header.stamp = this->get_clock()->now();
-    scan_msg.header.frame_id = livox_msg->header.frame_id;  // 使用雷达原始 frame_id
-    scan_msg.angle_min = angle_min_;
-    scan_msg.angle_max = angle_max_;
-    scan_msg.angle_increment = angle_increment_;
-    scan_msg.time_increment = 0.0;
-    scan_msg.scan_time = scan_time_;
-    scan_msg.range_min = range_min_;
-    scan_msg.range_max = range_max_;
+    auto scan = sensor_msgs::msg::LaserScan();
+    scan.header.stamp = this->get_clock()->now();
+    scan.header.frame_id = msg->header.frame_id;  // livox_frame
+    scan.angle_min = angle_min_;
+    scan.angle_max = angle_max_;
+    scan.angle_increment = angle_increment_;
+    scan.time_increment = 0.0;
+    scan.scan_time = scan_time_;
+    scan.range_min = range_min_;
+    scan.range_max = range_max_;
 
-    uint32_t ranges_size = static_cast<uint32_t>(std::ceil((angle_max_ - angle_min_) / angle_increment_));
-    scan_msg.ranges.assign(ranges_size, std::numeric_limits<float>::infinity());
-    scan_msg.intensities.assign(ranges_size, 0.0);
+    uint32_t size = std::ceil((angle_max_ - angle_min_) / angle_increment_);
+    scan.ranges.assign(size, std::numeric_limits<float>::infinity());
+    scan.intensities.assign(size, 0.0);
 
-    for (const auto& point : livox_msg->points)
+    for (const auto& pt : msg->points)
     {
-      // 直接使用雷达原始坐标，不转换
-      float x = point.x;
-      float y = point.y;
-      float z = point.z;
+      // 直接使用雷达坐标（X=右, Y=前）
+      float x = pt.x;
+      float y = pt.y;
+      float z = pt.z;
 
       if (z < min_height_ || z > max_height_) continue;
 
-      float range = std::sqrt(x * x + y * y);
+      float range = std::sqrt(x*x + y*y);
       if (range < range_min_ || range > range_max_) continue;
 
       float angle = std::atan2(y, x);
       if (angle < angle_min_ || angle > angle_max_) continue;
 
-      int index = static_cast<int>(std::round((angle - angle_min_) / angle_increment_));
-      if (index >= 0 && index < static_cast<int>(ranges_size))
+      int idx = std::round((angle - angle_min_) / angle_increment_);
+      if (idx >= 0 && idx < (int)size)
       {
-        if (range < scan_msg.ranges[index])
+        if (range < scan.ranges[idx])
         {
-          scan_msg.ranges[index] = range;
-          scan_msg.intensities[index] = point.reflectivity;
+          scan.ranges[idx] = range;
+          scan.intensities[idx] = pt.reflectivity;
         }
       }
     }
 
-    scan_pub_->publish(scan_msg);
+    scan_pub_->publish(scan);
   }
 
   rclcpp::Subscription<livox_ros_driver2::msg::CustomMsg>::SharedPtr cloud_sub_;
   rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_pub_;
-
   double min_height_, max_height_, angle_min_, angle_max_;
   double angle_increment_, scan_time_, range_min_, range_max_;
-  std::string input_topic_, output_topic_;
-  int queue_size_, debug_points_;
 };
 
 int main(int argc, char** argv)
