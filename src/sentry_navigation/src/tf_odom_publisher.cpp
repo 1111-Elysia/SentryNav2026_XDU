@@ -169,8 +169,8 @@ private:
             tf_odom.transform.translation.z = 0;
             tf_odom.transform.rotation.x = 0.0;
             tf_odom.transform.rotation.y = 0.0;
-            tf_odom.transform.rotation.z = 0.0;
-            tf_odom.transform.rotation.w = 1.0;
+            tf_odom.transform.rotation.z = 0.7071;
+            tf_odom.transform.rotation.w = 0.7071;
         } else {
             tf_odom.transform.translation.x = 0;
             tf_odom.transform.translation.y = 0;
