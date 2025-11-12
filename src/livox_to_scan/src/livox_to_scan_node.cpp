@@ -58,7 +58,7 @@ private:
   {
     auto scan_msg = sensor_msgs::msg::LaserScan();
     scan_msg.header.stamp = this->get_clock()->now();
-    scan_msg.header.frame_id = livox_msg->header.frame_id;
+    scan_msg.header.frame_id = "base_link";
     scan_msg.angle_min = angle_min_;
     scan_msg.angle_max = angle_max_;
     scan_msg.angle_increment = angle_increment_;

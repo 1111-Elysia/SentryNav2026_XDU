@@ -64,10 +64,10 @@ public:
         RCLCPP_INFO(this->get_logger(), "====================================");
         RCLCPP_INFO(this->get_logger(), "串口通信节点初始化完成");
         RCLCPP_INFO(this->get_logger(), "  发送频率: %d Hz", send_freq);
-        RCLCPP_WARN(this->get_logger(), "底盘控制:");
-        RCLCPP_WARN(this->get_logger(), "  输入: /cmd_vel (ROS标准坐标系)");
-        RCLCPP_WARN(this->get_logger(), "  输出: 直接转发，不做坐标转换");
-        RCLCPP_WARN(this->get_logger(), "  原因: 坐标转换已在 Controller 层完成");
+        RCLCPP_WARN(this->get_logger(), "坐标系转换:");
+        RCLCPP_WARN(this->get_logger(), "  输入: /cmd_vel (ROS系: X=前, Y=左)");
+        RCLCPP_WARN(this->get_logger(), "  输出: 底盘命令 (车体系: X=右, Y=前)");
+        RCLCPP_WARN(this->get_logger(), "  转换: vx_chassis=vy_ros, vy_chassis=vx_ros");
         RCLCPP_INFO(this->get_logger(), "====================================");
     }
 
@@ -93,11 +93,30 @@ private:
     {
         std::lock_guard<std::mutex> lock(mutex_);
         
-        // 直接使用ROS坐标系的值，不做转换
-        // 因为 Controller 输出的 /cmd_vel 已经是考虑了坐标系的
-        current_vx_ = static_cast<float>(msg->linear.x) / 10.0;
-        current_vy_ = static_cast<float>(msg->linear.y) / 10.0;
-        current_vyaw_ = static_cast<float>(msg->angular.z) / 25.0;
+        // ROS坐标系 → 车体坐标系（绕Z轴旋转+90度）
+        // ROS:   X=前, Y=左
+        // 车体:  X=右, Y=前
+        // 转换矩阵:
+        // [ X_chassis ]   [  0  -1 ] [ X_ros ]   [ -Y_ros ]
+        // [ Y_chassis ] = [  1   0 ] [ Y_ros ] = [  X_ros ]
+        
+        float vx_ros = static_cast<float>(msg->linear.x);   // ROS前进
+        float vy_ros = static_cast<float>(msg->linear.y);   // ROS左移
+        float vyaw_ros = static_cast<float>(msg->angular.z);
+        
+        // 转换到车体坐标系
+        current_vx_ = -vy_ros / 10.0;  // 车体右移 = -ROS左移
+        current_vy_ = vx_ros / 10.0;   // 车体前进 = ROS前进
+        current_vyaw_ = vyaw_ros / 25.0;
+        
+        // 调试日志
+        static auto last_log = this->now();
+        if ((this->now() - last_log).seconds() > 0.5) {
+            RCLCPP_DEBUG(this->get_logger(),
+                "ROS→车体: [%.2f前,%.2f左]→[%.2f右,%.2f前]",
+                vx_ros, vy_ros, current_vx_, current_vy_);
+            last_log = this->now();
+        }
     }
 
     void sendControlFrame()
@@ -132,7 +151,7 @@ private:
             if ((now - last_stats_time_).seconds() >= 1.0) {
                 double actual_freq = send_count_ / (now - last_stats_time_).seconds();
                 RCLCPP_INFO(this->get_logger(),
-                    "发送: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f",
+                    "发送: %.1f Hz | 车体系: vx=%.3f(右) vy=%.3f(前) vyaw=%.3f",
                     actual_freq, frame.vx, frame.vy, frame.vyaw);
                 send_count_ = 0;
                 last_stats_time_ = now;
