@@ -307,8 +307,8 @@ behavior_server:
     
     # ===== 行为插件列表 =====
     behavior_plugins: [
-      # "spin",              # 原地旋转
-      # "backup",            # 后退
+      "spin",              # 原地旋转
+      "backup",            # 后退
       "drive_on_heading",  # 沿固定方向前进
       "strafe",            # 横向移动 ← 全向轮特有
       "assisted_teleop",   # 辅助手动控制
@@ -316,10 +316,10 @@ behavior_server:
     ]
 
     # ----- 各行为插件配置 -----
-    # spin:
-    #   plugin: "nav2_behaviors/Spin"                  # 原地旋转行为
-    # backup:
-    #   plugin: "nav2_behaviors/BackUp"                # 后退行为
+    spin:
+      plugin: "nav2_behaviors/Spin"                  # 原地旋转行为
+    backup:
+      plugin: "nav2_behaviors/BackUp"                # 后退行为
     drive_on_heading:
       plugin: "nav2_behaviors/DriveOnHeading"        # 定向行驶行为
     strafe:
