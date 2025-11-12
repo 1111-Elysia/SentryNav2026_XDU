@@ -92,16 +92,16 @@ private:
         tf.header.stamp = this->now();
         tf.header.frame_id = "base_link";
         tf.child_frame_id = "livox_frame";
-        
-        tf.transform.translation.x = livox_offset_y_;
-        tf.transform.translation.y = -livox_offset_x_;
+
+        tf.transform.translation.x = livox_offset_x_;
+        tf.transform.translation.y = livox_offset_y_;
         tf.transform.translation.z = livox_offset_z_;
         
         // 雷达姿态：旋转180度
         tf2::Quaternion q;
-        q.setRPY(0, 0, 0);
-        tf.transform.rotation.x = q.x();
-        tf.transform.rotation.y = q.y();
+        q.setRPY(0, 0, -M_PI/2.0);
+        tf.transform.rotation.x = q.x
+        tf.transform.rotation.y = q.y();();
         tf.transform.rotation.z = q.z();
         tf.transform.rotation.w = q.w();
 
