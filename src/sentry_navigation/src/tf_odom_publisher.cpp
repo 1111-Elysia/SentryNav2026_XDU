@@ -93,13 +93,13 @@ private:
         tf.child_frame_id = "livox_frame";
 
         // 车体系: x=右, y=前, z=上 → 雷达在前方0.117m 
-        tf.transform.translation.x = 0.117;     // 右
-        tf.transform.translation.y = 0.0;   // 前
+        tf.transform.translation.x = 0.0;     // 右
+        tf.transform.translation.y = 0.117;   // 前
         tf.transform.translation.z = 0.0;     // 上
 
         // 顺时针90度
         tf2::Quaternion q;
-        q.setRPY(0, 0, M_PI);
+        q.setRPY(0, 0, 0);
         tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
@@ -136,31 +136,20 @@ private:
         auto now = this->now();
 
         geometry_msgs::msg::TransformStamped tf_odom;
-        tf_odom.header.stamp = last_fastlio_stamp_;
-        tf_odom.header.frame_id = "odom";
-        tf_odom.child_frame_id = "base_link";
+        tf_static.header.stamp = this->now();
+        tf_static.header.frame_id = "odom";
+        tf_static.child_frame_id = "base_link";
 
-        if (has_fastlio_) {
-            double x,y,z,qx,qy,qz,qw;
-            vehicleToROS(pose_x_, pose_y_, pose_z_,
-                         pose_qx_, pose_qy_, pose_qz_, pose_qw_,
-                         x, y, z, qx, qy, qz, qw);
-            tf_odom.transform.translation.x = x;
-            tf_odom.transform.translation.y = y;
-            tf_odom.transform.translation.z = z;
-            tf_odom.transform.rotation.x = qx;
-            tf_odom.transform.rotation.y = qy;
-            tf_odom.transform.rotation.z = qz;
-            tf_odom.transform.rotation.w = qw;
-        } else {
-            tf_odom.transform.translation.x = 0.0;
-            tf_odom.transform.translation.y = 0.0;
-            tf_odom.transform.translation.z = 0.0;
-            tf_odom.transform.rotation.x = 0.0;
-            tf_odom.transform.rotation.y = 0.0;
-            tf_odom.transform.rotation.z = 0.0;
-            tf_odom.transform.rotation.w = 1.0;
-        }
+        tf_static.transform.translation.x = 0.0;
+        tf_static.transform.translation.y = 0.0;
+        tf_static.transform.translation.z = 0.0;
+
+        tf2::Quaternion q;
+        q.setRPY(0, 0, 0); 
+        tf_odom.transform.rotation.x = q.x();
+        tf_odom.transform.rotation.y = q.y();
+        tf_odom.transform.rotation.z = q.z();
+        tf_odom.transform.rotation.w = q.w();
 
         tf_broadcaster_->sendTransform(tf_odom);
 
