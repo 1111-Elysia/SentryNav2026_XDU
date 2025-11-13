@@ -70,7 +70,7 @@ private:
         
         vx_   =  msg->linear.x / 10.0f;  
         vy_   =  msg->linear.y / 10.0f;  
-        vyaw_ =  -msg->angular.z / 10.0f;
+        vyaw_ =  msg->angular.z / 10.0f;
     }
 
     void sendFrame()
