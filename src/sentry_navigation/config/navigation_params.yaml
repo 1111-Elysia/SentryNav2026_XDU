@@ -30,8 +30,8 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.3            
-      yaw_goal_tolerance: 0.3            
+      xy_goal_tolerance: 0.5            # 位置容忍（m）
+      yaw_goal_tolerance: 0.6           # 朝向容忍（rad）
 
     # ===== MPPI 控制器配置 =====
     FollowPath:
@@ -137,7 +137,7 @@ controller_server:
         offset_from_furthest: 4           # 从最远点的偏移
         threshold_to_consider: 0.8        # 考虑的距离阈值 (m)
         max_angle_to_furthest: 0.4        # 最大角度 (rad)
-        mode: 1                           # 模式：0=前向，1=偏好前向，2=无偏好
+        mode: 2                           # 模式：0=前向，1=偏好前向，2=无偏好
       
       # ----- 噪声生成器 -----
       # MPPI 使用随机采样生成轨迹
@@ -179,7 +179,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"    # 膨胀层插件
         cost_scaling_factor: 3.0          # 代价衰减因子 - 越大衰减越慢
-        inflation_radius: 0.35             # 膨胀半径 (m) - 障碍物周围0.35米不可通行
+        inflation_radius: 0.5            # 膨胀半径 (m) - 障碍物周围0.35米不可通行
 
       # ----- 体素层：3D障碍物检测和清除 -----
       voxel_layer:
@@ -248,7 +248,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.35
+        inflation_radius: 0.5
 
       always_send_full_costmap: True      # 始终发布完整地图
 
@@ -270,18 +270,18 @@ planner_server:
     planner_plugins: ["GridBased"]        # 规划器插件列表
 
     # ----- NavFn 规划器：基于Dijkstra/A*的网格规划器 -----
-    GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"      # NavFn规划器插件
-      tolerance: 0.5                      # 目标容差 (m) - 允许在目标附近结束
-      use_astar: false                    # 使用Dijkstra（false）或A*（true）
-      allow_unknown: true                 # 允许路径穿过未知区域
+    # GridBased:
+    #   plugin: "nav2_navfn_planner/NavfnPlanner"      # NavFn规划器插件
+    #   tolerance: 0.5                      # 目标容差 (m) - 允许在目标附近结束
+    #   use_astar: false                    # 使用Dijkstra（false）或A*（true）
+    #   allow_unknown: true                 # 允许路径穿过未知区域
 
     # ===== 可选：SMAC Hybrid A* 规划器（适合全向轮）=====
-    # SmacHybrid:
-    #   plugin: "nav2_smac_planner/SmacPlannerHybrid"
-    #   tolerance: 0.5                    # 目标容差 (m)
-    #   motion_model_for_search: "REEDS_SHEPP"  # 运动模型：Reeds-Shepp曲线
-    #   allow_unknown: true               # 允许未知区域
+    SmacHybrid:
+      plugin: "nav2_smac_planner/SmacPlannerHybrid"
+      tolerance: 0.5                    # 目标容差 (m)
+      motion_model_for_search: "REEDS_SHEPP"  # 运动模型：Reeds-Shepp曲线
+      allow_unknown: true               # 允许未知区域
 
 # =======================================================================================
 # Smoother Server (路径平滑服务器) - 对全局路径进行平滑处理
