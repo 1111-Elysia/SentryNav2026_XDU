@@ -420,7 +420,7 @@ velocity_smoother:
     use_sim_time: False                    # 使用仿真时间
     smoothing_frequency: 20.0             # 平滑频率 (Hz)
     scale_velocities: False               # 不按比例缩放速度
-    feedback: "CLOSED_LOOP"                 # 闭环反馈（依赖里程计）
+    feedback: "OPEN_LOOP"                 # 闭环反馈（依赖里程计）
     
     # ===== 全向轮速度限制 [vx, vy, vtheta] =====
     max_velocity: [1.0, 1.0, 2.0]         # 最大速度 [m/s, m/s, rad/s]
