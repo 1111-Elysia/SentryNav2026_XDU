@@ -44,7 +44,7 @@ private:
   {
     sensor_msgs::msg::LaserScan scan;
     scan.header.stamp = msg->header.stamp; 
-    scan.header.frame_id = "livox_frame"; // 固定在机器人主坐标系
+    scan.header.frame_id = "base_link"; 
 
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;
