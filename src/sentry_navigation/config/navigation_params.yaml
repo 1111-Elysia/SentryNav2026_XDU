@@ -11,7 +11,7 @@
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 30.0            # MPPI 推荐更高频率 (Hz)
+    controller_frequency: 100.0            # MPPI 推荐更高频率 (Hz)
     odom_topic: "odom" 
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
@@ -47,20 +47,20 @@ controller_server:
       # ----- 速度限制（全向轮）-----
       vx_std: 0.2
       vy_std: 0.2
-      wz_std: 0.4
+      wz_std: 0.2
       
       vx_max: 1.0
       vx_min: -1.0                        # 允许倒退
       vy_max: 1.0                         # 允许左移
       vy_min: -1.0                        # ← 修复：允许右移
-      wz_max: 2.0
+      wz_max: 1.0
       iteration_count: 4                  # 优化迭代次数
       # ----- 加速度限制（全向轮）-----
-      ax_max: 2.0
-      ax_min: -2.0
-      ay_max: 2.0
-      ay_min: -2.0                        # ← 修复：Y轴负加速度
-      az_max: 3.2
+      ax_max: 1.0
+      ax_min: -1.0
+      ay_max: 1.0
+      ay_min: -1.0                        # ← 修复：Y轴负加速度
+      az_max: 2.0
       
       # ----- 代价函数权重（决定行为） -----
       # 这些权重需要根据实际情况调整
