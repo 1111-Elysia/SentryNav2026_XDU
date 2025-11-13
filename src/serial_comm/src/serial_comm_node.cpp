@@ -67,9 +67,9 @@ private:
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        // ROS(base_link) → 车体系
-        vx_   = -msg->linear.y / 10.0f;  // 右 = -左
-        vy_   =  msg->linear.x / 10.0f;  // 前 =  前
+        
+        vx_   =  msg->linear.x / 10.0f;  
+        vy_   =  msg->linear.y / 10.0f;  
         vyaw_ =  msg->angular.z / 25.0f;
     }
 
