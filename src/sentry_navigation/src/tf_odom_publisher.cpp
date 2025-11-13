@@ -97,9 +97,9 @@ private:
         tf.transform.translation.y = 0.0;   // 前
         tf.transform.translation.z = 0.0;     // 上
 
-        // 顺时针90度（绕Z -90°）
+        // 顺时针90度
         tf2::Quaternion q;
-        q.setRPY(0, 0, -M_PI/2.0);
+        q.setRPY(0, 0, M_PI/2.0);
         tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
@@ -126,6 +126,8 @@ private:
         vel_wy_ = msg->twist.twist.angular.y;
         vel_wz_ = msg->twist.twist.angular.z;
         
+        last_fastlio_stamp_ = msg->header.stamp;  // 记录时间戳
+
         has_fastlio_ = true;
     }
 
@@ -134,7 +136,7 @@ private:
         auto now = this->now();
 
         geometry_msgs::msg::TransformStamped tf_odom;
-        tf_odom.header.stamp = now;
+        tf_odom.header.stamp = last_fastlio_stamp_;
         tf_odom.header.frame_id = "odom";
         tf_odom.child_frame_id = "base_link";
 
@@ -164,7 +166,7 @@ private:
 
         // /odom 话题保持 pose=0，twist=Fast-LIO(ROS系)
         nav_msgs::msg::Odometry odom_msg;
-        odom_msg.header.stamp = now;
+        odom_msg.header.stamp = tf_odom.header.stamp;
         odom_msg.header.frame_id = "odom";
         odom_msg.child_frame_id = "base_link";
 
@@ -206,6 +208,7 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr fastlio_subscriber_;
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Time last_fastlio_stamp_;
     
     bool is_relocalized_ = false;
     bool warning_printed_ = false;
