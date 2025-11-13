@@ -92,9 +92,9 @@ private:
         tf.header.frame_id = "base_link";
         tf.child_frame_id = "livox_frame";
 
-        // 车体系: x=右, y=前, z=上 → 雷达在前方0.117m ⇒ y=0.117
-        tf.transform.translation.x = 0.0;     // 右
-        tf.transform.translation.y = 0.117;   // 前
+        // 车体系: x=右, y=前, z=上 → 雷达在前方0.117m 
+        tf.transform.translation.x = 0.117;     // 右
+        tf.transform.translation.y = 0.0;   // 前
         tf.transform.translation.z = 0.0;     // 上
 
         // 顺时针90度（绕Z -90°）
