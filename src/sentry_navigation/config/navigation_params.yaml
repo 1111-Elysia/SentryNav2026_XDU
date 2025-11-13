@@ -54,7 +54,7 @@ controller_server:
       vy_max: 1.0                         # 允许左移
       vy_min: -1.0                        # ← 修复：允许右移
       wz_max: 1.0
-      iteration_count: 4                  # 优化迭代次数
+      iteration_count: 16                  # 优化迭代次数
       # ----- 加速度限制（全向轮）-----
       ax_max: 1.0
       ax_min: -1.0
@@ -145,7 +145,7 @@ controller_server:
       gamma: 0.015                        # 折扣因子
       
       # ----- 可视化（调试用）-----
-      visualize: false                    # 是否可视化采样轨迹（影响性能）
+      visualize: true                    # 是否可视化采样轨迹（影响性能）
       
       # ----- TF 参数 -----
       transform_tolerance: 0.1            # TF容差 (s)
