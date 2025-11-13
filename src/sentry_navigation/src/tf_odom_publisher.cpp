@@ -136,13 +136,13 @@ private:
         auto now = this->now();
 
         geometry_msgs::msg::TransformStamped tf_odom;
-        tf_static.header.stamp = this->now();
-        tf_static.header.frame_id = "odom";
-        tf_static.child_frame_id = "base_link";
+        tf_odom.header.stamp = this->now();
+        tf_odom.header.frame_id = "odom";
+        tf_odom.child_frame_id = "base_link";
 
-        tf_static.transform.translation.x = 0.0;
-        tf_static.transform.translation.y = 0.0;
-        tf_static.transform.translation.z = 0.0;
+        tf_odom.transform.translation.x = 0.0;
+        tf_odom.transform.translation.y = 0.0;
+        tf_odom.transform.translation.z = 0.0;
 
         tf2::Quaternion q;
         q.setRPY(0, 0, 0); 
