@@ -50,9 +50,6 @@ public:
         
         RCLCPP_INFO(this->get_logger(), "========================================");
         RCLCPP_INFO(this->get_logger(), "串口通信节点初始化完成");
-        RCLCPP_INFO(this->get_logger(), "  ROS系: X=前, Y=左 → 车体系: X=右, Y=前");
-        RCLCPP_INFO(this->get_logger(), "  转换: vx_车=vy_ROS, vy_车=vx_ROS");
-        RCLCPP_INFO(this->get_logger(), "  验证: 发vx→车右移, 发vy→车前进");
         RCLCPP_INFO(this->get_logger(), "========================================");
     }
 
@@ -70,20 +67,10 @@ private:
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        
-        // ROS系 → 车体系（绕Z轴旋转+90度）
-        // ROS:   X=前, Y=左
-        // 车体:  X=右, Y=前
-        // 转换矩阵: [X_车]   [ 0  -1] [X_ROS]   [-Y_ROS]
-        //          [Y_车] = [ 1   0] [Y_ROS] = [ X_ROS]
-        
-        float vx_ros = msg->linear.x;   // ROS前进
-        float vy_ros = msg->linear.y;   // ROS左移
-        float vyaw_ros = msg->angular.z;
-        
-        vx_ = vx_ros / 10.0;  
-        vy_ = vy_ros / 10.0;    
-        vyaw_ = vyaw_ros / 25.0;
+        // ROS(base_link) → 车体系
+        vx_   = -msg->linear.y / 10.0f;  // 右 = -左
+        vy_   =  msg->linear.x / 10.0f;  // 前 =  前
+        vyaw_ =  msg->angular.z / 25.0f;
     }
 
     void sendFrame()

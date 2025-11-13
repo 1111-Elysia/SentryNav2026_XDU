@@ -36,8 +36,6 @@ public:
 
     RCLCPP_INFO(this->get_logger(), "========================================");
     RCLCPP_INFO(this->get_logger(), "Livox → LaserScan 启动");
-    RCLCPP_INFO(this->get_logger(), "坐标: 车体X=右,Y=前,Z=上 → ROS X=前,Y=左,Z=上");
-    RCLCPP_INFO(this->get_logger(), "frame_id: base_link");
     RCLCPP_INFO(this->get_logger(), "========================================");
   }
 
@@ -45,8 +43,8 @@ private:
   void cloudCallback(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg)
   {
     sensor_msgs::msg::LaserScan scan;
-    scan.header.stamp = this->get_clock()->now();
-    scan.header.frame_id = "base_link"; // 固定在机器人主坐标系
+    scan.header.stamp = msg->header.stamp; 
+    scan.header.frame_id = "livox_frame"; // 固定在机器人主坐标系
 
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;
@@ -61,32 +59,22 @@ private:
 
     for (const auto &pt : msg->points)
     {
-      // Livox 点云在车体系下：X=右, Y=前, Z=上
-      float x_v = pt.x;
-      float y_v = pt.y;
-      float z_v = pt.z;
+      // 保持雷达/车体系：X=右, Y=前, Z=上（不要再旋转）
+      float x = pt.x;
+      float y = pt.y;
+      float z = pt.z;
+      if (z < min_height_ || z > max_height_) continue;
 
-      if (z_v < min_height_ || z_v > max_height_)
-        continue;
+      float range = std::sqrt(x*x + y*y);
+      if (range < range_min_ || range > range_max_) continue;
 
-      // === 转到 ROS 坐标 ===
-      // 绕Z轴旋转 -90°: (x_ros = y_v, y_ros = -x_v)
-      float x_ros = y_v;
-      float y_ros = -x_v;
-
-      float range = std::sqrt(x_ros * x_ros + y_ros * y_ros);
-      if (range < range_min_ || range > range_max_)
-        continue;
-
-      float angle = std::atan2(y_ros, x_ros);
-      if (angle < angle_min_ || angle > angle_max_)
-        continue;
+      // 角度相对于该帧的 +X（右），逆时针为正（REP-103）
+      float angle = std::atan2(y, x);
+      if (angle < angle_min_ || angle > angle_max_) continue;
 
       int idx = static_cast<int>((angle - angle_min_) / angle_increment_);
-      if (idx >= 0 && idx < static_cast<int>(size))
-      {
-        if (range < scan.ranges[idx])
-        {
+      if (idx >= 0 && idx < static_cast<int>(size)) {
+        if (range < scan.ranges[idx]) {
           scan.ranges[idx] = range;
           scan.intensities[idx] = pt.reflectivity;
         }

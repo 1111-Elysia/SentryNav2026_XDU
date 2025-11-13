@@ -47,7 +47,6 @@ public:
         RCLCPP_INFO(this->get_logger(), "  车体系: X=右, Y=前, Z=上");
         RCLCPP_INFO(this->get_logger(), "  ROS系: X=前, Y=左, Z=上");
         RCLCPP_INFO(this->get_logger(), "  转换: 绕Z轴旋转-90度");
-        RCLCPP_INFO(this->get_logger(), "  雷达: 额外旋转180度修正");
         RCLCPP_INFO(this->get_logger(), "========================================");
     }
 
@@ -93,11 +92,12 @@ private:
         tf.header.frame_id = "base_link";
         tf.child_frame_id = "livox_frame";
 
-        tf.transform.translation.x = livox_offset_x_;
-        tf.transform.translation.y = livox_offset_y_;
-        tf.transform.translation.z = livox_offset_z_;
-        
-        // 雷达姿态：旋转180度
+        // 车体系: x=右, y=前, z=上 → 雷达在前方0.117m ⇒ y=0.117
+        tf.transform.translation.x = 0.0;     // 右
+        tf.transform.translation.y = 0.117;   // 前
+        tf.transform.translation.z = 0.0;     // 上
+
+        // 顺时针90度（绕Z -90°）
         tf2::Quaternion q;
         q.setRPY(0, 0, -M_PI/2.0);
         tf.transform.rotation.x = q.x();
@@ -106,9 +106,7 @@ private:
         tf.transform.rotation.w = q.w();
 
         static_tf_broadcaster_->sendTransform(tf);
-        
-        RCLCPP_INFO(this->get_logger(), 
-            "静态TF: base_link→livox_frame");
+        RCLCPP_INFO(this->get_logger(), "静态TF base_link->livox_frame: (x=0.0, y=0.117), yaw=-90deg");
     }
 
     void fastlioCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -134,88 +132,69 @@ private:
     void timerCallback()
     {
         auto now = this->now();
-        
-        bool has_lm = false;
-        try {
-            auto tf = tf_buffer_.lookupTransform("map", "odom", tf2::TimePointZero);
-            double tx = tf.transform.translation.x;
-            double ty = tf.transform.translation.y;
-            if (std::abs(tx) > 0.01 || std::abs(ty) > 0.01) {
-                has_lm = true;
-                if (!is_relocalized_) {
-                    is_relocalized_ = true;
-                    RCLCPP_INFO(this->get_logger(), "✓ Lightning-LM重定位成功!");
-                }
-            }
-        } catch (...) {
-            if (!warning_printed_ && (now - start_time_).seconds() > 5.0) {
-                RCLCPP_WARN(this->get_logger(), "等待Lightning-LM...");
-                warning_printed_ = true;
-            }
-        }
-        
+
         geometry_msgs::msg::TransformStamped tf_odom;
         tf_odom.header.stamp = now;
         tf_odom.header.frame_id = "odom";
         tf_odom.child_frame_id = "base_link";
-        
+
         if (has_fastlio_) {
-            double x, y, z, qx, qy, qz, qw;
-            vehicleToROS(pose_x_, pose_y_, pose_z_, pose_qx_, pose_qy_, pose_qz_, pose_qw_,
-                        x, y, z, qx, qy, qz, qw);
-            
-            tf_odom.transform.translation.x = 0;
-            tf_odom.transform.translation.y = 0;
-            tf_odom.transform.translation.z = 0;
+            double x,y,z,qx,qy,qz,qw;
+            vehicleToROS(pose_x_, pose_y_, pose_z_,
+                         pose_qx_, pose_qy_, pose_qz_, pose_qw_,
+                         x, y, z, qx, qy, qz, qw);
+            tf_odom.transform.translation.x = x;
+            tf_odom.transform.translation.y = y;
+            tf_odom.transform.translation.z = z;
+            tf_odom.transform.rotation.x = qx;
+            tf_odom.transform.rotation.y = qy;
+            tf_odom.transform.rotation.z = qz;
+            tf_odom.transform.rotation.w = qw;
+        } else {
+            tf_odom.transform.translation.x = 0.0;
+            tf_odom.transform.translation.y = 0.0;
+            tf_odom.transform.translation.z = 0.0;
             tf_odom.transform.rotation.x = 0.0;
             tf_odom.transform.rotation.y = 0.0;
-            tf_odom.transform.rotation.z = 0.7071;
-            tf_odom.transform.rotation.w = 0.7071;
-        } else {
-            tf_odom.transform.translation.x = 0;
-            tf_odom.transform.translation.y = 0;
-            tf_odom.transform.translation.z = 0;
-            tf_odom.transform.rotation.w = 1;
+            tf_odom.transform.rotation.z = 0.0;
+            tf_odom.transform.rotation.w = 1.0;
         }
-        
+
         tf_broadcaster_->sendTransform(tf_odom);
-        
+
+        // /odom 话题保持 pose=0，twist=Fast-LIO(ROS系)
         nav_msgs::msg::Odometry odom_msg;
         odom_msg.header.stamp = now;
         odom_msg.header.frame_id = "odom";
         odom_msg.child_frame_id = "base_link";
-        
-        odom_msg.pose.pose.position.x = 0;
-        odom_msg.pose.pose.position.y = 0;
-        odom_msg.pose.pose.position.z = 0;
-        odom_msg.pose.pose.orientation.w = 1;
-        
+
+        odom_msg.pose.pose.position.x = 0.0;
+        odom_msg.pose.pose.position.y = 0.0;
+        odom_msg.pose.pose.position.z = 0.0;
+        odom_msg.pose.pose.orientation.x = 0.0;
+        odom_msg.pose.pose.orientation.y = 0.0;
+        odom_msg.pose.pose.orientation.z = 0.0;
+        odom_msg.pose.pose.orientation.w = 1.0;
+
         if (has_fastlio_) {
-            double vx, vy, vz, wx, wy, wz;
-            vehicleVelToROS(vel_vx_, vel_vy_, vel_vz_, vel_wx_, vel_wy_, vel_wz_,
-                           vx, vy, vz, wx, wy, wz);
-            
-            odom_msg.twist.twist.linear.x = vx;
-            odom_msg.twist.twist.linear.y = vy;
-            odom_msg.twist.twist.linear.z = vz;
-            odom_msg.twist.twist.angular.x = wx;
-            odom_msg.twist.twist.angular.y = wy;
+            double vx, vy, wz;
+            vx = vel_vy_;        // 车体→ROS：vx=vy_v
+            vy = -vel_vx_;       //          vy=-vx_v
+            wz = vel_wz_;
+            odom_msg.twist.twist.linear.x  = vx;
+            odom_msg.twist.twist.linear.y  = vy;
             odom_msg.twist.twist.angular.z = wz;
         }
-        
+
         odom_msg.pose.covariance[0] = 0.01;
         odom_msg.pose.covariance[7] = 0.01;
         odom_msg.pose.covariance[35] = 0.01;
         odom_msg.twist.covariance[0] = 0.05;
         odom_msg.twist.covariance[7] = 0.05;
         odom_msg.twist.covariance[35] = 0.05;
-        
+
         odom_publisher_->publish(odom_msg);
-        
-        if (has_lm && (now - last_log_).seconds() > 10.0) {
-            RCLCPP_INFO(this->get_logger(), "状态: LM✓ FastLIO✓");
-            last_log_ = now;
-        }
+
     }
 
 private:

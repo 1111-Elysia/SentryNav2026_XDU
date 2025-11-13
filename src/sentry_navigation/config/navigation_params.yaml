@@ -30,12 +30,12 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.3             # MPPI 可以更精确
+      xy_goal_tolerance: 0.3            
       yaw_goal_tolerance: 0.3            
 
     # ===== MPPI 控制器配置 =====
     FollowPath:
-      plugin: "nav2_mppi_controller::MPPIController"  # ← 关键修改
+      plugin: "nav2_mppi_controller::MPPIController"  
       
       # ----- 基本参数 -----
       time_steps: 56                      # 预测时间步数（越多越精确但计算量大）
@@ -54,7 +54,7 @@ controller_server:
       vy_max: 1.0                         # 允许左移
       vy_min: -1.0                        # ← 修复：允许右移
       wz_max: 2.0
-      
+      iteration_count: 4                  # 优化迭代次数
       # ----- 加速度限制（全向轮）-----
       ax_max: 2.0
       ax_min: -2.0
@@ -164,7 +164,7 @@ local_costmap:
       publish_frequency: 10.0              # 地图发布频率 (Hz)
       global_frame: odom                  # 全局坐标系 - 在odom系中构建
       robot_base_frame: base_link         # 机器人本体坐标系
-      use_sim_time: True                  # 使用仿真时间
+      use_sim_time: False                  # 使用仿真时间
       rolling_window: true                # 滚动窗口模式 - 地图跟随机器人移动
       width: 15                           # 地图宽度 (m) - 机器人周围15米
       height: 15                          # 地图高度 (m)
