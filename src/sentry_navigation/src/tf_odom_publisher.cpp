@@ -140,16 +140,29 @@ private:
         tf_odom.header.frame_id = "odom";
         tf_odom.child_frame_id = "base_link";
 
-        tf_odom.transform.translation.x = 0.0;
-        tf_odom.transform.translation.y = 0.0;
-        tf_odom.transform.translation.z = 0.0;
+        if (has_fastlio_) {
+            // 车体系(X=右,Y=前,Z=上) → ROS(odom: X=前,Y=左,Z=上)：绕Z -90°
+            double x,y,z,qx,qy,qz,qw;
+            vehicleToROS(pose_x_, pose_y_, pose_z_,
+                         pose_qx_, pose_qy_, pose_qz_, pose_qw_,
+                         x, y, z, qx, qy, qz, qw);
 
-        tf2::Quaternion q;
-        q.setRPY(0, 0, 0); 
-        tf_odom.transform.rotation.x = q.x();
-        tf_odom.transform.rotation.y = q.y();
-        tf_odom.transform.rotation.z = q.z();
-        tf_odom.transform.rotation.w = q.w();
+            tf_odom.transform.translation.x = x;
+            tf_odom.transform.translation.y = y;
+            tf_odom.transform.translation.z = z;
+            tf_odom.transform.rotation.x = qx;
+            tf_odom.transform.rotation.y = qy;
+            tf_odom.transform.rotation.z = qz;
+            tf_odom.transform.rotation.w = qw;
+        } else {
+            tf_odom.transform.translation.x = 0.0;
+            tf_odom.transform.translation.y = 0.0;
+            tf_odom.transform.translation.z = 0.0;
+            tf_odom.transform.rotation.x = 0.0;
+            tf_odom.transform.rotation.y = 0.0;
+            tf_odom.transform.rotation.z = 0.0;
+            tf_odom.transform.rotation.w = 1.0;
+        }
 
         tf_broadcaster_->sendTransform(tf_odom);
 
