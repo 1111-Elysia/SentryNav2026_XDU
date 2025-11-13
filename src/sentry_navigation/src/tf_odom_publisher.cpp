@@ -99,7 +99,7 @@ private:
 
         // 顺时针90度
         tf2::Quaternion q;
-        q.setRPY(0, 0, M_PI/2.0);
+        q.setRPY(0, 0, M_PI);
         tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
