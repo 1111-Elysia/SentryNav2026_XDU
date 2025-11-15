@@ -67,9 +67,9 @@ private:
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        
-        vx_   =  msg->linear.y / 10.0f;  
-        vy_   =  -msg->linear.x / 10.0f;  
+
+        vx_   =  -msg->linear.x / 10.0f;
+        vy_   =  -msg->linear.y / 10.0f;
         vyaw_ =  msg->angular.z / 2.0f;
     }
 
