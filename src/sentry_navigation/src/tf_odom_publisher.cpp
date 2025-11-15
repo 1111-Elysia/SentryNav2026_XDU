@@ -18,7 +18,6 @@ public:
                         tf_buffer_(this->get_clock()),
                         tf_listener_(tf_buffer_)
     {
-        // 参数：雷达外参与发布频率
         this->declare_parameter<double>("base_link_to_livox_x", 0.0);
         this->declare_parameter<double>("base_link_to_livox_y", 0.117);
         this->declare_parameter<double>("base_link_to_livox_z", 0.0);
@@ -27,19 +26,17 @@ public:
         this->get_parameter("base_link_to_livox_x", livox_offset_x_);
         this->get_parameter("base_link_to_livox_y", livox_offset_y_);
         this->get_parameter("base_link_to_livox_z", livox_offset_z_);
-        double publish_rate;
+        double publish_rate = 50.0;
         this->get_parameter("publish_rate", publish_rate);
 
         static_tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
         odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
 
-        // 订阅 FAST_LIO 的 /Odometry
         fastlio_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/Odometry", 50,
             std::bind(&TfOdomPublisher::fastlioCallback, this, std::placeholders::_1));
 
-        // 周期发布 map->odom TF 和 /odom 话题
         auto period = std::chrono::duration<double>(1.0 / publish_rate);
         timer_ = this->create_wall_timer(
             std::chrono::duration_cast<std::chrono::milliseconds>(period),
@@ -47,46 +44,41 @@ public:
 
         publishStaticTransform();
 
-        RCLCPP_INFO(this->get_logger(), 
-            "tf_odom_publisher: 发布 base_link->livox_frame 静态TF、map->odom 动态TF 和 /odom 话题");
+        RCLCPP_INFO(this->get_logger(),
+                    "tf_odom_publisher: 发布 base_link->livox_frame 静态TF、map->odom 动态TF 和 /odom 话题");
     }
 
 private:
-   // 车体系(右/前/上) → ROS(前/左/上) 的速度映射
     inline void vehicleVelToROS(double vx_v, double vy_v, double vz_v,
                                 double wx_v, double wy_v, double wz_v,
-                                double& vx_r, double& vy_r, double& vz_r,
-                                double& wx_r, double& wy_r, double& wz_r)
+                                double &vx_r, double &vy_r, double &vz_r,
+                                double &wx_r, double &wy_r, double &wz_r)
     {
-        vx_r = vy_v;      // ROS前 = 车体前
-        vy_r = -vx_v;     // ROS左 = -车体右
-        vz_r = vz_v;      // ROS上 = 车体上
+        vx_r = vy_v;
+        vy_r = -vx_v;
+        vz_r = vz_v;
         wx_r = wy_v;
         wy_r = -wx_v;
         wz_r = wz_v;
     }
 
-    geometry_msgs::msg::Pose vehiclePoseToROS(const geometry_msgs::msg::Pose& pose_v)
+    geometry_msgs::msg::Pose vehiclePoseToROS(const geometry_msgs::msg::Pose &pose_v)
     {
         geometry_msgs::msg::Pose pose_r;
-        
-        // 位置转换：ROS = R_transform * Vehicle
-        pose_r.position.x = pose_v.position.y;   // ROS前 = 车体前
-        pose_r.position.y = -pose_v.position.x;  // ROS左 = -车体右
-        pose_r.position.z = pose_v.position.z;   // ROS上 = 车体上
-        
-        // 姿态转换：需要叠加 -90度 yaw 旋转
+
+        pose_r.position.x = pose_v.position.y;
+        pose_r.position.y = -pose_v.position.x;
+        pose_r.position.z = pose_v.position.z;
+
         tf2::Quaternion q_vehicle;
         tf2::fromMsg(pose_v.orientation, q_vehicle);
-        
-        // 车体系到ROS系的旋转：绕Z轴旋转-90度
+
         tf2::Quaternion q_transform;
         q_transform.setRPY(0, 0, -M_PI / 2.0);
-        
-        // 组合旋转
+
         tf2::Quaternion q_ros = q_transform * q_vehicle;
         pose_r.orientation = tf2::toMsg(q_ros);
-        
+
         return pose_r;
     }
 
@@ -100,8 +92,6 @@ private:
         tf.transform.translation.x = livox_offset_x_;
         tf.transform.translation.y = livox_offset_y_;
         tf.transform.translation.z = livox_offset_z_;
-
-        // 无旋转：坐标轴方向一致
         tf.transform.rotation.x = 0.0;
         tf.transform.rotation.y = 0.0;
         tf.transform.rotation.z = 0.0;
@@ -109,13 +99,12 @@ private:
 
         static_tf_broadcaster_->sendTransform(tf);
         RCLCPP_INFO(this->get_logger(),
-            "静态TF base_link->livox_frame: t=(%.3f, %.3f, %.3f), 无旋转",
-            livox_offset_x_, livox_offset_y_, livox_offset_z_);
+                    "静态TF base_link->livox_frame: t=(%.3f, %.3f, %.3f), 无旋转",
+                    livox_offset_x_, livox_offset_y_, livox_offset_z_);
     }
 
     void fastlioCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        // 缓存 FAST_LIO 的速度（车体系）
         vel_vx_ = msg->twist.twist.linear.x;
         vel_vy_ = msg->twist.twist.linear.y;
         vel_vz_ = msg->twist.twist.linear.z;
@@ -123,61 +112,61 @@ private:
         vel_wy_ = msg->twist.twist.angular.y;
         vel_wz_ = msg->twist.twist.angular.z;
 
-        // 缓存 odom 系下的位姿（车体系）
         odom_pose_vehicle_ = msg->pose.pose;
-        
+
         last_fastlio_stamp_ = msg->header.stamp;
         has_fastlio_ = true;
     }
 
     void timerCallback()
     {
-        // 1. 发布 map->odom TF
-        try {
-            // 获取 map -> base_link (来自 lighting-lm)
-            geometry_msgs::msg::TransformStamped map_to_baselink;
-            map_to_baselink = tf_buffer_.lookupTransform(
-                "map", "base_link", tf2::TimePointZero);
+        try
+        {
+            rclcpp::Time now = this->now();
 
-            // 获取 odom -> base_link (来自 FAST_LIO)
-            geometry_msgs::msg::TransformStamped odom_to_baselink;
-            odom_to_baselink = tf_buffer_.lookupTransform(
-                "odom", "base_link", tf2::TimePointZero);
+            geometry_msgs::msg::TransformStamped map_to_baselink =
+                tf_buffer_.lookupTransform("map", "base_link", now,
+                                           rclcpp::Duration::from_seconds(0.05));
 
-            // 转换为 tf2::Transform
+            geometry_msgs::msg::TransformStamped odom_to_baselink =
+                tf_buffer_.lookupTransform("odom", "base_link", now,
+                                           rclcpp::Duration::from_seconds(0.15));
+
             tf2::Transform tf_map_to_baselink;
             tf2::fromMsg(map_to_baselink.transform, tf_map_to_baselink);
 
             tf2::Transform tf_odom_to_baselink;
             tf2::fromMsg(odom_to_baselink.transform, tf_odom_to_baselink);
 
-            // 计算 map -> odom = (map -> base_link) × inverse(odom -> base_link)
             tf2::Transform tf_map_to_odom = tf_map_to_baselink * tf_odom_to_baselink.inverse();
 
-            // 发布 map -> odom TF
             geometry_msgs::msg::TransformStamped map_to_odom_msg;
-            map_to_odom_msg.header.stamp = this->now();
+            map_to_odom_msg.header.stamp = now;
             map_to_odom_msg.header.frame_id = "map";
             map_to_odom_msg.child_frame_id = "odom";
             map_to_odom_msg.transform = tf2::toMsg(tf_map_to_odom);
 
             tf_broadcaster_->sendTransform(map_to_odom_msg);
 
-            if (!has_published_tf_) {
+            if (!has_published_tf_)
+            {
                 RCLCPP_INFO(this->get_logger(), "成功发布 map->odom TF");
                 has_published_tf_ = true;
             }
+            has_warned_tf_ = false;
         }
-        catch (const tf2::TransformException& ex) {
-            if (!has_warned_tf_) {
-                RCLCPP_WARN(this->get_logger(), 
-                    "无法获取所需TF: %s (等待 lighting-lm 和 FAST_LIO 发布TF)", ex.what());
+        catch (const tf2::TransformException &ex)
+        {
+            if (!has_warned_tf_)
+            {
+                RCLCPP_WARN(this->get_logger(),
+                            "无法获取所需TF: %s", ex.what());
                 has_warned_tf_ = true;
             }
         }
 
-        // 2. 发布 /odom 话题（包含位置和速度）
-        if (!has_fastlio_) {
+        if (!has_fastlio_)
+        {
             return;
         }
 
@@ -186,22 +175,20 @@ private:
         odom_msg.header.frame_id = "odom";
         odom_msg.child_frame_id = "base_link";
 
-        // 填充位置（来自 FAST_LIO 的 odom 系位姿）
         odom_msg.pose.pose = vehiclePoseToROS(odom_pose_vehicle_);
-        // 填充速度（车体系 -> ROS 系转换）
+
         double vx, vy, vz, wx, wy, wz;
         vehicleVelToROS(vel_vx_, vel_vy_, vel_vz_,
                         vel_wx_, vel_wy_, vel_wz_,
                         vx, vy, vz, wx, wy, wz);
-        
-        odom_msg.twist.twist.linear.x  = vx;
-        odom_msg.twist.twist.linear.y  = vy;
-        odom_msg.twist.twist.linear.z  = vz;
+
+        odom_msg.twist.twist.linear.x = vx;
+        odom_msg.twist.twist.linear.y = vy;
+        odom_msg.twist.twist.linear.z = vz;
         odom_msg.twist.twist.angular.x = wx;
         odom_msg.twist.twist.angular.y = wy;
         odom_msg.twist.twist.angular.z = wz;
 
-        // 协方差
         odom_msg.pose.covariance[0] = 0.01;
         odom_msg.pose.covariance[7] = 0.01;
         odom_msg.pose.covariance[35] = 0.01;
@@ -228,18 +215,16 @@ private:
     bool has_warned_tf_ = false;
     bool has_published_tf_ = false;
 
-    // FAST_LIO 数据缓存
     double vel_vx_ = 0, vel_vy_ = 0, vel_vz_ = 0;
     double vel_wx_ = 0, vel_wy_ = 0, vel_wz_ = 0;
     geometry_msgs::msg::Pose odom_pose_vehicle_;
 
-    // 雷达外参
     double livox_offset_x_ = 0.0;
     double livox_offset_y_ = 0.117;
     double livox_offset_z_ = 0.0;
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<TfOdomPublisher>());
