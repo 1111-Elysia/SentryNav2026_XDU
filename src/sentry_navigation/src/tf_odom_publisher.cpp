@@ -270,8 +270,8 @@ private:
     geometry_msgs::msg::Pose odom_pose_vehicle_;
 
     // Livox 外参（仅平移）
-    double livox_offset_x_ = 0.0;
-    double livox_offset_y_ = 0.117;
+    double livox_offset_x_ = 0.117;
+    double livox_offset_y_ = 0.0;
     double livox_offset_z_ = 0.0;
 
     // TF 缓存
