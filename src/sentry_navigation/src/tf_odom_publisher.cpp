@@ -8,16 +8,16 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <tf2/time.h>
 #include <cmath>
 #include <chrono>
 
 class TfOdomPublisher : public rclcpp::Node
 {
 public:
-    TfOdomPublisher() : Node("tf_odom_publisher"),
-                        tf_buffer_(this->get_clock()),
-                        tf_listener_(tf_buffer_)
+    TfOdomPublisher()
+        : Node("tf_odom_publisher"),
+          tf_buffer_(this->get_clock()),
+          tf_listener_(tf_buffer_, this, true) // 独立线程处理 /tf，防止阻塞
     {
         this->declare_parameter<double>("base_link_to_livox_x", 0.0);
         this->declare_parameter<double>("base_link_to_livox_y", 0.117);
@@ -121,19 +121,25 @@ private:
 
     void timerCallback()
     {
+        // 非阻塞：先检查是否可用，避免长时间等待导致 TF 回调无法处理而“饿死”
+        if (!tf_buffer_.canTransform("map", "base_link", rclcpp::Time(0))) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                                 "等待 map->base_link TF");
+            return;
+        }
+        if (!tf_buffer_.canTransform("odom", "base_link", rclcpp::Time(0))) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                                 "等待 odom->base_link TF");
+            return;
+        }
+
         try
         {
+            // 获取各自最新可用的 TF（Time(0) 表示最新）
             geometry_msgs::msg::TransformStamped map_to_baselink =
-                tf_buffer_.lookupTransform(
-                    "map", "base_link",
-                    rclcpp::Time(0),
-                    rclcpp::Duration::from_seconds(0.05));
-
+                tf_buffer_.lookupTransform("map", "base_link", rclcpp::Time(0));
             geometry_msgs::msg::TransformStamped odom_to_baselink =
-                tf_buffer_.lookupTransform(
-                    "odom", "base_link",
-                    rclcpp::Time(0),
-                    rclcpp::Duration::from_seconds(0.15));
+                tf_buffer_.lookupTransform("odom", "base_link", rclcpp::Time(0));
 
             tf2::Transform tf_map_to_baselink;
             tf2::fromMsg(map_to_baselink.transform, tf_map_to_baselink);
@@ -141,9 +147,11 @@ private:
             tf2::Transform tf_odom_to_baselink;
             tf2::fromMsg(odom_to_baselink.transform, tf_odom_to_baselink);
 
+            // map -> odom = (map -> base_link) × inverse(odom -> base_link)
             tf2::Transform tf_map_to_odom = tf_map_to_baselink * tf_odom_to_baselink.inverse();
 
             geometry_msgs::msg::TransformStamped map_to_odom_msg;
+            // 用 map->base_link 的时间戳（高频、稳定）
             map_to_odom_msg.header.stamp = map_to_baselink.header.stamp;
             map_to_odom_msg.header.frame_id = "map";
             map_to_odom_msg.child_frame_id = "odom";
@@ -160,11 +168,9 @@ private:
         }
         catch (const tf2::TransformException &ex)
         {
-            if (!has_warned_tf_)
-            {
-                RCLCPP_WARN(this->get_logger(), "无法获取所需TF: %s", ex.what());
-                has_warned_tf_ = true;
-            }
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                                 "无法获取所需TF: %s", ex.what());
+            has_warned_tf_ = true;
         }
 
         if (!has_fastlio_)
@@ -229,7 +235,13 @@ private:
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<TfOdomPublisher>());
+
+    // 多线程执行器，确保 TF 订阅/Timer/回调都能并行处理
+    auto node = std::make_shared<TfOdomPublisher>();
+    rclcpp::executors::MultiThreadedExecutor exec;
+    exec.add_node(node);
+    exec.spin();
+
     rclcpp::shutdown();
     return 0;
 }
