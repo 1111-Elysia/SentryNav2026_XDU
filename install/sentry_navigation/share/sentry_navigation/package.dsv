@@ -1,8 +1,0 @@
-source;share/sentry_navigation/hook/cmake_prefix_path.ps1
-source;share/sentry_navigation/hook/cmake_prefix_path.dsv
-source;share/sentry_navigation/hook/cmake_prefix_path.sh
-source;share/sentry_navigation/local_setup.bash
-source;share/sentry_navigation/local_setup.dsv
-source;share/sentry_navigation/local_setup.ps1
-source;share/sentry_navigation/local_setup.sh
-source;share/sentry_navigation/local_setup.zsh

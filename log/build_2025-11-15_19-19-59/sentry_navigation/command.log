@@ -1,2 +1,0 @@
-Invoking command in '/home/pgd/SentryNav2026_XDU/build/sentry_navigation': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/local/bin/cmake --build /home/pgd/SentryNav2026_XDU/build/sentry_navigation -- -j16 -l16
-Invoked command in '/home/pgd/SentryNav2026_XDU/build/sentry_navigation' returned '2': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/local/bin/cmake --build /home/pgd/SentryNav2026_XDU/build/sentry_navigation -- -j16 -l16
