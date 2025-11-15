@@ -12,12 +12,20 @@ set(CMAKE_BUILD_TYPE Release)
 
 # -------------------------------------------------------------
 # 导入第三方库，同时做一些全局编译选项配置
+# 编译选项（优化过，不再爆内存）
 add_definitions("-DPCL_NO_PRECOMPILE")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -fopenmp -fPIC -g")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -fopenmp -fPIC -g -ggdb")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -ggdb -g -fopenmp -fPIC -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -g")
+# 基础 flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -fopenmp")
+
+# Release 优化（无 -g，无 -ggdb）
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -fopenmp -fPIC")
+
+# Debug 模式才加 -g
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -ggdb -fopenmp -fPIC")
+
+# C mode
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
 
 if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
