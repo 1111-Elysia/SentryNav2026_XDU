@@ -8,6 +8,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/time.h>
 #include <cmath>
 #include <chrono>
 
@@ -122,15 +123,17 @@ private:
     {
         try
         {
-            rclcpp::Time now = this->now();
-
             geometry_msgs::msg::TransformStamped map_to_baselink =
-                tf_buffer_.lookupTransform("map", "base_link", now,
-                                           rclcpp::Duration::from_seconds(0.05));
+                tf_buffer_.lookupTransform(
+                    "map", "base_link",
+                    tf2::TimePointZero,
+                    tf2::durationFromSec(0.05));
 
             geometry_msgs::msg::TransformStamped odom_to_baselink =
-                tf_buffer_.lookupTransform("odom", "base_link", now,
-                                           rclcpp::Duration::from_seconds(0.15));
+                tf_buffer_.lookupTransform(
+                    "odom", "base_link",
+                    tf2::TimePointZero,
+                    tf2::durationFromSec(0.15));
 
             tf2::Transform tf_map_to_baselink;
             tf2::fromMsg(map_to_baselink.transform, tf_map_to_baselink);
@@ -141,7 +144,7 @@ private:
             tf2::Transform tf_map_to_odom = tf_map_to_baselink * tf_odom_to_baselink.inverse();
 
             geometry_msgs::msg::TransformStamped map_to_odom_msg;
-            map_to_odom_msg.header.stamp = now;
+            map_to_odom_msg.header.stamp = map_to_baselink.header.stamp;
             map_to_odom_msg.header.frame_id = "map";
             map_to_odom_msg.child_frame_id = "odom";
             map_to_odom_msg.transform = tf2::toMsg(tf_map_to_odom);
@@ -159,8 +162,7 @@ private:
         {
             if (!has_warned_tf_)
             {
-                RCLCPP_WARN(this->get_logger(),
-                            "无法获取所需TF: %s", ex.what());
+                RCLCPP_WARN(this->get_logger(), "无法获取所需TF: %s", ex.what());
                 has_warned_tf_ = true;
             }
         }
