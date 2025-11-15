@@ -44,7 +44,7 @@ private:
   {
     sensor_msgs::msg::LaserScan scan;
     scan.header.stamp = msg->header.stamp; 
-    scan.header.frame_id = "odom"; 
+    scan.header.frame_id = "livox_frame"; 
 
     scan.angle_min = angle_min_;
     scan.angle_max = angle_max_;
