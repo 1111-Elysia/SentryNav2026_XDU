@@ -17,7 +17,7 @@ public:
     TfOdomPublisher()
         : Node("tf_odom_publisher"),
           tf_buffer_(this->get_clock()),
-          tf_listener_(tf_buffer_, this, true) // 独立线程处理 /tf，防止阻塞
+          tf_listener_(tf_buffer_, this, true) // 独立线程处理 /tf
     {
         this->declare_parameter<double>("base_link_to_livox_x", 0.0);
         this->declare_parameter<double>("base_link_to_livox_y", 0.117);
@@ -34,6 +34,7 @@ public:
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
         odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
 
+        // 订阅 FAST-LIO 的 /Odometry（车体系，需要转换到 ROS）
         fastlio_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/Odometry", 50,
             std::bind(&TfOdomPublisher::fastlioCallback, this, std::placeholders::_1));
@@ -46,31 +47,35 @@ public:
         publishStaticTransform();
 
         RCLCPP_INFO(this->get_logger(),
-                    "tf_odom_publisher: 发布 base_link->livox_frame 静态TF、map->odom 动态TF 和 /odom 话题");
+                    "tf_odom_publisher: 接收 map->base_link_all 与 odom->base_link，发布 map->odom，并发布 /odom 与 base_link->livox_frame 静态TF");
     }
 
 private:
+    // 车体系(右/前/上) → ROS(前/左/上) 的速度映射
     inline void vehicleVelToROS(double vx_v, double vy_v, double vz_v,
                                 double wx_v, double wy_v, double wz_v,
                                 double &vx_r, double &vy_r, double &vz_r,
                                 double &wx_r, double &wy_r, double &wz_r)
     {
-        vx_r = vy_v;
-        vy_r = -vx_v;
-        vz_r = vz_v;
+        vx_r = vy_v;   // 前 = 车体前
+        vy_r = -vx_v;  // 左 = -车体右
+        vz_r = vz_v;   // 上 = 车体上
         wx_r = wy_v;
         wy_r = -wx_v;
         wz_r = wz_v;
     }
 
+    // 车体系位姿 → ROS系位姿
     geometry_msgs::msg::Pose vehiclePoseToROS(const geometry_msgs::msg::Pose &pose_v)
     {
         geometry_msgs::msg::Pose pose_r;
 
-        pose_r.position.x = pose_v.position.y;
-        pose_r.position.y = -pose_v.position.x;
-        pose_r.position.z = pose_v.position.z;
+        // 位置转换
+        pose_r.position.x = pose_v.position.y;   // 前 = 车体前
+        pose_r.position.y = -pose_v.position.x;  // 左 = -车体右
+        pose_r.position.z = pose_v.position.z;   // 上
 
+        // 姿态转换：绕Z轴旋转 -90 度
         tf2::Quaternion q_vehicle;
         tf2::fromMsg(pose_v.orientation, q_vehicle);
 
@@ -93,19 +98,19 @@ private:
         tf.transform.translation.x = livox_offset_x_;
         tf.transform.translation.y = livox_offset_y_;
         tf.transform.translation.z = livox_offset_z_;
+
+        // 无旋转：坐标轴一致
         tf.transform.rotation.x = 0.0;
         tf.transform.rotation.y = 0.0;
         tf.transform.rotation.z = 0.0;
         tf.transform.rotation.w = 1.0;
 
         static_tf_broadcaster_->sendTransform(tf);
-        RCLCPP_INFO(this->get_logger(),
-                    "静态TF base_link->livox_frame: t=(%.3f, %.3f, %.3f), 无旋转",
-                    livox_offset_x_, livox_offset_y_, livox_offset_z_);
     }
 
     void fastlioCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
+        // 缓存 FAST-LIO（车体系）速度与位姿
         vel_vx_ = msg->twist.twist.linear.x;
         vel_vy_ = msg->twist.twist.linear.y;
         vel_vz_ = msg->twist.twist.linear.z;
@@ -121,40 +126,39 @@ private:
 
     void timerCallback()
     {
-        // 尝试获取最新 TF，失败则回退到缓存
-        geometry_msgs::msg::TransformStamped map_to_baselink_msg;
+        // 目标：使用 map->base_link_all 与 odom->base_link 计算 map->odom
+        geometry_msgs::msg::TransformStamped map_to_baselinkall_msg;
         geometry_msgs::msg::TransformStamped odom_to_baselink_msg;
         rclcpp::Time now = this->now();
 
-        // 新增：标记是否使用了缓存
-        bool used_cached_map_bl = false;
+        bool used_cached_map_blall = false;
         bool used_cached_odom_bl = false;
 
-        // 获取 map->base_link
-        bool got_map_bl = false;
+        // 获取 map->base_link_all（重定位包输出）
+        bool got_map_blall = false;
         try {
-            map_to_baselink_msg = tf_buffer_.lookupTransform("map", "base_link", rclcpp::Time(0));
-            last_map_to_baselink_msg_ = map_to_baselink_msg;
+            map_to_baselinkall_msg = tf_buffer_.lookupTransform("map", "base_link_all", rclcpp::Time(0));
+            last_map_to_baselinkall_msg_ = map_to_baselinkall_msg;
             have_map_tf_ = true;
-            got_map_bl = true;
+            got_map_blall = true;
         } catch (const tf2::TransformException &ex) {
             if (have_map_tf_) {
-                const double age = (now - last_map_to_baselink_msg_.header.stamp).seconds();
+                const double age = (now - last_map_to_baselinkall_msg_.header.stamp).seconds();
                 if (age < 0.3) {
-                    map_to_baselink_msg = last_map_to_baselink_msg_;
-                    used_cached_map_bl = true;   // 标记使用了缓存
-                    got_map_bl = true;
+                    map_to_baselinkall_msg = last_map_to_baselinkall_msg_;
+                    used_cached_map_blall = true;
+                    got_map_blall = true;
                 } else {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                         "map->base_link 不可用且缓存过旧(%.2fs): %s", age, ex.what());
+                                         "map->base_link_all 不可用且缓存过旧(%.2fs): %s", age, ex.what());
                 }
             } else {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "等待 map->base_link: %s", ex.what());
+                                     "等待 map->base_link_all: %s", ex.what());
             }
         }
 
-        // 获取 odom->base_link
+        // 获取 odom->base_link（FAST-LIO 输出）
         bool got_odom_bl = false;
         try {
             odom_to_baselink_msg = tf_buffer_.lookupTransform("odom", "base_link", rclcpp::Time(0));
@@ -164,9 +168,9 @@ private:
         } catch (const tf2::TransformException &ex) {
             if (have_odom_tf_) {
                 const double age = (now - last_odom_to_baselink_msg_.header.stamp).seconds();
-                if (age < 0.5) { // odom只有10Hz，放宽容忍
+                if (age < 0.5) { // 10Hz，放宽容忍
                     odom_to_baselink_msg = last_odom_to_baselink_msg_;
-                    used_cached_odom_bl = true;  // 标记使用了缓存
+                    used_cached_odom_bl = true;
                     got_odom_bl = true;
                 } else {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
@@ -178,25 +182,24 @@ private:
             }
         }
 
-        if (got_map_bl && got_odom_bl)
+        if (got_map_blall && got_odom_bl)
         {
             try {
-                // 计算并发布 map->odom
-                tf2::Transform tf_map_to_baselink, tf_odom_to_baselink;
-                tf2::fromMsg(map_to_baselink_msg.transform, tf_map_to_baselink);
-                tf2::fromMsg(odom_to_baselink_msg.transform, tf_odom_to_baselink);
+                // map->odom = (map->base_link_all) * inverse(odom->base_link)
+                tf2::Transform tf_map_to_blall, tf_odom_to_bl;
+                tf2::fromMsg(map_to_baselinkall_msg.transform, tf_map_to_blall);
+                tf2::fromMsg(odom_to_baselink_msg.transform, tf_odom_to_bl);
 
-                tf2::Transform tf_map_to_odom = tf_map_to_baselink * tf_odom_to_baselink.inverse();
+                tf2::Transform tf_map_to_odom = tf_map_to_blall * tf_odom_to_bl.inverse();
 
                 geometry_msgs::msg::TransformStamped map_to_odom_msg;
-                // 修复时间类型不匹配：用 if/else 填 builtin_interfaces::msg::Time
-                builtin_interfaces::msg::Time stamp;
-                if (used_cached_map_bl) {
-                    stamp = now;  // rclcpp::Time 可隐式转 builtin_interfaces::msg::Time
+
+                // 时间戳：若 map->bl_all 使用缓存，则用当前时间，避免时间过旧
+                if (used_cached_map_blall) {
+                    map_to_odom_msg.header.stamp = now;
                 } else {
-                    stamp = map_to_baselink_msg.header.stamp;
+                    map_to_odom_msg.header.stamp = map_to_baselinkall_msg.header.stamp;
                 }
-                map_to_odom_msg.header.stamp = stamp;
                 map_to_odom_msg.header.frame_id = "map";
                 map_to_odom_msg.child_frame_id = "odom";
                 map_to_odom_msg.transform = tf2::toMsg(tf_map_to_odom);
@@ -204,7 +207,7 @@ private:
                 tf_broadcaster_->sendTransform(map_to_odom_msg);
 
                 if (!has_published_tf_) {
-                    RCLCPP_INFO(this->get_logger(), "成功发布 map->odom TF");
+                    RCLCPP_INFO(this->get_logger(), "成功发布 map->odom");
                     has_published_tf_ = true;
                 }
                 has_warned_tf_ = false;
@@ -214,7 +217,7 @@ private:
             }
         }
 
-        // 发布 /odom（保持不变）
+        // 同步发布 /odom（位置与速度，车体系→ROS）
         if (!has_fastlio_) return;
 
         nav_msgs::msg::Odometry odom_msg;
@@ -225,7 +228,8 @@ private:
         odom_msg.pose.pose = vehiclePoseToROS(odom_pose_vehicle_);
 
         double vx, vy, vz, wx, wy, wz;
-        vehicleVelToROS(vel_vx_, vel_vy_, vel_vz_, vel_wx_, vel_wy_, vel_wz_, vx, vy, vz, wx, wy, wz);
+        vehicleVelToROS(vel_vx_, vel_vy_, vel_vz_, vel_wx_, vel_wy_, vel_wz_,
+                        vx, vy, vz, wx, wy, wz);
         odom_msg.twist.twist.linear.x = vx;
         odom_msg.twist.twist.linear.y = vy;
         odom_msg.twist.twist.linear.z = vz;
@@ -233,6 +237,7 @@ private:
         odom_msg.twist.twist.angular.y = wy;
         odom_msg.twist.twist.angular.z = wz;
 
+        // 简单协方差
         odom_msg.pose.covariance[0] = 0.01;
         odom_msg.pose.covariance[7] = 0.01;
         odom_msg.pose.covariance[35] = 0.01;
@@ -259,15 +264,18 @@ private:
     bool has_warned_tf_ = false;
     bool has_published_tf_ = false;
 
+    // FAST-LIO（车体系）缓存
     double vel_vx_ = 0, vel_vy_ = 0, vel_vz_ = 0;
     double vel_wx_ = 0, vel_wy_ = 0, vel_wz_ = 0;
     geometry_msgs::msg::Pose odom_pose_vehicle_;
 
+    // Livox 外参（仅平移）
     double livox_offset_x_ = 0.0;
     double livox_offset_y_ = 0.117;
     double livox_offset_z_ = 0.0;
 
-    geometry_msgs::msg::TransformStamped last_map_to_baselink_msg_;
+    // TF 缓存
+    geometry_msgs::msg::TransformStamped last_map_to_baselinkall_msg_;
     geometry_msgs::msg::TransformStamped last_odom_to_baselink_msg_;
     bool have_map_tf_ = false;
     bool have_odom_tf_ = false;
@@ -277,7 +285,7 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
-    // 多线程执行器，确保 TF 订阅/Timer/回调都能并行处理
+    // 多线程执行器：确保 TF 订阅/Timer/回调并行处理
     auto node = std::make_shared<TfOdomPublisher>();
     rclcpp::executors::MultiThreadedExecutor exec;
     exec.add_node(node);
