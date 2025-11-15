@@ -1,5 +1,5 @@
 {
-  "output_prefix": "/home/nuc/nav/nav2/src/resource/map/rmuc/rmuc",
+  "output_prefix": "/home/nuc/workspace/SentryNav2026_XDU/data",
   "resolution": 0.05,
   "min_z_height": 0.0,
   "max_z_height": 1.5,

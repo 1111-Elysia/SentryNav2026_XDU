@@ -936,7 +936,7 @@ public:
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         //------------------------------------------------------------------------------------------------------
-        auto period_ms = std::chrono::milliseconds(static_cast<int64_t>(1000.0 / 100.0));
+        auto period_ms = std::chrono::milliseconds(static_cast<int64_t>(1000.0 / 50.0));
         timer_ = rclcpp::create_timer(this, this->get_clock(), period_ms, std::bind(&LaserMappingNode::timer_callback, this));
 
         auto map_period_ms = std::chrono::milliseconds(static_cast<int64_t>(1000.0));

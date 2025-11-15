@@ -3,15 +3,16 @@
 <package format="3">
   <name>serial_comm</name>
   <version>0.0.1</version>
-  <description>USB serial communication package</description>
-  <maintainer email="pgd@todo.todo">pgd</maintainer>
-  <license>MIT</license>
+  <description>Serial communication package</description>
+  <maintainer email="your@email.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
-  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>libboost-dev</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

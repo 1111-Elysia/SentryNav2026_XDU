@@ -1,7 +1,7 @@
 livox_to_scan_node:
   ros__parameters:
     # 高度过滤参数（米，注意 CustomPoint 的 x/y/z 单位已经是米）
-    min_height: -0.5
+    min_height: 0.1
     max_height: 0.5
     
     # 角度范围参数（弧度）

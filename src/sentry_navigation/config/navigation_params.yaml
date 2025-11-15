@@ -11,7 +11,7 @@
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 100.0            # MPPI 推荐更高频率 (Hz)
+    controller_frequency: 50.0            # MPPI 推荐更高频率 (Hz)
     odom_topic: "odom" 
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
@@ -30,7 +30,7 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.5            # 位置容忍（m）
+      xy_goal_tolerance: 1.0            # 位置容忍（m）
       yaw_goal_tolerance: 0.6           # 朝向容忍（rad）
 
     # ===== MPPI 控制器配置 =====
@@ -38,9 +38,9 @@ controller_server:
       plugin: "nav2_mppi_controller::MPPIController"  
       
       # ----- 基本参数 -----
-      time_steps: 56                      # 预测时间步数（越多越精确但计算量大）
-      model_dt: 0.05                      # 模型时间步长 (s) = 50ms
-      batch_size: 2000                    # 采样轨迹数量（越多越优但计算量大）
+      time_steps: 100                      # 预测时间步数（越多越精确但计算量大）
+      model_dt: 0.02                      # 模型时间步长 (s) = 50ms
+      batch_size: 500                    # 采样轨迹数量（越多越优但计算量大）
       
       # 总预测时长 = time_steps × model_dt = 56 × 0.05 = 2.8秒
       
@@ -49,10 +49,10 @@ controller_server:
       vy_std: 0.2
       wz_std: 0.2
       
-      vx_max: 1.0
-      vx_min: -1.0                        # 允许倒退
-      vy_max: 1.0                         # 允许左移
-      vy_min: -1.0                        # ← 修复：允许右移
+      vx_max: 0.2
+      vx_min: -0.2                        # 允许倒退
+      vy_max: 0.2                         # 允许左移
+      vy_min: -0.2                        # ← 修复：允许右移
       wz_max: 1.0
       iteration_count: 16                  # 优化迭代次数
       # ----- 加速度限制（全向轮）-----
@@ -73,7 +73,7 @@ controller_server:
         "GoalAngleCritic",                # 目标角度评分
         "PathAlignCritic",                # 路径对齐评分
         "PathFollowCritic",               # 路径跟随评分
-        "PathAngleCritic",                # 路径角度评分
+        # "PathAngleCritic",                # 路径角度评分
         "PreferForwardCritic",            # 前进偏好评分
       ]
       
@@ -92,13 +92,13 @@ controller_server:
       GoalAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0                  # 目标角度偏差代价
+        cost_weight: 1.0                  # 目标角度偏差代价
         threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
       
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0                  # 前进偏好权重
+        cost_weight: 1.0                  # 前进偏好权重
         threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
       
       ObstaclesCritic:
@@ -130,18 +130,18 @@ controller_server:
         offset_from_furthest: 5           # 从最远点的偏移
         threshold_to_consider: 1.4        # 考虑的距离阈值 (m)
       
-      PathAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 8.0                  # 路径角度权重
-        offset_from_furthest: 4           # 从最远点的偏移
-        threshold_to_consider: 0.8        # 考虑的距离阈值 (m)
-        max_angle_to_furthest: 0.4        # 最大角度 (rad)
-        mode: 2                           # 模式：0=前向，1=偏好前向，2=无偏好
+      # PathAngleCritic:
+      #   enabled: true
+      #   cost_power: 1
+      #   cost_weight: 8.0                  # 路径角度权重
+      #   offset_from_furthest: 4           # 从最远点的偏移
+      #   threshold_to_consider: 0.8        # 考虑的距离阈值 (m)
+      #   max_angle_to_furthest: 0.4        # 最大角度 (rad)
+      #   mode: 2                           # 模式：0=前向，1=偏好前向，2=无偏好
       
       # ----- 噪声生成器 -----
       # MPPI 使用随机采样生成轨迹
-      temperature: 0.3                    # 温度参数（越小越贪婪，越大越探索）
+      temperature: 0.1                    # 温度参数（越小越贪婪，越大越探索）
       gamma: 0.015                        # 折扣因子
       
       # ----- 可视化（调试用）-----
@@ -160,8 +160,8 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 20.0               # 地图更新频率 (Hz)
-      publish_frequency: 10.0              # 地图发布频率 (Hz)
+      update_frequency: 50.0               # 地图更新频率 (Hz)
+      publish_frequency: 50.0              # 地图发布频率 (Hz)
       global_frame: odom                  # 全局坐标系 - 在odom系中构建
       robot_base_frame: base_link         # 机器人本体坐标系
       use_sim_time: False                  # 使用仿真时间
