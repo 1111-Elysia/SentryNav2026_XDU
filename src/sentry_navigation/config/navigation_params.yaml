@@ -49,10 +49,10 @@ controller_server:
       vy_std: 0.2
       wz_std: 0.2
       
-      vx_max: 0.2
-      vx_min: -0.2                        # 允许倒退
-      vy_max: 0.2                         # 允许左移
-      vy_min: -0.2                        # ← 修复：允许右移
+      vx_max: 0.4
+      vx_min: -0.4                        # 允许倒退
+      vy_max: 0.4                         # 允许左移
+      vy_min: -0.4                        # ← 修复：允许右移
       wz_max: 1.0
       iteration_count: 16                  # 优化迭代次数
       # ----- 加速度限制（全向轮）-----
@@ -70,7 +70,7 @@ controller_server:
         "ConstraintCritic",               # 约束评分（速度/加速度限制）
         "ObstaclesCritic",                # 障碍物评分
         "GoalCritic",                     # 目标评分
-        "GoalAngleCritic",                # 目标角度评分
+        # "GoalAngleCritic",                # 目标角度评分
         "PathAlignCritic",                # 路径对齐评分
         "PathFollowCritic",               # 路径跟随评分
         # "PathAngleCritic",                # 路径角度评分
@@ -89,11 +89,11 @@ controller_server:
         cost_weight: 5.0                  # 距离目标的代价
         threshold_to_consider: 1.4        # 考虑目标的距离阈值 (m)
       
-      GoalAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 1.0                  # 目标角度偏差代价
-        threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
+      # GoalAngleCritic:
+      #   enabled: true
+      #   cost_power: 1
+      #   cost_weight: 1.0                  # 目标角度偏差代价
+      #   threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
       
       PreferForwardCritic:
         enabled: true
