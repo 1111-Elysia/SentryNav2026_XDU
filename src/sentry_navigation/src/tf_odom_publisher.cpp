@@ -126,14 +126,14 @@ private:
             geometry_msgs::msg::TransformStamped map_to_baselink =
                 tf_buffer_.lookupTransform(
                     "map", "base_link",
-                    tf2::TimePointZero,
-                    tf2::durationFromSec(0.05));
+                    rclcpp::Time(0),
+                    rclcpp::Duration::from_seconds(0.05));
 
             geometry_msgs::msg::TransformStamped odom_to_baselink =
                 tf_buffer_.lookupTransform(
                     "odom", "base_link",
-                    tf2::TimePointZero,
-                    tf2::durationFromSec(0.15));
+                    rclcpp::Time(0),
+                    rclcpp::Duration::from_seconds(0.15));
 
             tf2::Transform tf_map_to_baselink;
             tf2::fromMsg(map_to_baselink.transform, tf_map_to_baselink);
