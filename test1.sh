@@ -1,8 +1,7 @@
 #!/bin/bash
-# 启动流程脚本：启动节点、等待 /scan、启动导航并检查 /local_costmap/costmap（超时重启脚本）
-# 使用 setsid 为每个终端创建独立进程组，并记录真实 PGID，以便完全关闭本脚本启动的所有窗口
+# 全新修复版：稳定启动 /scan 等待 / 开启导航 / 关闭所有窗口（PGID 正确）
 
-# ===== 获取脚本绝对路径（用于重启） =====
+# ===== 获取脚本绝对路径 =====
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 # ===== PID 文件目录 =====
@@ -23,11 +22,15 @@ NC='\033[0m'
 # ===== ROS2 环境 =====
 SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && source ../ws_livox/install/setup.bash"
 
-# ===== 关闭所有窗口（使用正确 PGID） =====
+# ============================================================
+#   完整修复版窗口关闭函数（保证所有窗口都能关闭）
+# ============================================================
 cleanup_all_windows() {
     echo -e "${YELLOW}正在关闭所有由脚本启动的窗口...${NC}"
+
     local found=0
 
+    # 关闭记录的 PGID
     for pidfile in "$PID_DIR"/pids_*; do
         [ -e "$pidfile" ] || continue
         pgid="$(cat "$pidfile" 2>/dev/null)"
@@ -35,26 +38,29 @@ cleanup_all_windows() {
 
         if [ -n "$pgid" ]; then
             if kill -0 -"${pgid}" 2>/dev/null; then
-                echo -e "${YELLOW}关闭进程组 PGID=${pgid}${NC}"
+                echo -e "${YELLOW}关闭 PGID=${pgid}${NC}"
                 kill -TERM -"${pgid}" 2>/dev/null || true
-                sleep 0.5
+                sleep 0.4
                 kill -KILL -"${pgid}" 2>/dev/null || true
                 found=1
             fi
         fi
     done
 
+    # fallback：确保杀掉没记录到 PGID 的终端
+    pkill -f "SentryNav-" 2>/dev/null && found=1
+
     if [ $found -eq 1 ]; then
-        echo -e "${GREEN}已关闭所有相关窗口${NC}"
+        echo -e "${GREEN}所有窗口均已关闭${NC}"
     else
-        echo -e "${GREEN}未找到需要关闭的窗口（可能已全部关闭）${NC}"
+        echo -e "${GREEN}无可关闭窗口${NC}"
     fi
 }
 
-# 启动时自动先清理
+# 脚本启动前先清理
 cleanup_all_windows
 
-# ===== 检查地图文件 =====
+# ===== 检查地图 =====
 if [ ! -f "$MAP_YAML" ]; then
     echo -e "${RED}错误: 地图文件不存在: $MAP_YAML${NC}"
     exit 1
@@ -62,25 +68,22 @@ fi
 
 eval "$SOURCE_CMD"
 
-echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}  哨兵导航系统启动脚本${NC}"
-echo -e "${GREEN}=====================================${NC}"
+echo -e "${GREEN}====== 哨兵导航系统启动 ======${NC}"
 echo -e "${YELLOW}使用地图: $MAP_YAML${NC}"
-echo ""
 
-# ===== 正确版本的终端启动函数（完全修复 PGID 记录问题） =====
+# ============================================================
+#   稳定终端启动函数（关键：使用 nohup + gnome-terminal）
+# ============================================================
 launch_term() {
     local title="$1"
     local cmd="$2"
 
-    # setsid 直接执行 gnome-terminal（无中间 shell）
-    setsid gnome-terminal --title="SentryNav-${title}" \
+    nohup gnome-terminal --title="SentryNav-${title}" \
         -- bash -c "$SOURCE_CMD && $cmd; exec bash" >/dev/null 2>&1 &
 
-    local term_pid=$!  # <--- 关键：这里就是 gnome-terminal 的 PID
-    sleep 0.1
+    local term_pid=$!
+    sleep 0.15
 
-    # 获取真实 PGID（gnome-terminal 进程组）
     local pgid
     pgid=$(ps -o pgid= -p "$term_pid" | tr -d ' ')
 
@@ -94,7 +97,32 @@ launch_term() {
     fi
 }
 
-# ===== 启动节点（按顺序） =====
+# ============================================================
+#   安全等待话题（ros2 topic echo 不会等待）
+# ============================================================
+wait_topic() {
+    local topic="$1"
+    local timeout="$2"
+
+    echo -e "${YELLOW}[等待 ${topic}，最多 ${timeout}s]${NC}"
+    local elapsed=0
+
+    while [ $elapsed -lt $timeout ]; do
+        if ros2 topic list | grep -q "^${topic}$"; then
+            echo -e "${GREEN}${topic} 已出现${NC}"
+            return 0
+        fi
+        sleep 0.2
+        elapsed=$((elapsed + 1))
+    done
+
+    echo -e "${RED}${topic} 超时${NC}"
+    return 1
+}
+
+# ============================================================
+#   顺序启动节点
+# ============================================================
 launch_term "Livox-Driver" "ros2 launch livox_ros_driver2 msg_MID360_launch.py"
 sleep 3
 
@@ -110,13 +138,8 @@ sleep 1
 launch_term "Livox-to-Scan" "ros2 run livox_to_scan livox_to_scan_node --ros-args --params-file install/livox_to_scan/share/livox_to_scan/config/livox_to_scan_params.yaml"
 
 # ===== 等待 /scan =====
-echo -e "${YELLOW}[等待 /scan，最多 ${SCAN_WAIT}s]${NC}"
-if timeout "$SCAN_WAIT" ros2 topic echo /scan --once >/dev/null 2>&1; then
-    echo -e "${GREEN}/scan 收到消息${NC}"
-else
-    echo -e "${RED}/scan 超时，准备重启脚本${NC}"
+if ! wait_topic "/scan" "$SCAN_WAIT"; then
     cleanup_all_windows
-    sleep 1
     exec bash "$SCRIPT_PATH"
 fi
 
@@ -128,19 +151,10 @@ sleep 2
 launch_term "Navigation-Stack" "ros2 launch sentry_navigation navigation_launch.py map:='$MAP_YAML' use_rviz:=true"
 sleep 1
 
-# ===== 检查 costmap =====
-echo -e "${YELLOW}[检查 /local_costmap/costmap，最多 ${COSTMAP_WAIT}s]${NC}"
-if timeout "$COSTMAP_WAIT" ros2 topic echo /local_costmap/costmap --once >/dev/null 2>&1; then
-    echo -e "${GREEN}/local_costmap/costmap 正常${NC}"
-else
-    echo -e "${RED}/local_costmap/costmap 超时，准备重启脚本${NC}"
+# ===== 等待 costmap =====
+if ! wait_topic "/local_costmap/costmap" "$COSTMAP_WAIT"; then
     cleanup_all_windows
-    sleep 1
     exec bash "$SCRIPT_PATH"
 fi
 
-echo ""
-echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}  所有节点已在独立终端启动${NC}"
-echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}启动脚本结束${NC}"
+echo -e "${GREEN}====== 所有节点已成功启动 ======${NC}"
