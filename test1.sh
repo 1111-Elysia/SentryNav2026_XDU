@@ -5,8 +5,8 @@
 # ===== 获取脚本绝对路径（用于重启） =====
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-# ===== 唯一标识符（用于窗口标题，便于批量关闭） =====
-UNIQUE_PREFIX="SentryNav2026"
+# ===== PID 文件（记录所有由本脚本启动的终端进程） =====
+PID_FILE="/tmp/sentry_nav_pids_$$"
 
 # ===== 配置区域 =====
 MAP_YAML="./data/new_map/map.yaml"
@@ -26,19 +26,39 @@ SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && 
 cleanup_all_windows() {
     echo -e "${YELLOW}正在关闭所有由本脚本启动的窗口...${NC}"
     
-    # 查找所有包含唯一标识符的 gnome-terminal 进程并关闭
-    pids=$(pgrep -f "gnome-terminal.*${UNIQUE_PREFIX}")
-    if [ -n "$pids" ]; then
-        for pid in $pids; do
-            echo -e "${YELLOW}关闭窗口 pid=${pid}${NC}"
-            kill "$pid" 2>/dev/null || true
-            sleep 0.1
-            kill -9 "$pid" 2>/dev/null || true
-        done
+    # 查找所有旧的 PID 文件并关闭对应进程
+    local found=0
+    for pid_file in /tmp/sentry_nav_pids_*; do
+        if [ -f "$pid_file" ]; then
+            while read -r pid; do
+                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    echo -e "${YELLOW}关闭窗口 pid=${pid}${NC}"
+                    # 杀死整个进程组（包括 gnome-terminal 和其子进程）
+                    pkill -TERM -P "$pid" 2>/dev/null || true
+                    kill "$pid" 2>/dev/null || true
+                    sleep 0.2
+                    kill -9 "$pid" 2>/dev/null || true
+                    found=1
+                fi
+            done < "$pid_file"
+            rm -f "$pid_file"
+        fi
+    done
+    
+    # 额外保险：强制杀死所有 ros2 节点（可选，谨慎使用）
+    pkill -9 -f "ros2 launch livox_ros_driver2" 2>/dev/null || true
+    pkill -9 -f "ros2 run lightning" 2>/dev/null || true
+    pkill -9 -f "ros2 launch fast_lio" 2>/dev/null || true
+    pkill -9 -f "ros2 run sentry_navigation tf_odom_publisher" 2>/dev/null || true
+    pkill -9 -f "ros2 run livox_to_scan" 2>/dev/null || true
+    pkill -9 -f "ros2 launch serial_comm" 2>/dev/null || true
+    pkill -9 -f "ros2 launch sentry_navigation navigation_launch" 2>/dev/null || true
+    
+    if [ $found -eq 1 ]; then
         sleep 1
         echo -e "${GREEN}已关闭所有相关窗口${NC}"
     else
-        echo -e "${GREEN}未找到需要关闭的窗口${NC}"
+        echo -e "${GREEN}未找到需要关闭的窗口（或已全部关闭）${NC}"
     fi
 }
 
@@ -60,17 +80,13 @@ echo -e "${GREEN}=====================================${NC}"
 echo -e "${YELLOW}使用地图: $MAP_YAML${NC}"
 echo ""
 
-# 用于保存由本脚本启动的终端 PID，便于在失败时关闭
-PIDS=()
-
-# 启动函数（在后台启动 gnome-terminal 并记录 PID，标题加唯一前缀）
+# 启动函数（在后台启动 gnome-terminal 并记录 PID）
 launch_term() {
     local title="$1"
     local cmd="$2"
-    # 标题加上唯一前缀，便于后续识别和关闭
-    gnome-terminal --title="${UNIQUE_PREFIX}-${title}" -- bash -c "$SOURCE_CMD && $cmd; exec bash" &
+    gnome-terminal --title="SentryNav-${title}" -- bash -c "$SOURCE_CMD && $cmd; exec bash" &
     local pid=$!
-    PIDS+=("$pid")
+    echo "$pid" >> "$PID_FILE"
     echo -e "${GREEN}已启动 ${title} (pid=${pid})${NC}"
 }
 
