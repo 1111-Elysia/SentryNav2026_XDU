@@ -50,28 +50,29 @@ cleanup_all_windows() {
 launch_term() {
     local title="$1"
     local cmd="$2"
-    local win_title="${TITLE_PREFIX}-${title}"
 
     echo -e "${GREEN}启动窗口: ${title}${NC}"
 
+    # 启动 gnome-terminal（不会黑屏）
     gnome-terminal \
-        --title="$win_title" \
+        --title="${TITLE_PREFIX}-${title}" \
         -- bash -ic "$SOURCE_CMD; $cmd; exec bash" &
 
-    sleep 0.5
+    # 给系统一点时间产生 bash 进程
+    sleep 0.6
 
-    # 找到这个窗口对应的进程
-    pid=$(pgrep -f "$win_title" | head -n 1)
+    # 关键：使用命令内容匹配 bash 进程（100% 能找到）
+    local pid
+    pid=$(pgrep -f "$cmd" | head -n 1)
+
     if [ -z "$pid" ]; then
         echo -e "${RED}[ERROR] 启动 ${title} 失败：找不到 PID${NC}"
         return 1
     fi
 
+    # 获取进程组 ID
+    local pgid
     pgid=$(ps -o pgid= -p "$pid" | tr -d ' ')
-    if [ -z "$pgid" ]; then
-        echo -e "${RED}[ERROR] 找不到 PGID${NC}"
-        return 1
-    fi
 
     echo "$pgid" > "$PID_DIR/pids_${pgid}"
     echo -e "${GREEN}已启动 ${title} (pid=$pid, pgid=$pgid)${NC}"
@@ -99,17 +100,16 @@ wait_for_scan() {
 
 
 # ========================
-#  启动流程
+# 启动流程
 # ========================
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}  哨兵导航系统启动脚本${NC}"
 echo -e "${GREEN}=====================================${NC}"
 
 cleanup_all_windows
-
 eval "$SOURCE_CMD"
 
-# 启动节点顺序（按你的原脚本）
+# 依你的顺序启动
 launch_term "Livox-Driver" "ros2 launch livox_ros_driver2 msg_MID360_launch.py"
 sleep 3
 
@@ -124,7 +124,7 @@ sleep 1
 
 launch_term "Livox-to-Scan" "ros2 run livox_to_scan livox_to_scan_node --ros-args --params-file install/livox_to_scan/share/livox_to_scan/config/livox_to_scan_params.yaml"
 
-# 等待 /scan
+# /scan 必须出现，否则重启
 if ! wait_for_scan; then
     echo -e "${RED}重启脚本...${NC}"
     cleanup_all_windows
@@ -138,6 +138,7 @@ sleep 2
 
 launch_term "Navigation-Stack" "ros2 launch sentry_navigation navigation_launch.py map:='$MAP_YAML' use_rviz:=true"
 
+# costmap 检查
 echo -e "${YELLOW}[检查 /local_costmap/costmap，最长 ${COSTMAP_WAIT}s]${NC}"
 if timeout $COSTMAP_WAIT ros2 topic echo /local_costmap/costmap --once >/dev/null 2>&1; then
     echo -e "${GREEN}/local_costmap/costmap 有数据，启动成功${NC}"
