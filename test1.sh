@@ -1,12 +1,14 @@
 #!/bin/bash
-# filepath: /home/pgd/SentryNav2026_XDU/test1.sh
+# ...existing code...
 # 启动流程脚本：启动节点、等待 /scan、启动导航并一次性检查 /local_costmap/costmap（超时重启脚本）
+# 本版改进：使用 setsid 启动终端进程组并记录 PGID，仅关闭记录的进程组，避免误杀系统中其他进程
 
 # ===== 获取脚本绝对路径（用于重启） =====
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-# ===== PID 文件（记录所有由本脚本启动的终端进程） =====
-PID_FILE="/tmp/sentry_nav_pids_$$"
+# ===== PID 文件目录（记录所有由本脚本启动的进程组） =====
+PID_DIR="/tmp/sentry_nav_pids"
+mkdir -p "$PID_DIR"
 
 # ===== 配置区域 =====
 MAP_YAML="./data/new_map/map.yaml"
@@ -22,38 +24,26 @@ NC='\033[0m'
 # ===== 环境变量（用于在脚本内执行 ros2 命令） =====
 SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && source ../ws_livox/install/setup.bash"
 
-# ===== 函数：关闭所有由本脚本启动的窗口 =====
+# ===== 函数：关闭所有由本脚本启动的窗口（仅关闭记录的 PGID） =====
 cleanup_all_windows() {
     echo -e "${YELLOW}正在关闭所有由本脚本启动的窗口...${NC}"
-    
-    # 查找所有旧的 PID 文件并关闭对应进程
     local found=0
-    for pid_file in /tmp/sentry_nav_pids_*; do
-        if [ -f "$pid_file" ]; then
-            while read -r pid; do
-                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                    echo -e "${YELLOW}关闭窗口 pid=${pid}${NC}"
-                    # 杀死整个进程组（包括 gnome-terminal 和其子进程）
-                    pkill -TERM -P "$pid" 2>/dev/null || true
-                    kill "$pid" 2>/dev/null || true
-                    sleep 0.2
-                    kill -9 "$pid" 2>/dev/null || true
-                    found=1
-                fi
-            done < "$pid_file"
-            rm -f "$pid_file"
+    for pidfile in "$PID_DIR"/pids_* 2>/dev/null; do
+        [ -f "$pidfile" ] || continue
+        pgid=$(cat "$pidfile" 2>/dev/null)
+        if [ -n "$pgid" ]; then
+            # 先尝试优雅终止进程组（负号表示进程组）
+            if kill -0 -"${pgid}" 2>/dev/null; then
+                echo -e "${YELLOW}关闭进程组 PGID=${pgid}${NC}"
+                kill -TERM -"${pgid}" 2>/dev/null || true
+                sleep 0.2
+                kill -KILL -"${pgid}" 2>/dev/null || true
+                found=1
+            fi
         fi
+        rm -f "$pidfile"
     done
-    
-    # 额外保险：强制杀死所有 ros2 节点（可选，谨慎使用）
-    pkill -9 -f "ros2 launch livox_ros_driver2" 2>/dev/null || true
-    pkill -9 -f "ros2 run lightning" 2>/dev/null || true
-    pkill -9 -f "ros2 launch fast_lio" 2>/dev/null || true
-    pkill -9 -f "ros2 run sentry_navigation tf_odom_publisher" 2>/dev/null || true
-    pkill -9 -f "ros2 run livox_to_scan" 2>/dev/null || true
-    pkill -9 -f "ros2 launch serial_comm" 2>/dev/null || true
-    pkill -9 -f "ros2 launch sentry_navigation navigation_launch" 2>/dev/null || true
-    
+
     if [ $found -eq 1 ]; then
         sleep 1
         echo -e "${GREEN}已关闭所有相关窗口${NC}"
@@ -62,7 +52,7 @@ cleanup_all_windows() {
     fi
 }
 
-# ===== 在脚本开始时先清理所有旧窗口 =====
+# 在脚本开始时先清理旧的记录（仅删除空或过期条目，并尝试关闭）
 cleanup_all_windows
 
 # ===== 检查地图文件 =====
@@ -80,14 +70,29 @@ echo -e "${GREEN}=====================================${NC}"
 echo -e "${YELLOW}使用地图: $MAP_YAML${NC}"
 echo ""
 
-# 启动函数（在后台启动 gnome-terminal 并记录 PID）
+# 启动函数：用 setsid 启动 gnome-terminal（创建新进程组），并记录 PGID 到文件
 launch_term() {
     local title="$1"
     local cmd="$2"
-    gnome-terminal --title="SentryNav-${title}" -- bash -c "$SOURCE_CMD && $cmd; exec bash" &
-    local pid=$!
-    echo "$pid" >> "$PID_FILE"
-    echo -e "${GREEN}已启动 ${title} (pid=${pid})${NC}"
+    # 使用 setsid 启动一个新的会话，这样 gnome-terminal 及其子进程会在新的进程组中
+    setsid gnome-terminal --title="SentryNav-${title}" -- bash -c "$SOURCE_CMD && $cmd; exec bash" >/dev/null 2>&1 &
+    # 父进程获得的 PID 是 setsid 启动的子进程的 PID
+    local child_pid=$!
+    # 获取该进程的进程组（PGID == PID of group leader）
+    # 等待短时间以确保进程已启动
+    sleep 0.05
+    if kill -0 "$child_pid" 2>/dev/null; then
+        pgid=$(ps -o pgid= -p "$child_pid" | tr -d ' ')
+        if [ -n "$pgid" ]; then
+            # 存储 PGID 到唯一文件，便于后续关闭
+            pidfile="$PID_DIR/pids_${pgid}"
+            echo "$pgid" > "$pidfile"
+            echo -e "${GREEN}已启动 ${title} (pid=${child_pid}, pgid=${pgid})${NC}"
+            return 0
+        fi
+    fi
+    echo -e "${RED}启动 ${title} 失败${NC}"
+    return 1
 }
 
 # ===== 启动节点（按顺序） =====
@@ -139,6 +144,7 @@ fi
 # 启动完成提示
 echo ""
 echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}  所有节点已在独立终端启动，且 /local_costmap/costmap 有数据${NC}"
+echo -e "${GREEN}  所有节点已在独立终端启动${NC}"
 echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}启动脚本结束${NC}"
+echo -e "${GREEN}启动脚本结束${NC}
+# ...existing code...
