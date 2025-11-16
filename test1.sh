@@ -5,6 +5,9 @@
 # ===== 获取脚本绝对路径（用于重启） =====
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
+# ===== 唯一标识符（用于窗口标题，便于批量关闭） =====
+UNIQUE_PREFIX="SentryNav2026"
+
 # ===== 配置区域 =====
 MAP_YAML="./data/new_map/map.yaml"
 SCAN_WAIT=6       # 等待 /scan 的最大秒数
@@ -18,6 +21,29 @@ NC='\033[0m'
 
 # ===== 环境变量（用于在脚本内执行 ros2 命令） =====
 SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && source ../ws_livox/install/setup.bash"
+
+# ===== 函数：关闭所有由本脚本启动的窗口 =====
+cleanup_all_windows() {
+    echo -e "${YELLOW}正在关闭所有由本脚本启动的窗口...${NC}"
+    
+    # 查找所有包含唯一标识符的 gnome-terminal 进程并关闭
+    pids=$(pgrep -f "gnome-terminal.*${UNIQUE_PREFIX}")
+    if [ -n "$pids" ]; then
+        for pid in $pids; do
+            echo -e "${YELLOW}关闭窗口 pid=${pid}${NC}"
+            kill "$pid" 2>/dev/null || true
+            sleep 0.1
+            kill -9 "$pid" 2>/dev/null || true
+        done
+        sleep 1
+        echo -e "${GREEN}已关闭所有相关窗口${NC}"
+    else
+        echo -e "${GREEN}未找到需要关闭的窗口${NC}"
+    fi
+}
+
+# ===== 在脚本开始时先清理所有旧窗口 =====
+cleanup_all_windows
 
 # ===== 检查地图文件 =====
 if [ ! -f "$MAP_YAML" ]; then
@@ -37,11 +63,12 @@ echo ""
 # 用于保存由本脚本启动的终端 PID，便于在失败时关闭
 PIDS=()
 
-# 启动函数（在后台启动 gnome-terminal 并记录 PID）
+# 启动函数（在后台启动 gnome-terminal 并记录 PID，标题加唯一前缀）
 launch_term() {
     local title="$1"
     local cmd="$2"
-    gnome-terminal --title="$title" -- bash -c "$SOURCE_CMD && $cmd; exec bash" &
+    # 标题加上唯一前缀，便于后续识别和关闭
+    gnome-terminal --title="${UNIQUE_PREFIX}-${title}" -- bash -c "$SOURCE_CMD && $cmd; exec bash" &
     local pid=$!
     PIDS+=("$pid")
     echo -e "${GREEN}已启动 ${title} (pid=${pid})${NC}"
@@ -68,17 +95,9 @@ echo -e "${YELLOW}[等待 /scan 话题，最长 ${SCAN_WAIT}s]${NC}"
 if timeout "${SCAN_WAIT}" ros2 topic echo /scan --once >/dev/null 2>&1; then
     echo -e "${GREEN}/scan 收到消息，继续启动后续节点${NC}"
 else
-    echo -e "${RED}/scan 在 ${SCAN_WAIT}s 内未收到任何消息，关闭由本脚本启动的窗口并重启脚本${NC}"
-    for pid in "${PIDS[@]}"; do
-        if kill -0 "$pid" 2>/dev/null; then
-            kill "$pid" 2>/dev/null || true
-            sleep 0.15
-            kill -9 "$pid" 2>/dev/null || true
-            echo -e "${YELLOW}已关闭 pid=${pid}${NC}"
-        fi
-    done
+    echo -e "${RED}/scan 在 ${SCAN_WAIT}s 内未收到任何消息，准备重启脚本${NC}"
+    cleanup_all_windows
     sleep 1
-    # 用绝对路径重启脚本
     exec bash "$SCRIPT_PATH" "$@"
 fi
 
@@ -95,23 +114,15 @@ echo -e "${YELLOW}[检查 /local_costmap/costmap，最多等待 ${COSTMAP_WAIT}s
 if timeout "${COSTMAP_WAIT}" ros2 topic echo /local_costmap/costmap --once >/dev/null 2>&1; then
     echo -e "${GREEN}/local_costmap/costmap 有数据，启动成功${NC}"
 else
-    echo -e "${RED}/local_costmap/costmap 在 ${COSTMAP_WAIT}s 内未收到消息，关闭由本脚本启动的窗口并重启脚本${NC}"
-    for pid in "${PIDS[@]}"; do
-        if kill -0 "$pid" 2>/dev/null; then
-            kill "$pid" 2>/dev/null || true
-            sleep 0.15
-            kill -9 "$pid" 2>/dev/null || true
-            echo -e "${YELLOW}已关闭 pid=${pid}${NC}"
-        fi
-    done
+    echo -e "${RED}/local_costmap/costmap 在 ${COSTMAP_WAIT}s 内未收到消息，准备重启脚本${NC}"
+    cleanup_all_windows
     sleep 1
-    # 用绝对路径重启脚本
     exec bash "$SCRIPT_PATH" "$@"
 fi
 
 # 启动完成提示
 echo ""
 echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}  所有节点已在独立终端启动${NC}"
+echo -e "${GREEN}  所有节点已在独立终端启动，且 /local_costmap/costmap 有数据${NC}"
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}启动脚本结束${NC}"
