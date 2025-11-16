@@ -1,7 +1,6 @@
 #!/bin/bash
-# ...existing code...
 # 启动流程脚本：启动节点、等待 /scan、启动导航并一次性检查 /local_costmap/costmap（超时重启脚本）
-# 本版改进：使用 setsid 启动终端进程组并记录 PGID，仅关闭记录的进程组，避免误杀系统中其他进程
+# 使用 setsid 为每个终端创建独立进程组，记录 PGID，以便完全关闭本脚本启动的所有窗口
 
 # ===== 获取脚本绝对路径（用于重启） =====
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -28,9 +27,10 @@ SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && 
 cleanup_all_windows() {
     echo -e "${YELLOW}正在关闭所有由本脚本启动的窗口...${NC}"
     local found=0
-    for pidfile in "$PID_DIR"/pids_* 2>/dev/null; do
-        [ -f "$pidfile" ] || continue
-        pgid=$(cat "$pidfile" 2>/dev/null)
+    for pidfile in "$PID_DIR"/pids_*; do
+        [ -e "$pidfile" ] || continue
+        pgid="$(cat "$pidfile" 2>/dev/null)"
+        rm -f "$pidfile"
         if [ -n "$pgid" ]; then
             # 先尝试优雅终止进程组（负号表示进程组）
             if kill -0 -"${pgid}" 2>/dev/null; then
@@ -41,7 +41,6 @@ cleanup_all_windows() {
                 found=1
             fi
         fi
-        rm -f "$pidfile"
     done
 
     if [ $found -eq 1 ]; then
@@ -52,7 +51,7 @@ cleanup_all_windows() {
     fi
 }
 
-# 在脚本开始时先清理旧的记录（仅删除空或过期条目，并尝试关闭）
+# 在脚本开始时先清理旧的记录（尝试关闭遗留进程组）
 cleanup_all_windows
 
 # ===== 检查地图文件 =====
@@ -76,15 +75,12 @@ launch_term() {
     local cmd="$2"
     # 使用 setsid 启动一个新的会话，这样 gnome-terminal 及其子进程会在新的进程组中
     setsid gnome-terminal --title="SentryNav-${title}" -- bash -c "$SOURCE_CMD && $cmd; exec bash" >/dev/null 2>&1 &
-    # 父进程获得的 PID 是 setsid 启动的子进程的 PID
     local child_pid=$!
-    # 获取该进程的进程组（PGID == PID of group leader）
     # 等待短时间以确保进程已启动
-    sleep 0.05
+    sleep 0.08
     if kill -0 "$child_pid" 2>/dev/null; then
-        pgid=$(ps -o pgid= -p "$child_pid" | tr -d ' ')
+        pgid="$(ps -o pgid= -p "$child_pid" 2>/dev/null | tr -d ' ')"
         if [ -n "$pgid" ]; then
-            # 存储 PGID 到唯一文件，便于后续关闭
             pidfile="$PID_DIR/pids_${pgid}"
             echo "$pgid" > "$pidfile"
             echo -e "${GREEN}已启动 ${title} (pid=${child_pid}, pgid=${pgid})${NC}"
@@ -146,5 +142,5 @@ echo ""
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}  所有节点已在独立终端启动${NC}"
 echo -e "${GREEN}=====================================${NC}"
-echo -e "${GREEN}启动脚本结束${NC}
-# ...existing code...
+echo -e "${GREEN}启动脚本结束${NC}"
+echo
