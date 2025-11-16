@@ -1,157 +1,152 @@
 #!/bin/bash
 
 # ========================
-#   参数配置
+#   基础配置
 # ========================
+SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && source ../ws_livox/install/setup.bash"
+MAP_YAML="./data/new_map/map.yaml"
+SCAN_WAIT=6
+COSTMAP_WAIT=10
 
-SOURCE_CMD="source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash"
-PID_DIR="/tmp/sentry_pids"
-SCAN_WAIT=6  # 等待 /scan 的秒数
-KILL_WAIT=1  # 关闭窗口后的延迟
-TITLE_PREFIX="SentryNav"  # 终端标题前缀
-
+PID_DIR="/tmp/sentry_nav_pids"
+TITLE_PREFIX="SentryNav"
 mkdir -p "$PID_DIR"
 
+# ========================
+# 颜色
+# ========================
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
 
 # ========================
-#   启动终端函数（最终版）
+#  关闭所有窗口（按 PGID）
+# ========================
+cleanup_all_windows() {
+    echo -e "${YELLOW}正在关闭所有启动的窗口...${NC}"
+
+    for pf in "$PID_DIR"/pids_*; do
+        [ -e "$pf" ] || continue
+
+        pgid=$(cat "$pf")
+        echo -e "${YELLOW}关闭 PGID=${pgid}${NC}"
+
+        kill -TERM -"$pgid" 2>/dev/null
+        sleep 0.5
+        kill -KILL -"$pgid" 2>/dev/null
+
+        rm -f "$pf"
+    done
+
+    echo -e "${GREEN}窗口关闭完成${NC}"
+}
+
+
+# ========================
+#  启动终端（最终稳定版）
 # ========================
 launch_term() {
     local title="$1"
     local cmd="$2"
     local win_title="${TITLE_PREFIX}-${title}"
 
-    echo -e "[INFO] 启动窗口: ${win_title}"
+    echo -e "${GREEN}启动窗口: ${title}${NC}"
 
-    # 启动终端（不依赖 setsid）
-    nohup gnome-terminal --title="${win_title}" \
-        -- bash -c "$SOURCE_CMD && $cmd; exec bash" >/dev/null 2>&1 &
+    gnome-terminal \
+        --title="$win_title" \
+        -- bash -ic "$SOURCE_CMD; $cmd; exec bash" &
 
-    # 等待终端 fork 完成
-    sleep 0.6
+    sleep 0.5
 
-    # 查找带窗口标题的终端 PID（最稳方案）
-    local pid
-    pid=$(pgrep -f "${win_title}" | head -n 1)
-
+    # 找到这个窗口对应的进程
+    pid=$(pgrep -f "$win_title" | head -n 1)
     if [ -z "$pid" ]; then
-        echo -e "[ERROR] 未找到终端进程: ${win_title}"
+        echo -e "${RED}[ERROR] 启动 ${title} 失败：找不到 PID${NC}"
         return 1
     fi
 
-    # 获取 PGID
-    local pgid
     pgid=$(ps -o pgid= -p "$pid" | tr -d ' ')
-
-    if [ -n "$pgid" ]; then
-        echo "$pgid" > "${PID_DIR}/pids_${pgid}"
-        echo -e "[INFO] 成功启动: ${win_title} (pid=$pid, pgid=$pgid)"
-    else
-        echo -e "[ERROR] 启动 ${win_title} 但无法获取 PGID"
+    if [ -z "$pgid" ]; then
+        echo -e "${RED}[ERROR] 找不到 PGID${NC}"
+        return 1
     fi
+
+    echo "$pgid" > "$PID_DIR/pids_${pgid}"
+    echo -e "${GREEN}已启动 ${title} (pid=$pid, pgid=$pgid)${NC}"
 }
 
 
 # ========================
-#   关闭所有窗口
-# ========================
-cleanup_all_windows() {
-    echo -e "[INFO] 正在关闭所有窗口..."
-
-    for f in "$PID_DIR"/pids_*; do
-        [ -e "$f" ] || continue
-
-        pgid=$(basename "$f" | cut -d_ -f2)
-
-        echo -e "[INFO] kill PGID: $pgid"
-
-        # 关闭整个进程组
-        kill -TERM -"$pgid" 2>/dev/null
-        sleep 0.3
-        kill -KILL -"$pgid" 2>/dev/null
-
-        rm -f "$f"
-    done
-
-    sleep "$KILL_WAIT"
-    echo -e "[INFO] 窗口已关闭"
-}
-
-
-# ========================
-#   等待 /scan 稳定出现
+#  等待 /scan
 # ========================
 wait_for_scan() {
-    echo -e "[INFO] 等待 /scan 出现..."
+    echo -e "${YELLOW}[等待 /scan 话题，最长 ${SCAN_WAIT}s]${NC}"
 
-    if timeout "$SCAN_WAIT" bash -c '
+    if timeout $SCAN_WAIT bash -c '
         while ! ros2 topic list | grep -q "^/scan$"; do
-            sleep 0.1
+            sleep 0.2
         done
     '; then
-        echo -e "[INFO] 检测到 /scan"
+        echo -e "${GREEN}/scan 已出现${NC}"
         return 0
-    else
-        echo -e "[WARN] /scan 超时 ${SCAN_WAIT}s"
-        return 1
     fi
+
+    echo -e "${RED}/scan 未在 ${SCAN_WAIT}s 内出现${NC}"
+    return 1
 }
 
 
 # ========================
-#   启动所有节点
+#  启动流程
 # ========================
-start_all_nodes() {
+echo -e "${GREEN}=====================================${NC}"
+echo -e "${GREEN}  哨兵导航系统启动脚本${NC}"
+echo -e "${GREEN}=====================================${NC}"
 
-    cleanup_all_windows  # 先清空旧窗口
+cleanup_all_windows
 
-    launch_term "laser_lvx2bag" "ros2 launch rose_simulator laser_lvx_to_bag.launch.py"
+eval "$SOURCE_CMD"
 
-    launch_term "laser2" "ros2 launch rose_robot rose_livox.launch.py"
+# 启动节点顺序（按你的原脚本）
+launch_term "Livox-Driver" "ros2 launch livox_ros_driver2 msg_MID360_launch.py"
+sleep 3
 
-    launch_term "mapping" "ros2 launch rose_robot rose_mapping_nocollision.launch.py"
+launch_term "Lightning-LM" "ros2 run lightning run_loc_online --config ./src/lightning-lm/config/default_nclt.yaml"
+sleep 2
 
-    launch_term "navigation" "ros2 launch rose_robot rose_global_planning_nav.launch.py rviz:=false"
+launch_term "Fast-LIO" "ros2 launch fast_lio mapping.launch.py"
+sleep 2
 
-    launch_term "camera" "ros2 launch rose_robot rose_rgbd_camera.launch.py"
+launch_term "TF-Odom-Publisher" "ros2 run sentry_navigation tf_odom_publisher --ros-args --params-file ./src/sentry_navigation/config/lidar.yaml"
+sleep 1
 
-    launch_term "behavior" "ros2 launch test_behavior behavior_navigation.launch.py"
+launch_term "Livox-to-Scan" "ros2 run livox_to_scan livox_to_scan_node --ros-args --params-file install/livox_to_scan/share/livox_to_scan/config/livox_to_scan_params.yaml"
 
-    launch_term "local_mask" "ros2 launch test_behavior mask_avoidance.launch.py"
+# 等待 /scan
+if ! wait_for_scan; then
+    echo -e "${RED}重启脚本...${NC}"
+    cleanup_all_windows
+    exec bash "$0" "$@"
+fi
 
-    launch_term "global_remap" "ros2 run test_behavior global_remap"
+sleep 1
 
-    launch_term "rotate" "ros2 run laser_rotate rotate"
+launch_term "USB-Serial-Comm" "ros2 launch serial_comm serial_comm.launch.py"
+sleep 2
 
-    launch_term "print" "ros2 run print_test print_node"
-}
+launch_term "Navigation-Stack" "ros2 launch sentry_navigation navigation_launch.py map:='$MAP_YAML' use_rviz:=true"
 
+echo -e "${YELLOW}[检查 /local_costmap/costmap，最长 ${COSTMAP_WAIT}s]${NC}"
+if timeout $COSTMAP_WAIT ros2 topic echo /local_costmap/costmap --once >/dev/null 2>&1; then
+    echo -e "${GREEN}/local_costmap/costmap 有数据，启动成功${NC}"
+else
+    echo -e "${RED}/local_costmap/costmap 超时，重启脚本${NC}"
+    cleanup_all_windows
+    exec bash "$0" "$@"
+fi
 
-# ========================
-#   主循环（可放 systemd）
-# ========================
-echo -e "==============================="
-echo -e "  自动启动与监测脚本开始运行"
-echo -e "===============================\n"
-
-while true; do
-
-    start_all_nodes
-
-    # 等待 /scan 出现
-    wait_for_scan
-    if [ $? -ne 0 ]; then
-        echo -e "[ERROR] /scan 未出现 → 重启所有节点"
-        continue    # 回到 start_all_nodes
-    fi
-
-    echo -e "[INFO] 系统已启动，进入监控模式"
-
-    # === 根据需要可以添加监控逻辑 ===
-    # 比如检测节点是否退出
-    # detect_failure || continue
-
-    # 暂时只保持运行
-    sleep 999999
-
-done
+echo -e "${GREEN}=====================================${NC}"
+echo -e "${GREEN}  所有节点已成功启动${NC}"
+echo -e "${GREEN}=====================================${NC}"
