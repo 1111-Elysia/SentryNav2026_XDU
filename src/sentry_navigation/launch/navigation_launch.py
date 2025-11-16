@@ -19,6 +19,8 @@ def generate_launch_description():
         default=os.path.join('./data/new_map', 'map.yaml'))
     params_file = LaunchConfiguration('params_file',
         default=os.path.join(sentry_nav_dir, 'config', 'navigation_params.yaml'))
+    lidar_params_file = LaunchConfiguration('lidar_params_file',
+        default=os.path.join(sentry_nav_dir, 'config', 'lidar.yaml'))
     rviz_config_file = LaunchConfiguration('rviz_config',
         default=os.path.join(sentry_nav_dir, 'config', 'nav2_default_view.rviz'))
 
@@ -44,6 +46,11 @@ def generate_launch_description():
             description='Full path to param file'),
         
         DeclareLaunchArgument(
+            'lidar_params_file',
+            default_value=lidar_params_file,
+            description='Full path to lidar/TF params file'),
+        
+        DeclareLaunchArgument(
             'rviz_config',
             default_value=rviz_config_file,
             description='Full path to RViz config file'),
@@ -67,12 +74,13 @@ def generate_launch_description():
                        {'autostart': True},
                        {'node_names': ['map_server']}]),
 
-        # 启动TF和Odom发布节点
+        # 启动TF和Odom发布节点（加载 lidar.yaml 配置）
         Node(
             package='sentry_navigation',
             executable='tf_odom_publisher',
             name='tf_odom_publisher',
-            output='screen'),
+            output='screen',
+            parameters=[lidar_params_file]),
 
         # 延迟2秒启动Nav2（等待TF树建立）
         TimerAction(
