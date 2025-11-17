@@ -8,11 +8,11 @@ tf_odom_publisher:
     
     # ===== C: base_link → livox_frame 变换参数 =====
     # 平移 (m)
-    base_link_to_livox_x: 0.0
-    base_link_to_livox_y: 0.117
+    base_link_to_livox_x: 0.16
+    base_link_to_livox_y: 0.0
     base_link_to_livox_z: 0.0
     
     # 旋转 角度制
     base_link_to_livox_roll: 0.0
-    base_link_to_livox_pitch: 0.0
+    base_link_to_livox_pitch: 45.0
     base_link_to_livox_yaw: 0.0
