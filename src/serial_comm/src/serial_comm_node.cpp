@@ -12,6 +12,7 @@ typedef struct {
     float vx;
     float vy;
     float vyaw;
+    // float vw
     uint8_t _EOF;
 } NucControlFrame;
 #pragma pack(pop)
@@ -114,7 +115,7 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     
     std::mutex mutex_;
-    float vx_ = 0.1, vy_ = 0, vyaw_ = 0;
+    float vx_ = 0, vy_ = 0, vyaw_ = 0;
     size_t send_count_ = 0;
     rclcpp::Time last_log_{this->now()};
 };
