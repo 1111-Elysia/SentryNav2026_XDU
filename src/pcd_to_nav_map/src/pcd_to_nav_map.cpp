@@ -11,6 +11,8 @@
 #include <pcl/common/common.h> // For pcl::getMinMax3D
 #include <pcl/filters/passthrough.h> // 用于高度过滤
 #include <pcl/filters/voxel_grid.h> // 用于体素下采样
+#include <pcl/common/transforms.h> // 用于点云变换
+#include <Eigen/Geometry> // 用于旋转变换
 
 #include <nlohmann/json.hpp> // JSON库头文件
 
@@ -39,6 +41,10 @@ int main(int argc, char** argv) {
     double occupied_thresh;
     double free_thresh;
     double map_padding;
+    // 三轴旋转角度（度），表示传感器在各轴上的旋转角度，正值按右手定则（度）
+    double rotation_deg_x;
+    double rotation_deg_y;
+    double rotation_deg_z;
 
     try {
         std::ifstream config_stream(config_file);
@@ -58,6 +64,11 @@ int main(int argc, char** argv) {
         occupied_thresh = config.at("occupied_thresh").get<double>();
         free_thresh = config.at("free_thresh").get<double>();
         map_padding = config.at("map_padding").get<double>();
+
+        // 三轴旋转参数，单位：度。默认 0.0
+        rotation_deg_x = config.value("rotation_deg_x", 0.0);
+        rotation_deg_y = config.value("rotation_deg_y", 0.0);
+        rotation_deg_z = config.value("rotation_deg_z", 0.0);
 
         std::cout << "从 " << config_file << " 加载配置成功。" << std::endl;
 
@@ -88,6 +99,35 @@ int main(int argc, char** argv) {
          return -1;
     }
 
+    // ----- 新增：将传感器旋转的点云旋转回水平（或者世界基准） -----
+    // 说明：rotation_deg_x/y/z 为传感器相对世界的旋转角（单位：度）。程序会对点云应用相反的旋转以恢复到未旋转的参考系。
+    if (std::abs(rotation_deg_x) > 1e-9 || std::abs(rotation_deg_y) > 1e-9 || std::abs(rotation_deg_z) > 1e-9) {
+        // 将角度转为弧度，并取负值以撤销传感器的旋转
+        double rx_rad = -rotation_deg_x * M_PI / 180.0;
+        double ry_rad = -rotation_deg_y * M_PI / 180.0;
+        double rz_rad = -rotation_deg_z * M_PI / 180.0;
+
+        Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+        // 使用 Z (yaw) * Y (pitch) * X (roll) 的顺序合成旋转，注意我们使用的是负角度以撤销原始旋转
+        Eigen::AngleAxisf rot_x(static_cast<float>(rx_rad), Eigen::Vector3f::UnitX());
+        Eigen::AngleAxisf rot_y(static_cast<float>(ry_rad), Eigen::Vector3f::UnitY());
+        Eigen::AngleAxisf rot_z(static_cast<float>(rz_rad), Eigen::Vector3f::UnitZ());
+
+        Eigen::Matrix3f rotation = (rot_z * rot_y * rot_x).toRotationMatrix();
+        transform.rotate(rotation);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_aligned(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::transformPointCloud(*cloud_raw, *cloud_aligned, transform);
+
+        cloud_raw = cloud_aligned; // 后续处理使用对齐后的点云
+
+        std::cout << "已对点云应用逆旋转 (deg): [" 
+                  << -rotation_deg_x << ", " << -rotation_deg_y << ", " << -rotation_deg_z 
+                  << "] -> 实际应用角 (deg): [" << rx_rad * 180.0 / M_PI << ", " << ry_rad * 180.0 / M_PI << ", " << rz_rad * 180.0 / M_PI << "]" << std::endl;
+    } else {
+        std::cout << "rotation_deg_x/y/z 都为 0，跳过点云旋转。" << std::endl;
+    }
+
     // 2. 高度过滤
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PassThrough<pcl::PointXYZ> pass_z;
@@ -107,7 +147,6 @@ int main(int argc, char** argv) {
     }
 
     // 3. 体素下采样
-    // ... (后续代码保持不变) ...
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::VoxelGrid<pcl::PointXYZ> vg;
     vg.setInputCloud(cloud_filtered_z);

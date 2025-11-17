@@ -1,5 +1,5 @@
 {
-  "output_prefix": "/home/nuc/workspace/SentryNav2026_XDU/data",
+  "output_prefix": "/home/nuc/Desktop/SentryNav2026_XDU/data",
   "resolution": 0.05,
   "min_z_height": 0.0,
   "max_z_height": 1.5,
@@ -9,5 +9,8 @@
   "unknown_value": 205,
   "occupied_thresh": 0.65,
   "free_thresh": 0.25,
-  "map_padding": 1.5
+  "map_padding": 1.5,
+  "rotation_deg_x": 0.0,
+  "rotation_deg_y": 45.0,
+  "rotation_deg_z": 0.0
 }

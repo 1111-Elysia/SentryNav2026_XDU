@@ -31,9 +31,13 @@ public:
         this->get_parameter("base_link_to_livox_x", livox_offset_x_);
         this->get_parameter("base_link_to_livox_y", livox_offset_y_);
         this->get_parameter("base_link_to_livox_z", livox_offset_z_);
-        this->get_parameter("base_link_to_livox_roll", livox_offset_roll_);
-        this->get_parameter("base_link_to_livox_pitch", livox_offset_pitch_);
-        this->get_parameter("base_link_to_livox_yaw", livox_offset_yaw_);
+        double roll_deg = 0.0, pitch_deg = 0.0, yaw_deg = 0.0;
+        this->get_parameter("base_link_to_livox_roll", roll_deg);
+        this->get_parameter("base_link_to_livox_pitch", pitch_deg);
+        this->get_parameter("base_link_to_livox_yaw", yaw_deg);
+        livox_offset_roll_  = roll_deg  * M_PI / 180.0;
+        livox_offset_pitch_ = pitch_deg * M_PI / 180.0;
+        livox_offset_yaw_   = yaw_deg   * M_PI / 180.0;
         double publish_rate = 50.0;
         this->get_parameter("publish_rate", publish_rate);
 

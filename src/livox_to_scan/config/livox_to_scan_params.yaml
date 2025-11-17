@@ -1,7 +1,7 @@
 livox_to_scan_node:
   ros__parameters:
     # 高度过滤参数（米）
-    min_height: 0.1
+    min_height: 0.05
     max_height: 0.5
     
     # 角度范围参数（弧度）

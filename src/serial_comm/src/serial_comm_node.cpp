@@ -68,8 +68,8 @@ private:
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        vx_   =  msg->linear.x / 10.0f;
-        vy_   =  msg->linear.y / 10.0f;
+        vx_   =  msg->linear.x;
+        vy_   =  msg->linear.y;
         // vyaw_ =  msg->angular.z / 2.0f;
         vyaw_ =  0;
     }
@@ -114,7 +114,7 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     
     std::mutex mutex_;
-    float vx_ = 0, vy_ = 0, vyaw_ = 0;
+    float vx_ = 0.1, vy_ = 0, vyaw_ = 0;
     size_t send_count_ = 0;
     rclcpp::Time last_log_{this->now()};
 };
