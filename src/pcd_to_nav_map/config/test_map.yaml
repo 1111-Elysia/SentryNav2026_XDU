@@ -1,0 +1,37 @@
+map_server:
+  ros__parameters:
+    use_sim_time: false
+    yaml_filename: "/media/gc/Software/workplace/Sentry/Test_workplace/kiss-icp/src/resource/map/0502/0502.yaml"
+    topic_name: "/map"
+    frame_id: "map"
+
+# Parameters for the global_costmap node
+global_costmap: # Node namespace, should match the node name in launch file if namespacing parameters
+  ros__parameters:
+    update_frequency: 1.0       # How often to update the costmap (Hz). Can be low if only static.
+    publish_frequency: 1.0      # How often to publish the costmap (Hz).
+    global_frame: map           # The global frame for the costmap, must match map_server.
+    robot_base_frame: base_link # The robot's base frame. Required by costmap logic.
+                                # We'll publish a static transform for this later.
+    robot_radius: 0.35
+    resolution: 0.05
+    use_sim_time: false         # Match the rest of the system.
+    rolling_window: false       # Global costmap typically doesn't roll.
+    always_send_full_costmap: true # Publish the full costmap each time.
+
+    # --- Plugins ---
+    # Define the layers (plugins) that make up this costmap.
+    # Order matters: static map first, then inflation.
+    plugins: ["static_layer", "inflation_layer"]
+
+    # --- Plugin Configurations ---
+    static_layer:
+      plugin: "nav2_costmap_2d::StaticLayer"
+      map_subscribe_transient_local: True # IMPORTANT: Use Transient Local QoS to get the map
+      # map_topic: "/map" # Default topic name is /map, uncomment to override
+
+    inflation_layer:
+      plugin: "nav2_costmap_2d::InflationLayer"
+      cost_scaling_factor: 3.0      # Exponential decay rate. Higher means sharper falloff.
+      inflation_radius: 0.35        # Max distance inflation spreads from obstacles (meters).
+      inflate_unknown: false        # Don't inflate unknown space.
