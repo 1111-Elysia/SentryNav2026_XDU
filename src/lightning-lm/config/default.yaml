@@ -3,7 +3,7 @@ common:
   dataset: "nclt"
   lidar_topic: "points_raw"
   livox_lidar_topic: "/livox/lidar"
-  imu_topic: "imu_raw"
+  imu_topic: "/livox/imu"
 
 # fasterlio 参数
 fasterlio:

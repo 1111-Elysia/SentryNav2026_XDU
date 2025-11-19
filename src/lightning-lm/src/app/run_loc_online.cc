@@ -4,6 +4,7 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <Sophus/se3.hpp> 
 
 #include "core/system/loc_system.h"
 #include "ui/pangolin_window.h"
@@ -29,8 +30,23 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "failed to init loc";
     }
 
+    double roll_rad = 0.0 * M_PI / 180.0;
+    double pitch_rad = 45.0 * M_PI / 180.0;
+    double yaw_rad = 0.0 * M_PI / 180.0;
+    
+    // 创建旋转矩阵 (SO3)
+    Sophus::SO3d rotation = Sophus::SO3d::rotZ(yaw_rad) * Sophus::SO3d::rotY(pitch_rad) * Sophus::SO3d::rotX(roll_rad);
+    
+    // 创建平移向量
+    Eigen::Vector3d translation(0.0, 0.0, 0.0);
+    
+    // 创建 SE3 位姿
+    Sophus::SE3d init_pose(rotation, translation);
+
     /// 默认起点开始定位
-    loc.SetInitPose(SE3());
+    LOG(INFO) << "初始位姿: " << init_pose.translation().transpose() 
+          << ", 四元数: " << init_pose.unit_quaternion().coeffs().transpose();
+    loc.SetInitPose(init_pose);
     loc.Spin();
 
     rclcpp::shutdown();
