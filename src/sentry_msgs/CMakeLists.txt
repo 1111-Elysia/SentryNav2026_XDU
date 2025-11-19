@@ -11,8 +11,7 @@ set(msg_files
   msg/MatchStage.msg
   msg/RemainTime.msg
   msg/Remain17mm.msg
-  msg/IsBlue.msg
-  msg/RobotId.msg
+  msg/Color.msg
   msg/Vw.msg
   msg/ScanMode.msg
 )

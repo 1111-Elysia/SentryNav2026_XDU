@@ -18,11 +18,18 @@ ament_target_dependencies(serial_comm_node
   rclcpp
   geometry_msgs
   std_msgs
-  sentry_msgs              # 新增
+  sentry_msgs
+)
+
+add_executable(serial_receive_node src/serial_receive_node.cpp)  # 新增
+ament_target_dependencies(serial_receive_node                     # 新增
+  rclcpp
+  sentry_msgs
 )
 
 install(TARGETS
   serial_comm_node
+  serial_receive_node    # 新增
   DESTINATION lib/${PROJECT_NAME}
 )
 

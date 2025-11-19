@@ -28,11 +28,21 @@ public:
         this->declare_parameter<std::string>("port", "/dev/ttyACM0");
         this->declare_parameter<int>("baudrate", 115200);
         this->declare_parameter<int>("send_frequency", 500);
-        
+
+        // 声明并读取话题名参数（默认值与原来一致）
+        this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
+        this->declare_parameter<std::string>("vw_topic", "/vw");
+        this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
+
         std::string port = this->get_parameter("port").as_string();
         int baudrate = this->get_parameter("baudrate").as_int();
         int send_freq = this->get_parameter("send_frequency").as_int();
-        
+
+        // 获取参数化的话题名
+        std::string cmd_vel_topic = this->get_parameter("cmd_vel_topic").as_string();
+        std::string vw_topic = this->get_parameter("vw_topic").as_string();
+        std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
+
         try {
             serial_port_.open(port);
             serial_port_.set_option(boost::asio::serial_port_base::baud_rate(baudrate));
@@ -43,19 +53,20 @@ public:
             return;
         }
 
+        // 使用参数化的话题名创建订阅
         cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-            "/cmd_vel", 10,
+            cmd_vel_topic, 10,
             std::bind(&SerialCommNode::cmdVelCallback, this, std::placeholders::_1));
 
         vw_sub_ = this->create_subscription<sentry_msgs::msg::Vw>(
-            "/vw", 10,
+            vw_topic, 10,
             [this](const sentry_msgs::msg::Vw::SharedPtr m){
                 std::lock_guard<std::mutex> lk(mutex_);
                 vw_ = m->vw;
             });
 
         scan_mod_sub_ = this->create_subscription<sentry_msgs::msg::ScanMode>(
-            "/mas_type", 10,   // 按需求: scan_mod_type 从 /mas_type 获取
+            scan_mod_type_topic, 10,
             [this](const sentry_msgs::msg::ScanMode::SharedPtr m){
                 std::lock_guard<std::mutex> lk(mutex_);
                 scan_mod_type_ = m->scan_mod_type;
