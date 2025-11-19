@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <mutex>
 #include <chrono>
+#include <sentry_msgs/msg/vw.hpp>          
+#include <sentry_msgs/msg/scan_mode.hpp>   
 
 #pragma pack(push, 1)
 typedef struct {
@@ -12,7 +14,8 @@ typedef struct {
     float vx;
     float vy;
     float vyaw;
-    // float vw
+    float vw;             
+    bool  scan_mod_type;  
     uint8_t _EOF;
 } NucControlFrame;
 #pragma pack(pop)
@@ -44,6 +47,20 @@ public:
             "/cmd_vel", 10,
             std::bind(&SerialCommNode::cmdVelCallback, this, std::placeholders::_1));
 
+        vw_sub_ = this->create_subscription<sentry_msgs::msg::Vw>(
+            "/vw", 10,
+            [this](const sentry_msgs::msg::Vw::SharedPtr m){
+                std::lock_guard<std::mutex> lk(mutex_);
+                vw_ = m->vw;
+            });
+
+        scan_mod_sub_ = this->create_subscription<sentry_msgs::msg::ScanMode>(
+            "/mas_type", 10,   // 按需求: scan_mod_type 从 /mas_type 获取
+            [this](const sentry_msgs::msg::ScanMode::SharedPtr m){
+                std::lock_guard<std::mutex> lk(mutex_);
+                scan_mod_type_ = m->scan_mod_type;
+            });
+
         int period_ms = 1000 / send_freq;
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(period_ms),
@@ -59,6 +76,8 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_);
             vx_ = vy_ = vyaw_ = 0;
+            vw_ = 0;                
+            scan_mod_type_ = false; 
         }
         sendFrame();
         if (serial_port_.is_open()) serial_port_.close();
@@ -80,16 +99,15 @@ private:
         NucControlFrame frame;
         frame.SOF = 0x55;
         frame.ID = 0x04;
-        
         {
             std::lock_guard<std::mutex> lock(mutex_);
             frame.vx = vx_;
             frame.vy = vy_;
             frame.vyaw = vyaw_;
+            frame.vw = vw_;                     // 新增
+            frame.scan_mod_type = scan_mod_type_;// 新增
         }
-        
         frame._EOF = 0xFF;
-        
         try {
             boost::asio::write(serial_port_, boost::asio::buffer(&frame, sizeof(frame)));
             
@@ -98,8 +116,9 @@ private:
             if ((now - last_log_).seconds() >= 1.0) {
                 double freq = send_count_ / (now - last_log_).seconds();
                 RCLCPP_INFO(this->get_logger(),
-                    "发送: %.1f Hz | 车体系: vx=%.3f(右) vy=%.3f(前) vyaw=%.3f",
-                    freq, frame.vx, frame.vy, frame.vyaw);
+                    "发送: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u",
+                    freq, frame.vx, frame.vy, frame.vyaw, frame.vw,
+                    (unsigned)frame.scan_mod_type);
                 send_count_ = 0;
                 last_log_ = now;
             }
@@ -112,10 +131,14 @@ private:
     boost::asio::io_context io_context_;
     boost::asio::serial_port serial_port_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+    rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr vw_sub_;          
+    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr scan_mod_sub_; 
     rclcpp::TimerBase::SharedPtr timer_;
     
     std::mutex mutex_;
     float vx_ = 0, vy_ = 0, vyaw_ = 0;
+    float vw_ = 0;              
+    bool  scan_mod_type_ = false; 
     size_t send_count_ = 0;
     rclcpp::Time last_log_{this->now()};
 };

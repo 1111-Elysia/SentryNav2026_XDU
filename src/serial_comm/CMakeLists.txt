@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sentry_msgs REQUIRED)   # 新增
 
 include_directories(include)
 
@@ -17,6 +18,7 @@ ament_target_dependencies(serial_comm_node
   rclcpp
   geometry_msgs
   std_msgs
+  sentry_msgs              # 新增
 )
 
 install(TARGETS

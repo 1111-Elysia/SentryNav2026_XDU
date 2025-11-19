@@ -12,7 +12,8 @@
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
-  <depend>libboost-dev</depend>
+  <depend>std_msgs</depend>
+  <depend>sentry_msgs</depend> <!-- 新增依赖 -->
 
   <export>
     <build_type>ament_cmake</build_type>
