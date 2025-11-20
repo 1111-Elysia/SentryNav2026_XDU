@@ -5,7 +5,8 @@
 #include <mutex>
 #include <chrono>
 #include <sentry_msgs/msg/vw.hpp>          
-#include <sentry_msgs/msg/scan_mode.hpp>   
+#include <sentry_msgs/msg/scan_mode.hpp>
+#include <sentry_msgs/msg/match_stage.hpp>   // 新增
 
 #pragma pack(push, 1)
 typedef struct {
@@ -33,6 +34,7 @@ public:
         this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
         this->declare_parameter<std::string>("vw_topic", "/vw");
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
+        this->declare_parameter<std::string>("match_stage_topic", "/match_stage");  // 新增
 
         std::string port = this->get_parameter("port").as_string();
         int baudrate = this->get_parameter("baudrate").as_int();
@@ -42,6 +44,7 @@ public:
         std::string cmd_vel_topic = this->get_parameter("cmd_vel_topic").as_string();
         std::string vw_topic = this->get_parameter("vw_topic").as_string();
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
+        std::string match_stage_topic = this->get_parameter("match_stage_topic").as_string();  // 新增
 
         try {
             serial_port_.open(port);
@@ -70,6 +73,18 @@ public:
             [this](const sentry_msgs::msg::ScanMode::SharedPtr m){
                 std::lock_guard<std::mutex> lk(mutex_);
                 scan_mod_type_ = m->scan_mod_type;
+            });
+
+        // 新增：订阅比赛阶段
+        match_stage_sub_ = this->create_subscription<sentry_msgs::msg::MatchStage>(
+            match_stage_topic, 10,
+            [this](const sentry_msgs::msg::MatchStage::SharedPtr m){
+                std::lock_guard<std::mutex> lk(mutex_);
+                match_stage_ = m->match_stage;
+                if (match_stage_ != 4) {
+                    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                        "比赛阶段=%u (!=4)，控制量清零", match_stage_);
+                }
             });
 
         int period_ms = 1000 / send_freq;
@@ -112,11 +127,20 @@ private:
         frame.ID = 0x04;
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            frame.vx = vx_;
-            frame.vy = vy_;
-            frame.vyaw = vyaw_;
-            frame.vw = vw_;                     // 新增
-            frame.scan_mod_type = scan_mod_type_;// 新增
+            // 当 match_stage != 4 时，所有控制量设置为 0
+            if (match_stage_ != 4) {
+                frame.vx = 0;
+                frame.vy = 0;
+                frame.vyaw = 0;
+                frame.vw = 0;
+                frame.scan_mod_type = false;
+            } else {
+                frame.vx = vx_;
+                frame.vy = vy_;
+                frame.vyaw = vyaw_;
+                frame.vw = vw_;
+                frame.scan_mod_type = scan_mod_type_;
+            }
         }
         frame._EOF = 0xFF;
         try {
@@ -127,8 +151,8 @@ private:
             if ((now - last_log_).seconds() >= 1.0) {
                 double freq = send_count_ / (now - last_log_).seconds();
                 RCLCPP_INFO(this->get_logger(),
-                    "发送: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u",
-                    freq, frame.vx, frame.vy, frame.vyaw, frame.vw,
+                    "发送: %.1f Hz | stage=%u vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u",
+                    freq, match_stage_, frame.vx, frame.vy, frame.vyaw, frame.vw,
                     (unsigned)frame.scan_mod_type);
                 send_count_ = 0;
                 last_log_ = now;
@@ -143,13 +167,15 @@ private:
     boost::asio::serial_port serial_port_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr vw_sub_;          
-    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr scan_mod_sub_; 
+    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr scan_mod_sub_;
+    rclcpp::Subscription<sentry_msgs::msg::MatchStage>::SharedPtr match_stage_sub_;  // 新增
     rclcpp::TimerBase::SharedPtr timer_;
     
     std::mutex mutex_;
     float vx_ = 0, vy_ = 0, vyaw_ = 0;
     float vw_ = 0;              
-    bool  scan_mod_type_ = false; 
+    bool  scan_mod_type_ = false;
+    uint8_t match_stage_ = 0;  // 新增：默认为0，表示未开始
     size_t send_count_ = 0;
     rclcpp::Time last_log_{this->now()};
 };
