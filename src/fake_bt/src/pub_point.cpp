@@ -69,7 +69,6 @@ private:
     double timeout_sec_;
     std::mutex lock_;
     rclcpp::TimerBase::SharedPtr timeout_timer_;
-    rclcpp::TimerBase::SharedPtr oneshot_timer_;
 
     // -------------------- 发送下一个点 --------------------
     void send_next_goal()
@@ -87,6 +86,7 @@ private:
 
         auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
 
+        // Nav2 结果回调
         options.result_callback =
             [this](const GoalHandleNav::WrappedResult & result)
             {
@@ -97,11 +97,13 @@ private:
                 else
                     RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
 
-                create_oneshot_timer([this]() { next_index_and_send(); });
+                // 延迟 0.5s 发下一点
+                create_delay_timer(500ms, [this]() { next_index_and_send(); });
             };
 
         client_->async_send_goal(goal, options);
 
+        // 启动超时定时器
         timeout_timer_ = create_wall_timer(
             std::chrono::duration<double>(timeout_sec_),
             [this]()
@@ -109,7 +111,7 @@ private:
                 RCLCPP_WARN(get_logger(), "超时 %.1f 秒，切换下一个点", timeout_sec_);
                 timeout_timer_.reset();
 
-                create_oneshot_timer([this]() { next_index_and_send(); });
+                create_delay_timer(500ms, [this]() { next_index_and_send(); });
             }
         );
     }
@@ -118,30 +120,29 @@ private:
     void next_index_and_send()
     {
         index_++;
-
         if (index_ >= points_.size())
         {
             RCLCPP_INFO(get_logger(), "所有路径点已完成，重新开始循环");
-            index_ = 0;  // 🔹 无限循环回第一个点
+            index_ = 0;  // 无限循环回第一个点
         }
 
         send_next_goal();
     }
 
-    // -------------------- 一次性定时器 --------------------
-    void create_oneshot_timer(std::function<void()> func)
+    // -------------------- 延迟定时器 --------------------
+    void create_delay_timer(std::chrono::milliseconds delay, std::function<void()> func)
     {
-        oneshot_timer_ = create_wall_timer(
-            1ms,
+        // 延迟一次执行
+        timeout_timer_ = create_wall_timer(
+            delay,
             [this, func]()
             {
+                timeout_timer_.reset();  // 执行一次后销毁
                 func();
-                oneshot_timer_.reset();
             }
         );
     }
 };
-
 
 int main(int argc, char **argv)
 {
