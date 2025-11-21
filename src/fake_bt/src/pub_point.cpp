@@ -75,6 +75,12 @@ private:
     {
         std::lock_guard<std::mutex> guard(lock_);
 
+        // 取消之前的 timeout timer
+        if (timeout_timer_) {
+            timeout_timer_->cancel();
+            timeout_timer_.reset();
+        }
+
         auto goal = NavigateToPose::Goal();
         goal.pose = points_[index_];
 
@@ -87,19 +93,22 @@ private:
         auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
 
         // Nav2 结果回调
-        options.result_callback =
-            [this](const GoalHandleNav::WrappedResult & result)
-            {
+        options.result_callback = [this](const GoalHandleNav::WrappedResult & result)
+        {
+            // 确保 timeout timer 已取消
+            if (timeout_timer_) {
+                timeout_timer_->cancel();
                 timeout_timer_.reset();
+            }
 
-                if (result.code == rclcpp_action::ResultCode::SUCCEEDED)
-                    RCLCPP_INFO(get_logger(), "到达目标点");
-                else
-                    RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED)
+                RCLCPP_INFO(get_logger(), "到达目标点");
+            else
+                RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
 
-                // 延迟 0.5s 发下一点
-                create_delay_timer(3000ms, [this]() { next_index_and_send(); });
-            };
+            // 延迟 0.5s 发下一点
+            create_delay_timer(500ms, [this]() { next_index_and_send(); });
+        };
 
         client_->async_send_goal(goal, options);
 
@@ -109,8 +118,15 @@ private:
             [this]()
             {
                 RCLCPP_WARN(get_logger(), "超时 %.1f 秒，切换下一个点", timeout_sec_);
-                timeout_timer_.reset();
 
+                // 取消当前 goal
+                client_->async_cancel_all_goals();
+
+                // 延迟 0.5s 发下一点
+                if (timeout_timer_) {
+                    timeout_timer_->cancel();
+                    timeout_timer_.reset();
+                }
                 create_delay_timer(500ms, [this]() { next_index_and_send(); });
             }
         );
@@ -132,12 +148,12 @@ private:
     // -------------------- 延迟定时器 --------------------
     void create_delay_timer(std::chrono::milliseconds delay, std::function<void()> func)
     {
-        // 延迟一次执行
         timeout_timer_ = create_wall_timer(
             delay,
             [this, func]()
             {
-                timeout_timer_.reset();  // 执行一次后销毁
+                timeout_timer_->cancel();
+                timeout_timer_.reset();
                 func();
             }
         );
