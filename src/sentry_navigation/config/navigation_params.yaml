@@ -137,7 +137,7 @@ controller_server:
       #   offset_from_furthest: 4           # 从最远点的偏移
       #   threshold_to_consider: 0.8        # 考虑的距离阈值 (m)
       #   max_angle_to_furthest: 0.4        # 最大角度 (rad)
-      #   mode: 2                           # 模式：0=前向，1=偏好前向，2=无偏好
+      #   mode: 0                           # 模式：0=前向，1=偏好前向，2=无偏好
       
       # ----- 噪声生成器 -----
       # MPPI 使用随机采样生成轨迹

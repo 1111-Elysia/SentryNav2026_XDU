@@ -6,7 +6,7 @@
 SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && source ../ws_livox/install/setup.bash"
 MAP_YAML="./data/new_map/map.yaml"
 SCAN_WAIT=6
-COSTMAP_WAIT=10
+COSTMAP_WAIT=15
 
 PID_DIR="/tmp/sentry_nav_pids"
 TITLE_PREFIX="SentryNav"

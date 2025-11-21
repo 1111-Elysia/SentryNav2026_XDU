@@ -114,9 +114,9 @@ private:
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        vx_   =  msg->linear.x * 40;
-        vy_   =  msg->linear.y * 40;
-        // vyaw_ =  msg->angular.z / 2.0f;
+        vx_   =  msg->linear.x;
+        vy_   =  msg->linear.y;
+        vyaw_ =  msg->angular.z;
         vyaw_ =  0;
     }
 

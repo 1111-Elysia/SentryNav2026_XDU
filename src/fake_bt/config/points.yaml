@@ -1,0 +1,7 @@
+pub_point:
+  ros__parameters:
+    points: [0.0, 0.0, 0.0,
+             1.0, 1.0, 180.0]
+
+    # 超时时间（秒）
+    timeout: 8.0

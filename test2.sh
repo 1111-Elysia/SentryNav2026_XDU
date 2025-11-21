@@ -6,7 +6,7 @@
 SOURCE_CMD="source /opt/ros/humble/setup.bash && source ./install/setup.bash && source ../ws_livox/install/setup.bash"
 MAP_YAML="./data/new_map/map.yaml"
 SCAN_WAIT=6
-COSTMAP_WAIT=10
+COSTMAP_WAIT=15
 
 PID_DIR="/tmp/sentry_nav_pids"
 TITLE_PREFIX="SentryNav"
@@ -137,6 +137,11 @@ launch_term "USB-Serial-Comm" "ros2 launch serial_comm serial_comm.launch.py"
 sleep 2
 
 launch_term "Navigation-Stack" "ros2 launch sentry_navigation navigation_launch.py map:='$MAP_YAML' use_rviz:=true"
+sleep 2
+
+# 新增：启动 point_pub 节点（使用包内 params 文件）
+launch_term "easy_bt" "ros2 launch fake_bt control_fake_bt.launch.py "
+sleep 1
 
 # costmap 检查
 echo -e "${YELLOW}[检查 /local_costmap/costmap，最长 ${COSTMAP_WAIT}s]${NC}"
@@ -147,8 +152,6 @@ else
     cleanup_all_windows
     exec bash "$0" "$@"
 fi
-
-launch_term "Target-Pose-Publisher" "ros2 run sentry_navigation target_pose_publisher"
 
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}  所有节点已成功启动${NC}"

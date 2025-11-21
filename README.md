@@ -1,5 +1,10 @@
 # Sentry Navigation 2026 XDU
 
+ros2 topic pub /hurt_armor sentry_msgs/msg/HurtArmor "{hurt_armor: 2}" -r 1
+ros2 topic pub /hurt_armor sentry_msgs/msg/HurtArmor "{hurt_armor: 0}" -1
+ros2 topic pub /match_stage sentry_msgs/msg/MatchStage "{match_stage: 4}" -r 1
+
+
 ## 依赖安装
 
 ```bash
