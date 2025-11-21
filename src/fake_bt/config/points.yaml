@@ -3,5 +3,4 @@ pub_point:
     points: [0.0, 0.0, 0.0,
              1.0, 1.0, 180.0]
 
-    # 超时时间（秒）
-    timeout: 5.0
+    interval: 5.0

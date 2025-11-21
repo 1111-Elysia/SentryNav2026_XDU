@@ -16,12 +16,12 @@ public:
     using NavigateToPose = nav2_msgs::action::NavigateToPose;
     using GoalHandleNav = rclcpp_action::ClientGoalHandle<NavigateToPose>;
 
-    PubPoint() : Node("pub_point"), index_(0), goal_active_(false)
+    PubPoint() : Node("pub_point"), index_(0)
     {
         declare_parameter("points", std::vector<double>{});
-        declare_parameter("timeout", 10.0);
+        declare_parameter("interval", 2.0);  // 定时发布的时间间隔
 
-        timeout_sec_ = get_parameter("timeout").as_double();
+        interval_sec_ = get_parameter("interval").as_double();
 
         // 读取 points 数组
         std::vector<double> flat = get_parameter("points").as_double_array();
@@ -58,30 +58,26 @@ public:
         RCLCPP_INFO(get_logger(), "等待 Nav2 navigate_to_pose Action 服务器...");
         client_->wait_for_action_server();
 
-        RCLCPP_INFO(get_logger(), "服务器就绪，发送第一个点...");
-        send_next_goal();
+        RCLCPP_INFO(get_logger(), "服务器就绪，开始定时发送目标点...");
+
+        // 定时器：按间隔定时发布目标点
+        create_interval_timer();
     }
 
 private:
     rclcpp_action::Client<NavigateToPose>::SharedPtr client_;
     std::vector<geometry_msgs::msg::PoseStamped> points_;
     size_t index_;
-    double timeout_sec_;
+    double interval_sec_;
     std::mutex lock_;
-    rclcpp::TimerBase::SharedPtr timeout_timer_;
-    bool goal_active_;
+    rclcpp::TimerBase::SharedPtr interval_timer_;
 
-    // -------------------- 发送下一个点 --------------------
+    // -------------------- 定时发送目标点 --------------------
     void send_next_goal()
     {
         std::lock_guard<std::mutex> guard(lock_);
 
-        // 如果有 active goal，直接返回
-        if (goal_active_)
-            return;
-
-        goal_active_ = true;
-
+        // 创建目标
         auto goal = NavigateToPose::Goal();
         goal.pose = points_[index_];
 
@@ -93,68 +89,26 @@ private:
 
         auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
 
-        // Nav2 结果回调
-        options.result_callback = [this](const GoalHandleNav::WrappedResult & result)
-        {
-            goal_active_ = false;
+        // 直接发送目标，不做到点检测
+        client_->async_send_goal(goal);
 
-            if (timeout_timer_) {
-                timeout_timer_->cancel();
-                timeout_timer_.reset();
-            }
-
-            if (result.code == rclcpp_action::ResultCode::SUCCEEDED)
-                RCLCPP_INFO(get_logger(), "到达目标点");
-            else
-                RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
-
-            create_delay_timer(500ms, [this]() { next_index_and_send(); });
-        };
-
-        client_->async_send_goal(goal, options);
-
-        // 启动超时定时器
-        timeout_timer_ = create_wall_timer(
-            std::chrono::duration<double>(timeout_sec_),
-            [this]()
-            {
-                RCLCPP_WARN(get_logger(), "超时 %.1f 秒，切换下一个点", timeout_sec_);
-
-                goal_active_ = false;
-                client_->async_cancel_all_goals();
-
-                if (timeout_timer_) {
-                    timeout_timer_->cancel();
-                    timeout_timer_.reset();
-                }
-                create_delay_timer(500ms, [this]() { next_index_and_send(); });
-            }
-        );
-    }
-
-    // -------------------- 切换下一点 --------------------
-    void next_index_and_send()
-    {
+        // 更新目标点索引
         index_++;
         if (index_ >= points_.size())
         {
             RCLCPP_INFO(get_logger(), "所有路径点已完成，重新开始循环");
             index_ = 0;  // 无限循环回第一个点
         }
-
-        send_next_goal();
     }
 
-    // -------------------- 延迟定时器 --------------------
-    void create_delay_timer(std::chrono::milliseconds delay, std::function<void()> func)
+    // -------------------- 定时器 --------------------
+    void create_interval_timer()
     {
-        timeout_timer_ = create_wall_timer(
-            delay,
-            [this, func]()
+        interval_timer_ = create_wall_timer(
+            std::chrono::duration<double>(interval_sec_),
+            [this]()
             {
-                timeout_timer_->cancel();
-                timeout_timer_.reset();
-                func();
+                send_next_goal();  // 定时发送目标点
             }
         );
     }
