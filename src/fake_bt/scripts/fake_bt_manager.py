@@ -4,9 +4,7 @@ from rclpy.node import Node
 from ament_index_python.packages import get_package_share_directory
 from sentry_msgs.msg import MatchStage
 import subprocess
-import signal
 import os
-import time
 
 class FakeBtManager(Node):
     def __init__(self):
@@ -17,10 +15,7 @@ class FakeBtManager(Node):
         self.get_logger().info('青春版行为树启动，等待比赛开始...')
 
     def cb(self, msg: MatchStage):
-        try:
-            stage = int(msg.match_stage)
-        except Exception:
-            stage = 0
+        stage = int(msg.match_stage) if msg.match_stage else 0
         if stage == 4:
             self.start_nodes()
         else:
@@ -37,10 +32,13 @@ class FakeBtManager(Node):
             self.proc_point = subprocess.Popen([
                 'ros2', 'run', 'fake_bt', 'pub_point',
                 '--ros-args', '--params-file', points_yaml
-            ])
+            ], env=os.environ)
+
         if not self._is_running(self.proc_vw):
             self.get_logger().info('小陀螺已上线')
-            self.proc_vw = subprocess.Popen(['ros2', 'run', 'fake_bt', 'pub_vw'])
+            self.proc_vw = subprocess.Popen([
+                'ros2', 'run', 'fake_bt', 'pub_vw'
+            ], env=os.environ)
 
     def stop_nodes(self):
         if self._is_running(self.proc_point):
