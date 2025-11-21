@@ -16,7 +16,7 @@ public:
     using NavigateToPose = nav2_msgs::action::NavigateToPose;
     using GoalHandleNav = rclcpp_action::ClientGoalHandle<NavigateToPose>;
 
-    PubPoint() : Node("pub_point"), index_(0)
+    PubPoint() : Node("pub_point"), index_(0), goal_active_(false)
     {
         declare_parameter("points", std::vector<double>{});
         declare_parameter("timeout", 10.0);
@@ -69,17 +69,18 @@ private:
     double timeout_sec_;
     std::mutex lock_;
     rclcpp::TimerBase::SharedPtr timeout_timer_;
+    bool goal_active_;
 
     // -------------------- 发送下一个点 --------------------
     void send_next_goal()
     {
         std::lock_guard<std::mutex> guard(lock_);
 
-        // 取消之前的 timeout timer
-        if (timeout_timer_) {
-            timeout_timer_->cancel();
-            timeout_timer_.reset();
-        }
+        // 如果有 active goal，直接返回
+        if (goal_active_)
+            return;
+
+        goal_active_ = true;
 
         auto goal = NavigateToPose::Goal();
         goal.pose = points_[index_];
@@ -95,7 +96,8 @@ private:
         // Nav2 结果回调
         options.result_callback = [this](const GoalHandleNav::WrappedResult & result)
         {
-            // 确保 timeout timer 已取消
+            goal_active_ = false;
+
             if (timeout_timer_) {
                 timeout_timer_->cancel();
                 timeout_timer_.reset();
@@ -106,7 +108,6 @@ private:
             else
                 RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
 
-            // 延迟 0.5s 发下一点
             create_delay_timer(500ms, [this]() { next_index_and_send(); });
         };
 
@@ -119,10 +120,9 @@ private:
             {
                 RCLCPP_WARN(get_logger(), "超时 %.1f 秒，切换下一个点", timeout_sec_);
 
-                // 取消当前 goal
+                goal_active_ = false;
                 client_->async_cancel_all_goals();
 
-                // 延迟 0.5s 发下一点
                 if (timeout_timer_) {
                     timeout_timer_->cancel();
                     timeout_timer_.reset();
