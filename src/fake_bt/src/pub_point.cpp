@@ -69,18 +69,12 @@ private:
     double timeout_sec_;
     std::mutex lock_;
     rclcpp::TimerBase::SharedPtr timeout_timer_;
-    rclcpp::TimerBase::SharedPtr oneshot_timer_;  // ✅ 保存一次性定时器
+    rclcpp::TimerBase::SharedPtr oneshot_timer_;
 
     // -------------------- 发送下一个点 --------------------
     void send_next_goal()
     {
         std::lock_guard<std::mutex> guard(lock_);
-
-        if (index_ >= points_.size())
-        {
-            RCLCPP_INFO(get_logger(), "所有路径点已完成");
-            return;
-        }
 
         auto goal = NavigateToPose::Goal();
         goal.pose = points_[index_];
@@ -93,24 +87,21 @@ private:
 
         auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
 
-        // Nav2 结果回调
         options.result_callback =
             [this](const GoalHandleNav::WrappedResult & result)
             {
-                timeout_timer_.reset();   // 停止超时计时器
+                timeout_timer_.reset();
 
                 if (result.code == rclcpp_action::ResultCode::SUCCEEDED)
                     RCLCPP_INFO(get_logger(), "到达目标点");
                 else
                     RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
 
-                // 延迟 1ms 发下一点
                 create_oneshot_timer([this]() { next_index_and_send(); });
             };
 
         client_->async_send_goal(goal, options);
 
-        // 启动超时定时器
         timeout_timer_ = create_wall_timer(
             std::chrono::duration<double>(timeout_sec_),
             [this]()
@@ -128,9 +119,10 @@ private:
     {
         index_++;
 
-        if (index_ >= points_.size()) {
-            RCLCPP_INFO(get_logger(), "所有路径点已完成");
-            return;
+        if (index_ >= points_.size())
+        {
+            RCLCPP_INFO(get_logger(), "所有路径点已完成，重新开始循环");
+            index_ = 0;  // 🔹 无限循环回第一个点
         }
 
         send_next_goal();
@@ -143,8 +135,8 @@ private:
             1ms,
             [this, func]()
             {
-                func();                  // 执行下一点
-                oneshot_timer_.reset();  // 执行一次后释放
+                func();
+                oneshot_timer_.reset();
             }
         );
     }
