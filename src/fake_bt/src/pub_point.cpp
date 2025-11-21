@@ -25,7 +25,6 @@ public:
 
         // 读取 points 数组
         std::vector<double> flat = get_parameter("points").as_double_array();
-
         if (flat.size() % 3 != 0)
         {
             RCLCPP_ERROR(get_logger(),
@@ -70,6 +69,7 @@ private:
     double timeout_sec_;
     std::mutex lock_;
     rclcpp::TimerBase::SharedPtr timeout_timer_;
+    rclcpp::TimerBase::SharedPtr oneshot_timer_;  // ✅ 保存一次性定时器
 
     // -------------------- 发送下一个点 --------------------
     void send_next_goal()
@@ -104,14 +104,13 @@ private:
                 else
                     RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
 
-                create_oneshot_timer([this]() {
-                    next_index_and_send();
-                });
+                // 延迟 1ms 发下一点
+                create_oneshot_timer([this]() { next_index_and_send(); });
             };
 
         client_->async_send_goal(goal, options);
 
-        // 启动超时计时器
+        // 启动超时定时器
         timeout_timer_ = create_wall_timer(
             std::chrono::duration<double>(timeout_sec_),
             [this]()
@@ -119,10 +118,7 @@ private:
                 RCLCPP_WARN(get_logger(), "超时 %.1f 秒，切换下一个点", timeout_sec_);
                 timeout_timer_.reset();
 
-                // 延迟 1ms，避免立即触发造成连续超高速调用
-                create_oneshot_timer([this]() {
-                    next_index_and_send();
-                });
+                create_oneshot_timer([this]() { next_index_and_send(); });
             }
         );
     }
@@ -130,11 +126,9 @@ private:
     // -------------------- 切换下一点 --------------------
     void next_index_and_send()
     {
-        std::lock_guard<std::mutex> guard(lock_);
-
         index_++;
-        if (index_ >= points_.size())
-        {
+
+        if (index_ >= points_.size()) {
             RCLCPP_INFO(get_logger(), "所有路径点已完成");
             return;
         }
@@ -145,10 +139,13 @@ private:
     // -------------------- 一次性定时器 --------------------
     void create_oneshot_timer(std::function<void()> func)
     {
-        // 注意这里不用保存 timer，回调执行一次后会自动销毁
-        rclcpp::Node::create_wall_timer(
+        oneshot_timer_ = create_wall_timer(
             1ms,
-            [func]() { func(); }
+            [this, func]()
+            {
+                func();                  // 执行下一点
+                oneshot_timer_.reset();  // 执行一次后释放
+            }
         );
     }
 };
