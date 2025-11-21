@@ -98,7 +98,7 @@ private:
                     RCLCPP_WARN(get_logger(), "Nav2 失败或终止");
 
                 // 延迟 0.5s 发下一点
-                create_delay_timer(500ms, [this]() { next_index_and_send(); });
+                create_delay_timer(3000ms, [this]() { next_index_and_send(); });
             };
 
         client_->async_send_goal(goal, options);
