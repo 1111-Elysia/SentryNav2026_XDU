@@ -5,7 +5,6 @@ from ament_index_python.packages import get_package_share_directory
 from sentry_msgs.msg import MatchStage
 import subprocess
 import os
-import time
 
 class FakeBtManager(Node):
     def __init__(self):
@@ -38,11 +37,12 @@ class FakeBtManager(Node):
         if not self._is_running(self.proc_point):
             points_yaml = os.path.join(get_package_share_directory('fake_bt'), 'config', 'points.yaml')
             try:
+                # 子进程日志直接输出到终端
                 self.proc_point = subprocess.Popen(
                     ['ros2', 'run', 'fake_bt', 'pub_point', '--ros-args', '--params-file', points_yaml],
                     env=os.environ,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stdout=None,
+                    stderr=None
                 )
                 self.get_logger().info(f'开始发布路径点, pid={self.proc_point.pid}')
             except Exception as e:
@@ -54,8 +54,8 @@ class FakeBtManager(Node):
                 self.proc_vw = subprocess.Popen(
                     ['ros2', 'run', 'fake_bt', 'pub_vw'],
                     env=os.environ,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stdout=None,
+                    stderr=None
                 )
                 self.get_logger().info(f'小陀螺已上线, pid={self.proc_vw.pid}')
             except Exception as e:
@@ -77,7 +77,7 @@ class FakeBtManager(Node):
 
         self.nodes_started = False
 
-    # 检查子进程状态，异常退出自动重启
+    # 定时检查子进程状态，异常退出自动重启
     def check_subprocesses(self):
         if not self.nodes_started:
             return
