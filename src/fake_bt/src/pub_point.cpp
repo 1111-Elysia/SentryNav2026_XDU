@@ -52,15 +52,24 @@ public:
             points_.push_back(p);
         }
 
+        if (points_.empty()) {
+            RCLCPP_ERROR(get_logger(), "points 参数为空，无法发送目标点");
+            rclcpp::shutdown();
+            return;
+        }
+
         // 创建 Nav2 客户端
         client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
 
         RCLCPP_INFO(get_logger(), "等待 Nav2 navigate_to_pose Action 服务器...");
         client_->wait_for_action_server();
 
-        RCLCPP_INFO(get_logger(), "服务器就绪，开始定时发送目标点...");
+        RCLCPP_INFO(get_logger(), "服务器就绪，开始发送第一个目标点并启动定时器...");
 
-        // 定时器：按间隔定时发布目标点
+        // 立即发送第一个目标点，随后按 interval 定时发送剩余目标
+        send_next_goal();
+
+        // 定时器：按间隔定时发布目标点（第一次由上面立即发送）
         create_interval_timer();
     }
 
