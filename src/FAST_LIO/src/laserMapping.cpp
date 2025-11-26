@@ -625,12 +625,27 @@ void set_posestamp(T & out)
     
 }
 
+
+template<typename T>
+void set_twiststamp(T & out)
+{
+    // 这三个 xyz的速度没问题
+    out.twist.linear.x = state_point.vel(0);
+    out.twist.linear.y = state_point.vel(1);
+    out.twist.linear.z = state_point.vel(2);
+    out.twist.angular.x = imu_buffer.back()->angular_velocity.x;
+    out.twist.angular.y = imu_buffer.back()->angular_velocity.y;
+    out.twist.angular.z = imu_buffer.back()->angular_velocity.z;
+}
+
 void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdomAftMapped, std::unique_ptr<tf2_ros::TransformBroadcaster> & tf_br)
 {
     odomAftMapped.header.frame_id = "odom";
     odomAftMapped.child_frame_id = "livox_frame_two";
     odomAftMapped.header.stamp = get_ros_time(lidar_end_time);
     set_posestamp(odomAftMapped.pose);
+    // 自己加的一个函数   publish_odometry()中仅这里有改动
+    set_twiststamp(odomAftMapped.twist); 
     pubOdomAftMapped->publish(odomAftMapped);
     auto P = kf.get_P();
     for (int i = 0; i < 6; i ++)
