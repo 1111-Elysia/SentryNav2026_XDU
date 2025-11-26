@@ -65,6 +65,7 @@ loop_closing:
   closest_id_th: 50     # 历史关键帧与当前帧的ID间隔
   max_range: 30.0       # 候选帧的最大距离
   ndt_score_th: 1.0     # ndt位姿分值
+  with_height: true
 
 
 ### 激光雷达定位参数 ================================================================================================
@@ -76,7 +77,7 @@ lidar_loc:
   filter_intensity_min: 10.0         # 点云强度过滤最小值
   filter_z_max: 30.0                 # 点云Z轴（高度）过滤最大值
   filter_z_min: -1.0                 # 点云Z轴（高度）过滤最小值
-  force_2d: false                    # 是否强制2D定位（忽略Z轴和俯仰角、翻滚角）
+  force_2d: true                    # 是否强制2D定位（忽略Z轴和俯仰角、翻滚角）
   grid_search_angle_range: 180.0     # 网格搜索的角度范围（度）
   grid_search_angle_step: 60         # 网格搜索的角度步长（度）
   lidar_loc_odom_th: 0.5             # 激光雷达定位与里程计的阈值（米）

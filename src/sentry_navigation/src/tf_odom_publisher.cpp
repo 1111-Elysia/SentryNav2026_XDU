@@ -38,7 +38,7 @@ public:
         livox_offset_roll_  = roll_deg  * M_PI / 180.0;
         livox_offset_pitch_ = pitch_deg * M_PI / 180.0;
         livox_offset_yaw_   = yaw_deg   * M_PI / 180.0;
-        double publish_rate = 50.0;
+        double publish_rate = 100.0;
         this->get_parameter("publish_rate", publish_rate);
 
         // 计算 C: base_link → livox_frame
@@ -108,7 +108,7 @@ private:
         } catch (const tf2::TransformException &ex) {
             if (have_D_) {
                 const double age = (now - last_D_msg_.header.stamp).seconds();
-                if (age < 0.3) {
+                if (age < 1.0) {
                     D_msg = last_D_msg_;
                     used_cached_D = true;
                     got_D = true;
@@ -135,7 +135,7 @@ private:
         } catch (const tf2::TransformException &ex) {
             if (have_E_) {
                 const double age = (now - last_E_msg_.header.stamp).seconds();
-                if (age < 0.5) { // 10Hz，放宽容忍
+                if (age < 1.0) { // 10Hz，放宽容忍
                     E_msg = last_E_msg_;
                     used_cached_E = true;
                     got_E = true;

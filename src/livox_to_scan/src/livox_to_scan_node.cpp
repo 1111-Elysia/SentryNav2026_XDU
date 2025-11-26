@@ -56,7 +56,7 @@ private:
     try {
       transform = tf_buffer_.lookupTransform(
           target_frame_, msg->header.frame_id, 
-          msg->header.stamp, rclcpp::Duration::from_seconds(0.1));
+          msg->header.stamp, rclcpp::Duration::from_seconds(20.0));
     } catch (const tf2::TransformException &ex) {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                            "无法获取 TF %s → %s: %s", 

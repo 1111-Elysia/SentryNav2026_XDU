@@ -521,6 +521,7 @@ void LaserMapping::ObsModel(NavState &s, ESKF::CustomObservationModel &obs) {
                 point_world.intensity = point_body.intensity;
 
                 auto &points_near = nearest_points_[i];
+                points_near.clear();
 
                 /** Find the closest surfaces in the map **/
                 // if (obs.converge_) {
@@ -540,6 +541,8 @@ void LaserMapping::ObsModel(NavState &s, ESKF::CustomObservationModel &obs) {
                     if (valid_corr) {
                         point_selected_surf_[i] = true;
                         residuals_[i] = pd2;
+                    } else {
+                        point_selected_surf_[i] = false;
                     }
                 }
             });

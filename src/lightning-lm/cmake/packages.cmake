@@ -2,7 +2,6 @@ find_package(glog REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(yaml-cpp REQUIRED)
-find_package(glog REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(pcl_conversions REQUIRED)
@@ -69,4 +68,3 @@ set(third_party_libs
         tbb
         ${rosbag2_cpp_LIBRARIES}
 )
-
