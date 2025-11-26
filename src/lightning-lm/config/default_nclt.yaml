@@ -72,12 +72,12 @@ loop_closing:
 lidar_loc:
   enable_dynamic_polygon: false      # 是否启用动态多边形区域检测
   enable_parking_static: true        # 是否在停车时保持静态（不更新位姿）
-  enable_icp_adjust: false           # 是否启用ICP微调功能
+  enable_icp_adjust: true           # 是否启用ICP微调功能
   filter_intensity_max: 100.0        # 点云强度过滤最大值
   filter_intensity_min: 10.0         # 点云强度过滤最小值
   filter_z_max: 30.0                 # 点云Z轴（高度）过滤最大值
   filter_z_min: -1.0                 # 点云Z轴（高度）过滤最小值
-  force_2d: true                    # 是否强制2D定位（忽略Z轴和俯仰角、翻滚角）
+  force_2d: false                    # 是否强制2D定位（忽略Z轴和俯仰角、翻滚角）
   grid_search_angle_range: 180.0     # 网格搜索的角度范围（度）
   grid_search_angle_step: 60         # 网格搜索的角度步长（度）
   lidar_loc_odom_th: 0.5             # 激光雷达定位与里程计的阈值（米）

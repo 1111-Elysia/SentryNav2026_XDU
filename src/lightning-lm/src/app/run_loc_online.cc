@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     }
 
     double roll_rad = 0.0 * M_PI / 180.0;
-    double pitch_rad = 45.7 * M_PI / 180.0;
+    double pitch_rad = 0.0 * M_PI / 180.0;
     double yaw_rad = 0.0 * M_PI / 180.0;
     
     // 创建旋转矩阵 (SO3)

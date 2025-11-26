@@ -95,10 +95,12 @@ bool SlamSystem::Init(const std::string& yaml_path) {
             imu_topic_, qos, [this](sensor_msgs::msg::Imu::SharedPtr msg) {
                 IMUPtr imu = std::make_shared<IMU>();
                 imu->timestamp = ToSec(msg->header.stamp);
-                imu->linear_acceleration =
-                    Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
-                imu->angular_velocity =
-                    Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+
+                Vec3d acc(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
+                Vec3d gyr(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+                acc *= -9.7944;
+                imu->linear_acceleration = acc;
+                imu->angular_velocity = gyr;
 
                 ProcessIMU(imu);
             });
