@@ -46,7 +46,7 @@ ros2 run livox_to_scan livox_to_scan_node --ros-args --params-file src/livox_to_
 
 ### SLAM 建图模式
 ```bash
-ros2 run lightning run_slam_online --config ./src/lightning-lm/config/default_nclt.yaml
+ros2 run lightning run_slam_online --config ./src/lightning-lm/config/default_livox.yaml
 ```
 
 ### 保存地图
@@ -56,7 +56,7 @@ ros2 service call /lightning/save_map lightning/srv/SaveMap "{map_id: 'new_map'}
 
 ### 定位模式
 ```bash
-ros2 run lightning run_loc_online --config ./src/lightning-lm/config/default_nclt.yaml
+ros2 run lightning run_loc_online --config ./src/lightning-lm/config/default_livox.yaml
 ```
 
 ## 启动导航
