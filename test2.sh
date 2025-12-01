@@ -139,10 +139,6 @@ sleep 2
 launch_term "Navigation-Stack" "ros2 launch sentry_navigation navigation_launch.py map:='$MAP_YAML' use_rviz:=true"
 sleep 2
 
-# 新增：启动 point_pub 节点（使用包内 params 文件）
-launch_term "easy_bt" "ros2 launch fake_bt control_fake_bt.launch.py "
-sleep 1
-
 # costmap 检查
 echo -e "${YELLOW}[检查 /local_costmap/costmap，最长 ${COSTMAP_WAIT}s]${NC}"
 if timeout $COSTMAP_WAIT ros2 topic echo /local_costmap/costmap --once >/dev/null 2>&1; then
@@ -152,6 +148,9 @@ else
     cleanup_all_windows
     exec bash "$0" "$@"
 fi
+
+launch_term "easy_bt" "ros2 launch fake_bt control_fake_bt.launch.py "
+sleep 1
 
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}  所有节点已成功启动${NC}"
