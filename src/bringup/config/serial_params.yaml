@@ -1,0 +1,12 @@
+serial_comm_node:
+  ros__parameters:
+    port: "/dev/ttyACM0"    # 发送与接收共用同一端口
+    baudrate: 115200
+    send_frequency: 500
+    use_sim_time: false
+
+serial_receive_node:
+  ros__parameters:
+    port: "/dev/ttyACM0"    # 与发送节点共用同一串口
+    baudrate: 115200
+    use_sim_time: false
