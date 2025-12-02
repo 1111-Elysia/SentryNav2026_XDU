@@ -8,7 +8,7 @@ def generate_launch_description():
     pkg_bringup = FindPackageShare('bringup').find('bringup')
     pkg_sentry = FindPackageShare('sentry_navigation').find('sentry_navigation')
     pkg_livox_to_scan = FindPackageShare('livox_to_scan').find('livox_to_scan')
-    pkg_lightning = FindPackageShare('lightning-lm').find('lightning-lm')
+    pkg_lightning = FindPackageShare('lightning').find('lightning')
 
     # 参数文件绝对路径
     tf_params = os.path.join(pkg_sentry, 'config', 'lidar.yaml')
