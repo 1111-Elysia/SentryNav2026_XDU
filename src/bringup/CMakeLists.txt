@@ -13,9 +13,9 @@ install(PROGRAMS
 
 # 安装launch文件和配置文件
 install(DIRECTORY
-  launch/
-  config/
-  map/
+  launch
+  config
+  map
   DESTINATION share/${PROJECT_NAME}/
 )
 
