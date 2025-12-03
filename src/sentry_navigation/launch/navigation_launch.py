@@ -10,7 +10,8 @@ from launch.conditions import IfCondition
 def generate_launch_description():
     # 获取包路径
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
-    sentry_nav_dir = get_package_share_directory('sentry_navigation')
+    # sentry_nav_dir = get_package_share_directory('sentry_navigation')
+    bringup_dir = get_package_share_directory('bringup')
     
     # 参数配置
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
@@ -18,11 +19,11 @@ def generate_launch_description():
     map_yaml_file = LaunchConfiguration('map', 
         default=os.path.join('./data/new_map', 'map.yaml'))
     params_file = LaunchConfiguration('params_file',
-        default=os.path.join(sentry_nav_dir, 'config', 'navigation_params.yaml'))
+        default=os.path.join(bringup_dir, 'config', 'navigation_params.yaml'))
     lidar_params_file = LaunchConfiguration('lidar_params_file',
-        default=os.path.join(sentry_nav_dir, 'config', 'lidar.yaml'))
+        default=os.path.join(bringup_dir, 'config', 'lidar.yaml'))
     rviz_config_file = LaunchConfiguration('rviz_config',
-        default=os.path.join(sentry_nav_dir, 'config', 'nav2_default_view.rviz'))
+        default=os.path.join(bringup_dir, 'config', 'nav2_default_view.rviz'))
 
     return LaunchDescription([
         DeclareLaunchArgument(

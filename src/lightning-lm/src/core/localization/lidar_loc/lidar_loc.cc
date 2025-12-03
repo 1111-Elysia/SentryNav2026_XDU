@@ -439,7 +439,7 @@ void LidarLoc::Align(const CloudPtr& input) {
     double current_time = math::ToSec(input->header.stamp) + lo::lidar_time_interval;
     current_timestamp_ = current_time;
 
-    LOG(INFO) << "current time: " << std::fixed << std::setprecision(12) << current_timestamp_;
+    // LOG(INFO) << "current time: " << std::fixed << std::setprecision(12) << current_timestamp_;
 
     /// 设置当前帧对应的rel_pose
     if (!AssignLOPose(current_time)) {
@@ -540,7 +540,7 @@ void LidarLoc::Align(const CloudPtr& input) {
         const SE3 delta = last_lo_pose_.inverse() * current_lo_pose_;
         guess_from_lo = last_abs_pose_ * delta;
         // guess_from_lo.translation()[2] = 0;
-        LOG(INFO) << "loc using lo guess: " << guess_from_lo.translation().transpose();
+        // LOG(INFO) << "loc using lo guess: " << guess_from_lo.translation().transpose();
     }
 
     SE3 guess_from_self = guess_from_lo;
@@ -806,7 +806,7 @@ bool LidarLoc::Localize(SE3& pose, double& confidence, CloudPtr input, CloudPtr 
     bool loc_success = false;
     Eigen::Matrix4f guess_pose = pose.matrix().cast<float>();
 
-    LOG(INFO) << "loc from: " << pose.translation().transpose();
+    // LOG(INFO) << "loc from: " << pose.translation().transpose();
 
     if (pcl_ndt_->getInputTarget() == nullptr) {
         LOG(INFO) << "lidar loc target is null, skip";
@@ -864,7 +864,7 @@ bool LidarLoc::Localize(SE3& pose, double& confidence, CloudPtr input, CloudPtr 
     q_3d.normalize();
     pose = SE3(q_3d, t_3d);
 
-    LOG(INFO) << "confidence: " << confidence << ", t: " << t_3d.transpose() << ", succ: " << loc_success;
+    // LOG(INFO) << "confidence: " << confidence << ", t: " << t_3d.transpose() << ", succ: " << loc_success;
 
     return loc_success;
 }

@@ -4,12 +4,14 @@
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 100.0            
+    controller_frequency: 95.0            
     odom_topic: "odom" 
     min_x_velocity_threshold: 0.1
     min_y_velocity_threshold: 0.1
     min_theta_velocity_threshold: 0.1
     
+    allow_late_callbacks: true
+
     failure_tolerance: 0.3
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
@@ -159,9 +161,10 @@ local_costmap:
       robot_base_frame: base_link         # 机器人本体坐标系
       use_sim_time: False                  # 使用仿真时间
       rolling_window: true                # 滚动窗口模式 - 地图跟随机器人移动
-      width: 6                           # 地图宽度 (m) 
-      height: 6                          # 地图高度 (m)
+      width: 3                           # 地图宽度 (m) 
+      height: 2                          # 地图高度 (m)
       resolution: 0.05                    # 地图分辨率 (m/cell) - 5cm精度
+      transform_tolerance: 60.0  
       # robot_radius: 0.25                  # 机器人半径 (m) - 根据实际车体调整！
       footprint: "[[0.175, 0.175], [0.175, -0.175], [-0.175, -0.175], [-0.175, 0.175]]"
       footprint_padding: 0.01
@@ -181,8 +184,8 @@ local_costmap:
         publish_voxel_map: True           # 发布3D体素地图（用于调试）
         origin_z: 0.0                     # Z轴原点高度 (m)
         z_resolution: 0.05                # Z轴分辨率 (m/voxel)
-        z_voxels: 16                      # Z轴体素数量（16 * 0.05 = 0.8m高）
-        max_obstacle_height: 2.0          # 障碍物最大高度 (m)
+        z_voxels: 40                      # Z轴体素数量
+        max_obstacle_height: 3.0          # 障碍物最大高度 (m)
         mark_threshold: 0                 # 标记障碍物的阈值（点数）
         observation_sources: scan         # 观测数据源列表
         scan:                             # 激光扫描数据源配置

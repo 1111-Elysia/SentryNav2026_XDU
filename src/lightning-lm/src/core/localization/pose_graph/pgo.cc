@@ -145,8 +145,8 @@ bool PGO::ProcessDR(const NavState& dr_result) {
         const double last_stamp = impl_->dr_pose_queue_.back().timestamp_;
         delta_timestamp = dr_result.timestamp_ - last_stamp;
         if (dr_result.timestamp_ < last_stamp) {
-            LOG(WARNING) << "当前DR定位的结果的时间戳应当比上一个时间戳数值大，实际相减得"
-                         << dr_result.timestamp_ - last_stamp;
+            // LOG(WARNING) << "当前DR定位的结果的时间戳应当比上一个时间戳数值大，实际相减得"
+            //              << dr_result.timestamp_ - last_stamp;
             return false;
         }
     }
@@ -229,7 +229,7 @@ bool PGO::ProcessLidarLoc(const LocalizationResult& loc_result) {
 
     // 如果相对位姿(DR和LidarOdom有一个即可)还没来，也退出
     if (RelativePoseQueueEmpty()) {
-        LOG(WARNING) << "PGO received LidarLoc, but is waiting for LO or DR ... ";
+        // LOG(WARNING) << "PGO received LidarLoc, but is waiting for LO or DR ... ";
         return false;
     }
 
@@ -287,8 +287,8 @@ bool PGO::ProcessLidarLoc(const LocalizationResult& loc_result) {
         }
     }
 
-    LOG(INFO) << std::setprecision(14) << std::fixed << "PGO received LidarLoc ["
-              << new_frame->lidar_loc_pose_.translation().transpose() << "], t=" << new_frame->timestamp_;
+    // LOG(INFO) << std::setprecision(14) << std::fixed << "PGO received LidarLoc ["
+    //           << new_frame->lidar_loc_pose_.translation().transpose() << "], t=" << new_frame->timestamp_;
     return ProcessPGOFrame(new_frame);
 }
 

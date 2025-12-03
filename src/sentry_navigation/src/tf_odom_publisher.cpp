@@ -108,7 +108,7 @@ private:
         } catch (const tf2::TransformException &ex) {
             if (have_D_) {
                 const double age = (now - last_D_msg_.header.stamp).seconds();
-                if (age < 1.0) {
+                if (age < 5.0) {
                     D_msg = last_D_msg_;
                     used_cached_D = true;
                     got_D = true;
@@ -135,7 +135,7 @@ private:
         } catch (const tf2::TransformException &ex) {
             if (have_E_) {
                 const double age = (now - last_E_msg_.header.stamp).seconds();
-                if (age < 1.0) { // 10Hz，放宽容忍
+                if (age < 5.0) { // 10Hz，放宽容忍
                     E_msg = last_E_msg_;
                     used_cached_E = true;
                     got_E = true;

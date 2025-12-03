@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 import os
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory('serial_comm')
+    pkg_share = get_package_share_directory('bringup')
     config_file = os.path.join(pkg_share, 'config', 'serial_params.yaml')
     topics_file = os.path.join(pkg_share, 'config', 'topic_names.yaml')  # 新增
 

@@ -1,0 +1,56 @@
+sequential_nodes:
+  - label: Livox-Driver
+    type: execute
+    cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
+    wait_after: 3
+
+  - label: Lightning-LM
+    type: execute
+    cmd: [
+      "ros2", "run", "lightning", "run_loc_online",
+      "--config", "default_livox.yaml"
+    ]
+    use_config_dir_as_cwd: true
+    wait_after: 2
+
+  - label: Fast-LIO
+    type: execute
+    cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
+    wait_after: 2
+
+  - label: TF-Odom-Publisher
+    type: node
+    package: sentry_navigation
+    executable: tf_odom_publisher
+    name: tf_odom_publisher
+    parameters:
+      - lidar.yaml
+    arguments: ["--ros-args"]
+    wait_after: 2
+
+  - label: Livox-to-Scan
+    type: node
+    package: livox_to_scan
+    executable: livox_to_scan_node
+    name: livox_to_scan_node
+    parameters:
+      - livox_to_scan.yaml
+    wait_after: 4
+
+  - label: USB-Serial-Comm
+    type: execute
+    cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
+    wait_after: 2
+
+  - label: Navigation-Stack
+    type: execute
+    cmd: [
+      "ros2", "launch", "sentry_navigation", "navigation_launch.py",
+      "map:=../map/map.yaml", "use_rviz:=true"
+    ]
+    wait_after: 0
+
+  # - label: Easy-BT
+  #   type: execute
+  #   cmd: ["ros2", "launch", "fake_bt", "control_fake_bt.launch.py"]
+  #   wait_after: 0

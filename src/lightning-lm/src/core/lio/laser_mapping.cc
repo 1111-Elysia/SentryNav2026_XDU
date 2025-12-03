@@ -245,8 +245,8 @@ bool LaserMapping::Run() {
     // update local map
     Timer::Evaluate([&, this]() { MapIncremental(); }, "    Incremental Mapping");
 
-    LOG(INFO) << "[ mapping ]: In num: " << scan_undistort_->points.size() << " down " << cur_pts
-              << " Map grid num: " << ivox_->NumValidGrids() << " effect num : " << effect_feat_num_;
+    // LOG(INFO) << "[ mapping ]: In num: " << scan_undistort_->points.size() << " down " << cur_pts
+    //           << " Map grid num: " << ivox_->NumValidGrids() << " effect num : " << effect_feat_num_;
 
     /// keyframes
     if (last_kf_ == nullptr) {
@@ -296,10 +296,10 @@ void LaserMapping::MakeKF() {
 
     kf->SetState(state_point_);
 
-    LOG(INFO) << "LIO: create kf " << kf->GetID() << ", state: " << state_point_.pos_.transpose()
-              << ", kf opt pose: " << kf->GetOptPose().translation().transpose()
-              << ", lio pose: " << kf->GetLIOPose().translation().transpose() << ", time: " << std::setprecision(14)
-              << state_point_.timestamp_;
+    // LOG(INFO) << "LIO: create kf " << kf->GetID() << ", state: " << state_point_.pos_.transpose()
+    //           << ", kf opt pose: " << kf->GetOptPose().translation().transpose()
+    //           << ", lio pose: " << kf->GetLIOPose().translation().transpose() << ", time: " << std::setprecision(14)
+    //           << state_point_.timestamp_;
 
     if (options_.is_in_slam_mode_) {
         all_keyframes_.emplace_back(kf);
