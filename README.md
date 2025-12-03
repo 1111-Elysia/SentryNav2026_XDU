@@ -36,7 +36,7 @@ ros2 run lightning run_loc_online --config ./src/bringup/config/default_livox.ya
 
 ### 完整启动（包含地图服务器和导航栈）
 ```bash
-bash test2.sh
+bash start.sh
 ```
 
 ### 调试命令
@@ -62,7 +62,7 @@ ros2 topic pub /match_stage sentry_msgs/msg/MatchStage "{match_stage: 4}" -r 1
 map--->odom--->base_link--->livox_frame
 
 ## TODO
-### 1、新建bringup包，在launch中管理全节点生命周期
+### 1、新建bringup包，在launch中管理全节点生命周期[done]
 ### 2、接入行为树测试
 ### 3、修改高翔，使可根据红蓝方发布初始位姿[done]
 ### 4、修改通信包和消息包，接入裁判系统
