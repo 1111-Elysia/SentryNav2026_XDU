@@ -2,9 +2,21 @@ cmake_minimum_required(VERSION 3.8)
 project(bringup)
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
-install(DIRECTORY launch config map
-  DESTINATION share/${PROJECT_NAME}
+# 安装Python脚本到正确位置
+install(PROGRAMS
+  scripts/costmap_monitor.py
+  scripts/restart_manager.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# 安装launch文件和配置文件
+install(DIRECTORY
+  launch/
+  config/
+  map/
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 ament_package()

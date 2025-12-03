@@ -29,6 +29,7 @@ ros2 service call /lightning/save_map lightning/srv/SaveMap "{map_id: 'new_map'}
 ### 定位模式
 ```bash
 ros2 run lightning run_loc_online --config ./src/lightning-lm/config/default_livox.yaml
+ros2 run lightning run_loc_online --config ./src/bringup/config/default_livox.yaml
 ```
 
 ## 启动导航
