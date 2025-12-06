@@ -1,3 +1,3 @@
 source ../Workspace/ws_livox/install/setup.bash 
 source ./install/setup.bash 
-ros2 launch bringup start.launch.py 
+ros2 launch bringup monitored_start.launch.py 

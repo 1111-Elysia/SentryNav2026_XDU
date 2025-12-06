@@ -1,6 +1,0 @@
-pub_point:
-  ros__parameters:
-    points: [0.0, 0.0, 0.0,
-             1.0, 1.0, 180.0]
-
-    interval: 5.0

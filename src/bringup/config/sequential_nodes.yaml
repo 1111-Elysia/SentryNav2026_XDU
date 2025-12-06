@@ -50,7 +50,4 @@ sequential_nodes:
     ]
     wait_after: 0
 
-  # - label: Easy-BT
-  #   type: execute
-  #   cmd: ["ros2", "launch", "fake_bt", "control_fake_bt.launch.py"]
-  #   wait_after: 0
+

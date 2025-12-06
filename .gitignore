@@ -4,3 +4,6 @@ log/
 .cache/
 data/
 src/bringup/map/
+*.pcd
+*.pgm
+*.ply
