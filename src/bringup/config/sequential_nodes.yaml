@@ -48,7 +48,7 @@ sequential_nodes:
       "ros2", "launch", "sentry_navigation", "navigation_launch.py",
       "map:=../map/map.yaml", "use_rviz:=true"
     ]
-    wait_after: 2
+    wait_after: 3
 
   - label: behavior-tree-nodes
     type: execute
