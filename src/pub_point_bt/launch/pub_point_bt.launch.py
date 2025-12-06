@@ -15,7 +15,7 @@ def generate_launch_description():
             name='pub_point_bt_node',
             output='screen',
             parameters=[params_file, {
-                "use_sim_time": True,     # 仿真时间（如果你用 Gazebo）
+                "use_sim_time": False,    
                 "bt_xml": os.path.join(pkg_share, 'config', 'waypoints_bt.xml'),
             }],
         )
