@@ -1,0 +1,8 @@
+pub_point_bt_node:
+  ros__parameters:
+    points: [
+      1.0, 0.0, 0.0,
+      1.0, 1.0, 90.0,
+      0.0, 1.0, 180.0
+    ]
+    interval: 2.0
