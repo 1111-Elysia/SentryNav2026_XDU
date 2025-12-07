@@ -74,6 +74,11 @@ class LaserMapping {
 
     void SetUI(std::shared_ptr<ui::PangolinWindow> ui) { ui_ = ui; }
 
+    // 修改添加建图时的旋转
+    bool enable_mount_correction_ = false;
+    Eigen::Matrix4f mount_correction_ = Eigen::Matrix4f::Identity();
+    void ApplyMountCorrection(PointCloudType::Ptr& cloud);
+
     /// 获取关键帧
     Keyframe::Ptr GetKeyframe() const { return last_kf_; }
 

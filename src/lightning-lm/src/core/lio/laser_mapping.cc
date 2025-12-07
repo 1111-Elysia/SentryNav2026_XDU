@@ -110,6 +110,22 @@ bool LaserMapping::LoadParamsFromYAML(const std::string &yaml_file) {
     p_imu_->SetGyrBiasCov(Vec3d(b_gyr_cov, b_gyr_cov, b_gyr_cov));
     p_imu_->SetAccBiasCov(Vec3d(b_acc_cov, b_acc_cov, b_acc_cov));
 
+    if (yaml["lio"]["mount_correction_rpy"]) {
+        auto rpy_deg = yaml["lio"]["mount_correction_rpy"].as<std::vector<double>>();
+        if (rpy_deg.size() == 3) {
+            std::array<float,3> rpy_rad = {
+                static_cast<float>(rpy_deg[0] * M_PI / 180.0),
+                static_cast<float>(rpy_deg[1] * M_PI / 180.0),
+                static_cast<float>(rpy_deg[2] * M_PI / 180.0)};
+            Eigen::Matrix3f R = (Eigen::AngleAxisf(rpy_rad[2], Eigen::Vector3f::UnitZ()) *
+                                 Eigen::AngleAxisf(rpy_rad[1], Eigen::Vector3f::UnitY()) *
+                                 Eigen::AngleAxisf(rpy_rad[0], Eigen::Vector3f::UnitX()))
+                                    .matrix();
+            mount_correction_.setIdentity();
+            mount_correction_.block<3,3>(0,0) = R;
+            enable_mount_correction_ = true;
+        }
+    }
     return true;
 }
 
@@ -117,6 +133,16 @@ LaserMapping::LaserMapping(Options options) : options_(options) {
     preprocess_.reset(new PointCloudPreprocess());
     p_imu_.reset(new ImuProcess());
 }
+
+
+// 修改添加建图时的旋转
+void LaserMapping::ApplyMountCorrection(PointCloudType::Ptr& cloud) {
+    if (!enable_mount_correction_ || !cloud || cloud->empty()) {
+        return;
+    }
+    pcl::transformPointCloud(*cloud, *cloud, mount_correction_);
+}
+
 
 void LaserMapping::ProcessIMU(const lightning::IMUPtr &imu) {
     publish_count_++;
@@ -324,6 +350,7 @@ void LaserMapping::ProcessPointCloud2(const sensor_msgs::msg::PointCloud2::Share
 
             CloudPtr cloud(new PointCloudType());
             preprocess_->Process(msg, cloud);
+            ApplyMountCorrection(cloud);
 
             lidar_buffer_.push_back(cloud);
             time_buffer_.push_back(timestamp);
@@ -348,6 +375,7 @@ void LaserMapping::ProcessPointCloud2(const livox_ros_driver2::msg::CustomMsg::S
 
             CloudPtr cloud(new PointCloudType());
             preprocess_->Process(msg, cloud);
+            ApplyMountCorrection(cloud);
 
             lidar_buffer_.push_back(cloud);
             time_buffer_.push_back(timestamp);

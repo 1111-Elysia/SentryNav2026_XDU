@@ -93,8 +93,9 @@ int main(int argc, char** argv) {
     } else {
         // 使用默认全 0 初始位姿
         roll_rad = 0.0 * M_PI / 180.0;
-        pitch_rad = 0.0 * M_PI / 180.0;
+        pitch_rad = 45.7 * M_PI / 180.0;
         yaw_rad = 0.0 * M_PI / 180.0;
+        
 
         Sophus::SO3d rotation = Sophus::SO3d::rotZ(yaw_rad) * Sophus::SO3d::rotY(pitch_rad) * Sophus::SO3d::rotX(roll_rad);
         Sophus::SE3d init_pose(rotation, translation);
