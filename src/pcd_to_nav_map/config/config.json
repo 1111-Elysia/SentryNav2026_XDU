@@ -1,5 +1,5 @@
 {
-  "output_prefix": "/home/pgd/SentryNav2026_XDU/map",
+  "output_prefix": "./src/bringup/map/map",
   "resolution": 0.05,
   "min_z_height": 0.1,
   "max_z_height": 1.5,
@@ -11,6 +11,6 @@
   "free_thresh": 0.196,
   "map_padding": 1.0,
   "lidar_roll_deg": 0.0,
-  "lidar_pitch_deg": 45.0,
+  "lidar_pitch_deg": 0.0,
   "lidar_yaw_deg": 0.0
 }
