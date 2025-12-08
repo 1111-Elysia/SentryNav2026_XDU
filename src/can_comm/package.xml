@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>can_comm</name>
+  <version>0.0.1</version>
+  <description>CAN communication node with librm referee system parsing</description>
+  <maintainer email="1361109760@qq.com">pgd</maintainer>
+  <license>MIT</license>
+
+  <!-- ROS2 依赖 -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>sentry_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

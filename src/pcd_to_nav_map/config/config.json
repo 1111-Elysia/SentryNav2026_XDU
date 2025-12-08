@@ -11,6 +11,6 @@
   "free_thresh": 0.196,
   "map_padding": 1.0,
   "lidar_roll_deg": 0.0,
-  "lidar_pitch_deg": 0.0,
+  "lidar_pitch_deg": 0.0, 
   "lidar_yaw_deg": 0.0
 }
