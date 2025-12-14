@@ -6,7 +6,7 @@ import os
 def generate_launch_description():
     pkg_share = get_package_share_directory('bringup')
     config_file = os.path.join(pkg_share, 'config', 'serial_params.yaml')
-    topics_file = os.path.join(pkg_share, 'config', 'topic_names.yaml')  # 新增
+    topics_file = os.path.join(pkg_share, 'config', 'topic_names.yaml')  
 
     return LaunchDescription([
         Node(
@@ -14,13 +14,6 @@ def generate_launch_description():
             executable='serial_comm_node',
             name='serial_comm_node',
             output='screen',
-            parameters=[config_file, topics_file]  # 同时加载两个参数文件
-        ),
-        Node(
-            package='serial_comm',
-            executable='serial_receive_node',
-            name='serial_receive_node',
-            output='screen',
-            parameters=[config_file, topics_file]  # 同样加载
+            parameters=[config_file, topics_file]  
         )
     ])

@@ -6,12 +6,6 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 
 set(msg_files
-  msg/HurtArmor.msg
-  msg/Hp.msg
-  msg/MatchStage.msg
-  msg/RemainTime.msg
-  msg/Remain17mm.msg
-  msg/Color.msg
   msg/Vw.msg
   msg/ScanMode.msg
 )

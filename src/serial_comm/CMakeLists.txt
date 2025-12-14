@@ -9,7 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(sentry_msgs REQUIRED)   # 新增
+find_package(sentry_msgs REQUIRED)   
 
 include_directories(include)
 
@@ -21,15 +21,8 @@ ament_target_dependencies(serial_comm_node
   sentry_msgs
 )
 
-add_executable(serial_receive_node src/serial_receive_node.cpp)  # 新增
-ament_target_dependencies(serial_receive_node                     # 新增
-  rclcpp
-  sentry_msgs
-)
-
 install(TARGETS
-  serial_comm_node
-  serial_receive_node    # 新增
+  serial_comm_node  
   DESTINATION lib/${PROJECT_NAME}
 )
 

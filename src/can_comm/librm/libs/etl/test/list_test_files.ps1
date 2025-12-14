@@ -1,1 +1,0 @@
-Get-ChildItem -Path "./test_*.cpp" | Select-Object -ExpandProperty Name

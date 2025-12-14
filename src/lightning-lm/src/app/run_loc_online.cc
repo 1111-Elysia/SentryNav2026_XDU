@@ -12,12 +12,14 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include "rm2_referee_msgs/msg/robot_status.hpp"
+#include <yaml-cpp/yaml.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 
 #include "core/system/loc_system.h"
 #include "ui/pangolin_window.h"
 #include "wrapper/ros_utils.h"
-
-// ...existing code...
 
 DEFINE_string(config, "./config/default.yaml", "配置文件");
 
@@ -32,84 +34,88 @@ int main(int argc, char** argv) {
 
     rclcpp::init(argc, argv);
 
-    // 通过话题 /init_pose 获取初始位姿（geometry_msgs::msg::PoseWithCovarianceStamped）
-    auto param_node = rclcpp::Node::make_shared("init_pose_reader");
-    auto prom = std::make_shared<std::promise<geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr>>();
-    auto fut = prom->get_future();
+    // 订阅 /rm2_referee/robot_status，获取 robot_id
+    auto status_node = rclcpp::Node::make_shared("robot_status_reader");
+    auto status_prom = std::make_shared<std::promise<rm2_referee_msgs::msg::RobotStatus::SharedPtr>>();
+    auto status_fut = status_prom->get_future();
 
-    auto sub = param_node->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
-        "/init_pose",
-        rclcpp::QoS(1).transient_local(),
-        [prom](const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+    auto status_sub = status_node->create_subscription<rm2_referee_msgs::msg::RobotStatus>(
+        "/rm2_referee/robot_status",
+        rclcpp::QoS(10),
+        [status_prom](const rm2_referee_msgs::msg::RobotStatus::SharedPtr msg) {
             try {
-                prom->set_value(msg);
+                status_prom->set_value(msg);
             } catch (...) {
-                // already set or other error, 忽略
+                // 已设置或其他错误，忽略
             }
         });
 
-    // 等待消息到达，最多等待 1 秒（通过轮询 spin_some）
-    geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr init_msg = nullptr;
-    const auto timeout = std::chrono::milliseconds(1000);
-    const auto start = std::chrono::steady_clock::now();
-    while (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
-        rclcpp::spin_some(param_node);
-        if (std::chrono::steady_clock::now() - start > timeout) break;
+    // 等待 robot_status，最多等待 2 秒
+    const auto status_timeout = std::chrono::milliseconds(2000);
+    const auto status_start = std::chrono::steady_clock::now();
+    while (status_fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+        rclcpp::spin_some(status_node);
+        if (std::chrono::steady_clock::now() - status_start > status_timeout) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    if (fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-        init_msg = fut.get();
     }
 
     LocSystem::Options opt;
     LocSystem loc(opt);
-
     if (!loc.Init(FLAGS_config)) {
         LOG(ERROR) << "failed to init loc";
     }
 
-    double roll_rad = 0.0;
-    double pitch_rad = 0.0;
-    double yaw_rad = 0.0;
-    Eigen::Vector3d translation(0.0, 0.0, 0.0);
+    // 通过 bringup 的 share 目录读取
+    std::string kPoseYaml = ament_index_cpp::get_package_share_directory("bringup") + "/config/loc_start_pose.yaml";
 
-    if (init_msg) {
-        auto &p = init_msg->pose.pose.position;
-        auto &o = init_msg->pose.pose.orientation;
-        translation = Eigen::Vector3d(p.x, p.y, p.z);
 
-        // 构造 Eigen 四元数（w, x, y, z）
-        Eigen::Quaterniond q(o.w, o.x, o.y, o.z);
-        Eigen::Matrix3d R = q.toRotationMatrix();
-
-        // 从旋转矩阵获得 Sophus SO3
-        Sophus::SO3d rotation(R);
-
-        Sophus::SE3d init_pose(rotation, translation);
-
-        LOG(INFO) << "从话题 /init_pose 读取初始位姿: " << init_pose.translation().transpose()
-                  << ", 四元数: " << init_pose.unit_quaternion().coeffs().transpose();
-        loc.SetInitPose(init_pose);
+    int robot_id = -1;
+    if (status_fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+        auto status_msg = status_fut.get();
+        robot_id = static_cast<int>(status_msg->robot_id);
+        LOG(INFO) << "收到 /rm2_referee/robot_status，robot_id=" << robot_id;
     } else {
-        // 使用默认全 0 初始位姿
-        roll_rad = 0.0 * M_PI / 180.0;
-        pitch_rad = 45.7 * M_PI / 180.0;
-        yaw_rad = 0.0 * M_PI / 180.0;
-        
-
-        Sophus::SO3d rotation = Sophus::SO3d::rotZ(yaw_rad) * Sophus::SO3d::rotY(pitch_rad) * Sophus::SO3d::rotX(roll_rad);
-        Sophus::SE3d init_pose(rotation, translation);
-
-        LOG(INFO) << "未收到 /init_pose，使用默认初始位姿: " << init_pose.translation().transpose()
-                  << ", 四元数: " << init_pose.unit_quaternion().coeffs().transpose();
-        loc.SetInitPose(init_pose);
+        LOG(WARNING) << "未收到 /rm2_referee/robot_status，使用默认 red 位姿";
     }
+
+    std::string side = (robot_id == 7) ? "red" : (robot_id == 107) ? "blue" : "red";
+
+    double x = 0.0, y = 0.0, z = 0.0;
+    double roll_deg = 0.0, pitch_deg = 0.0, yaw_deg = 0.0;
+
+    try {
+        YAML::Node cfg = YAML::LoadFile(kPoseYaml);
+        auto pose_node = cfg["start_pose"][side];
+        if (pose_node) {
+            x = pose_node["x"].as<double>();
+            y = pose_node["y"].as<double>();
+            z = pose_node["z"].as<double>();
+            yaw_deg = pose_node["yaw_deg"].as<double>();
+            pitch_deg = pose_node["pitch_deg"].as<double>();
+            roll_deg = pose_node["roll_deg"].as<double>();
+        } else {
+            LOG(WARNING) << "YAML 中未找到 start_pose." << side << "，使用全零位姿";
+        }
+    } catch (const std::exception& e) {
+        LOG(ERROR) << "读取 YAML 失败: " << e.what() << "，使用全零位姿";
+    }
+
+    auto deg2rad = [](double d) { return d * M_PI / 180.0; };
+    double roll_rad = deg2rad(roll_deg);
+    double pitch_rad = deg2rad(pitch_deg);
+    double yaw_rad = deg2rad(yaw_deg);
+
+    Eigen::Vector3d translation(x, y, z);
+    Sophus::SO3d rotation = Sophus::SO3d::rotZ(yaw_rad) * Sophus::SO3d::rotY(pitch_rad) * Sophus::SO3d::rotX(roll_rad);
+    Sophus::SE3d init_pose(rotation, translation);
+
+    LOG(INFO) << "使用 " << side << " 初始位姿: t=[" << translation.transpose()
+              << "], rpy_deg=[" << roll_deg << ", " << pitch_deg << ", " << yaw_deg << "]";
+
+    loc.SetInitPose(init_pose);
 
     loc.Spin();
 
     rclcpp::shutdown();
-
     return 0;
 }
-
-// ...existing code...
