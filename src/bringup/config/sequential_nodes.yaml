@@ -13,9 +13,14 @@ sequential_nodes:
     use_config_dir_as_cwd: true
     wait_after: 2
 
-  - label: Fast-LIO
+  # - label: Fast-LIO
+  #   type: execute
+  #   cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
+  #   wait_after: 2
+
+  - label: Surfel-LIO
     type: execute
-    cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
+    cmd: ["ros2", "launch", "lio_ros_wrapper", "lio_mid360.launch.py"]
     wait_after: 2
 
   - label: TF-Odom-Publisher
