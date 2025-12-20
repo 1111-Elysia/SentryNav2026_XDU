@@ -478,7 +478,7 @@ private:
         
         auto pose_msg = geometry_msgs::msg::PoseStamped();
         pose_msg.header.stamp = ros_time;
-        pose_msg.header.frame_id = "map";
+        pose_msg.header.frame_id = "odom";
         
         pose_msg.pose.position.x = state.m_position.x();
         pose_msg.pose.position.y = state.m_position.y();
@@ -504,7 +504,7 @@ private:
         // Publish Odometry
         auto odom_msg = nav_msgs::msg::Odometry();
         odom_msg.header.stamp = ros_time;
-        odom_msg.header.frame_id = "map";
+        odom_msg.header.frame_id = "odom";
         odom_msg.child_frame_id = "livox_frame_two";
         
         odom_msg.pose.pose.position.x = state.m_position.x();
@@ -557,7 +557,7 @@ private:
         // Broadcast TF: map -> livox_frame_two
         geometry_msgs::msg::TransformStamped transform;
         transform.header.stamp = ros_time;
-        transform.header.frame_id = "map";
+        transform.header.frame_id = "odom";
         transform.child_frame_id = "livox_frame_two";
         
         transform.transform.translation.x = state.m_position.x();
@@ -574,7 +574,7 @@ private:
         // Add to trajectory
         geometry_msgs::msg::PoseStamped pose_msg;
         pose_msg.header.stamp = ros_time;
-        pose_msg.header.frame_id = "map";
+        pose_msg.header.frame_id = "odom";
         pose_msg.pose.position.x = state.m_position.x();
         pose_msg.pose.position.y = state.m_position.y();
         pose_msg.pose.position.z = state.m_position.z();
@@ -585,7 +585,7 @@ private:
         
         trajectory_.poses.push_back(pose_msg);
         trajectory_.header.stamp = ros_time;
-        trajectory_.header.frame_id = "map";
+        trajectory_.header.frame_id = "odom";
     }
     
     void publishVisualization(const LIOProcessingResult& result)
@@ -618,7 +618,7 @@ private:
         
         sensor_msgs::msg::PointCloud2 cloud_msg;
         cloud_msg.header.stamp = timestamp;
-        cloud_msg.header.frame_id = "map";
+        cloud_msg.header.frame_id = "odom";
         cloud_msg.height = 1;
         cloud_msg.width = cloud->size();
         cloud_msg.is_dense = false;
@@ -662,7 +662,7 @@ private:
         
         sensor_msgs::msg::PointCloud2 cloud_msg;
         cloud_msg.header.stamp = timestamp;
-        cloud_msg.header.frame_id = "map";
+        cloud_msg.header.frame_id = "odom";
         cloud_msg.height = 1;
         cloud_msg.width = cloud->size();
         cloud_msg.is_dense = false;
@@ -703,7 +703,7 @@ private:
     {
         sensor_msgs::msg::PointCloud2 cloud_msg;
         cloud_msg.header.stamp = timestamp;
-        cloud_msg.header.frame_id = "map";
+        cloud_msg.header.frame_id = "odom";
         cloud_msg.height = 1;
         cloud_msg.width = cloud->size();
         cloud_msg.is_dense = false;
