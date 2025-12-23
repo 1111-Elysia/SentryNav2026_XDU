@@ -188,7 +188,18 @@ private:
         tf_D_avg.setRotation(mean_q);
 
         // 启动时不动：map->base_link 近似 map->odom
-        const tf2::Transform tf_A = tf_D_avg * tf_C_inv_;
+        const tf2::Transform tf_A_raw = tf_D_avg * tf_C_inv_;
+
+        // ===== 按你的要求处理 tfA：平移保留，旋转再乘一个 C 的旋转 =====
+        tf2::Transform tf_A = tf_A_raw;
+        tf_A.setOrigin(tf_A_raw.getOrigin());  // 平移保持不变
+
+        tf2::Quaternion qA = tf_A_raw.getRotation();
+        tf2::Quaternion qC = tf_C_.getRotation();  // C: base_link->livox_frame 的旋转部分
+        tf2::Quaternion q_new = qA * qC;           // 旋转再乘 C 的旋转
+        q_new.normalize();
+        tf_A.setRotation(q_new);
+        // ===== end =====
 
         geometry_msgs::msg::TransformStamped A_msg;
         A_msg.header.stamp = stamp_now;
