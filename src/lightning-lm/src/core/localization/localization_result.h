@@ -4,6 +4,9 @@
 #pragma once
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <builtin_interfaces/msg/time.hpp>
+#include <std_msgs/msg/float32.hpp>
+
 #include "common/eigen_types.h"
 #include "common/nav_state.h"
 
@@ -54,6 +57,10 @@ struct LocalizationResult {
 
     geometry_msgs::msg::TransformStamped ToGeoMsg() const;  // 转到geometry msg
     NavState ToNavState() const;                            // 转到navstate
+
+    // 新增：把时间戳与置信度转成 ROS 消息（供 Node 层发布成话题）
+    builtin_interfaces::msg::Time ToRosTimeMsg() const;
+    std_msgs::msg::Float32 ToConfidenceMsg() const;
 };
 
 }  // namespace lightning::loc

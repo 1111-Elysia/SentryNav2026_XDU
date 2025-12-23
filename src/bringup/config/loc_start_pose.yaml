@@ -4,12 +4,12 @@ start_pose:
     y: 0.0
     z: 0.0
     yaw_deg: 0.0
-    pitch_deg: 45.7
+    pitch_deg: 0.0
     roll_deg: 0.0
   blue:
     x: 0.0
     y: 0.0
     z: 0.0
     yaw_deg: 0.0
-    pitch_deg: 45.7
+    pitch_deg: 0.0
     roll_deg: 0.0

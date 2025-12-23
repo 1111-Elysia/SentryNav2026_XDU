@@ -130,4 +130,4 @@ ui:
   car_height: 1.7
   scans: 1
 lio:
-  mount_correction_rpy: [0.0, 45.7, 0.0] #roll pitch yaw 角度制
+  mount_correction_rpy: [0.0, 0.0, 0.0] #roll pitch yaw 角度制

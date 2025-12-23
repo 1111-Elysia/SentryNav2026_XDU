@@ -14,6 +14,7 @@ RefereeNode::RefereeNode(const rclcpp::NodeOptions &options)
     this->SerialInit(this->param_normal_tty_device_, this->normal_serial_);
     this->normal_serial_rx_thread_ = std::thread([this] {
       for (;;) {
+        // RCLCPP_INFO(this->get_logger(), "linkstart");
         this->normal_decoder_ << this->normal_serial_->read();
       }
     });
@@ -144,6 +145,7 @@ void RefereeNode::SerialInit(std::string tty_device, std::unique_ptr<serial::Ser
  */
 void RefereeNode::PublishMsg(uint8_t *packet_payload, OpCodeEnum op_code) {
   RCLCPP_DEBUG(this->get_logger(), "Received a packet with OpCode: %d", static_cast<int>(op_code));
+  RCLCPP_INFO(this->get_logger(), "received packet");
   switch (op_code) {
     case OpCodeEnum::kGameStatus: {
       this->game_status_msg_.header.stamp = this->get_clock()->now();
@@ -203,6 +205,7 @@ void RefereeNode::PublishMsg(uint8_t *packet_payload, OpCodeEnum op_code) {
       break;
     }
     case OpCodeEnum::kRobotStatus: {
+      RCLCPP_INFO(this->get_logger(), "pub_robot_status");
       this->robot_status_msg_.header.stamp = this->get_clock()->now();
       this->robot_status_msg_.robot_id = packet_payload[0];
       this->robot_status_msg_.robot_level = packet_payload[1];

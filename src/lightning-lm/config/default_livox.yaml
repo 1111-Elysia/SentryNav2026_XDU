@@ -131,4 +131,4 @@ ui:
   scans: 1
 # 建图旋转修改
 lio:
-  mount_correction_rpy: [0.0, 45.7, 0.0] #roll pitch yaw 角度制
+  mount_correction_rpy: [0.0, 0.0, 0.0] #roll pitch yaw 角度制

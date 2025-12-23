@@ -8,20 +8,20 @@ sequential_nodes:
     type: execute
     cmd: [
       "ros2", "run", "lightning", "run_loc_online",
-      "--config", "default_livox.yaml"
+      "--config", "/home/pgd/SentryNav2026_XDU/src/bringup/config/default_livox.yaml"
     ]
     use_config_dir_as_cwd: true
     wait_after: 2
 
-  # - label: Fast-LIO
-  #   type: execute
-  #   cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
-  #   wait_after: 2
-
-  - label: Surfel-LIO
+  - label: Fast-LIO
     type: execute
-    cmd: ["ros2", "launch", "lio_ros_wrapper", "lio_mid360.launch.py"]
+    cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
     wait_after: 2
+
+  # - label: Surfel-LIO
+  #   type: execute
+  #   cmd: ["ros2", "launch", "lio_ros_wrapper", "lio_mid360.launch.py"]
+  #   wait_after: 2
 
   - label: TF-Odom-Publisher
     type: node
@@ -51,7 +51,7 @@ sequential_nodes:
     type: execute
     cmd: [
       "ros2", "launch", "sentry_navigation", "navigation_launch.py",
-      "map:=../map/map.yaml", "use_rviz:=true"
+      "map:=/home/pgd/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
     ]
     wait_after: 3
 
