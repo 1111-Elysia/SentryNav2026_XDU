@@ -12,7 +12,8 @@
 #include <memory>
 #include <vector>
 #include <cmath>
-#include "rm2_referee_msgs/msg/robot_status.hpp"
+#include <rclcpp/rclcpp.hpp> 
+#include "rm_referee_msgs/msg/robot_status.hpp"
 #include <yaml-cpp/yaml.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
@@ -34,15 +35,15 @@ int main(int argc, char** argv) {
 
     rclcpp::init(argc, argv);
 
-    // 订阅 /rm2_referee/robot_status，获取 robot_id
+    // 订阅 /rm_referee/robot_status，获取 robot_id
     auto status_node = rclcpp::Node::make_shared("robot_status_reader");
-    auto status_prom = std::make_shared<std::promise<rm2_referee_msgs::msg::RobotStatus::SharedPtr>>();
+    auto status_prom = std::make_shared<std::promise<rm_referee_msgs::msg::RobotStatus::SharedPtr>>();
     auto status_fut = status_prom->get_future();
 
-    auto status_sub = status_node->create_subscription<rm2_referee_msgs::msg::RobotStatus>(
-        "/rm2_referee/robot_status",
+    auto status_sub = status_node->create_subscription<rm_referee_msgs::msg::RobotStatus>(
+        "/rm_referee/robot_status",
         rclcpp::QoS(10),
-        [status_prom](const rm2_referee_msgs::msg::RobotStatus::SharedPtr msg) {
+        [status_prom](const rm_referee_msgs::msg::RobotStatus::SharedPtr msg) {
             try {
                 status_prom->set_value(msg);
             } catch (...) {
@@ -73,9 +74,9 @@ int main(int argc, char** argv) {
     if (status_fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
         auto status_msg = status_fut.get();
         robot_id = static_cast<int>(status_msg->robot_id);
-        LOG(INFO) << "收到 /rm2_referee/robot_status，robot_id=" << robot_id;
+        LOG(INFO) << "收到 /rm_referee/robot_status，robot_id=" << robot_id;
     } else {
-        LOG(WARNING) << "未收到 /rm2_referee/robot_status，使用默认 red 位姿";
+        LOG(WARNING) << "未收到 /rm_referee/robot_status，使用默认 red 位姿";
     }
 
     std::string side = (robot_id == 7) ? "red" : (robot_id == 107) ? "blue" : "red";

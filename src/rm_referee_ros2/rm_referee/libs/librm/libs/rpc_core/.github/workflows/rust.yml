@@ -1,0 +1,46 @@
+name: rust
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'include/**'
+      - 'test/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'include/**'
+      - 'test/**'
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  Linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: cargo fmt -- --check
+        working-directory: rust
+        run: cargo fmt -- --check
+
+      - name: build
+        working-directory: rust
+        run: cargo build
+
+      - name: test build
+        working-directory: rust
+        run: cargo test build
+
+      - name: rpc
+        working-directory: rust
+        run: cargo test --test rpc
+
+      - name: net_tcp
+        working-directory: rust
+        run: cargo test --test net_tcp --features="net"
+
+      - name: net_rpc
+        working-directory: rust
+        run: cargo test --test net_rpc --features="net"

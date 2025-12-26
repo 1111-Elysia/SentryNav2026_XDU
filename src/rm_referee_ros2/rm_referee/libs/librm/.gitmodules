@@ -1,0 +1,13 @@
+[submodule "libs/kalman"]
+	path = libs/kalman
+	url = https://github.com/SF4cl/kalman.git
+	branch = master
+[submodule "libs/etl"]
+	path = libs/etl
+	url = https://github.com/ETLCPP/etl.git
+[submodule "libs/rpc_core"]
+	path = libs/rpc_core
+	url = https://github.com/shuai132/rpc_core.git
+[submodule "libs/eternal"]
+	path = libs/eternal
+	url = https://github.com/mapbox/eternal.git

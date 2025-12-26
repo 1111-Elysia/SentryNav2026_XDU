@@ -1,0 +1,20 @@
+{
+  "name": "rpc_core",
+  "description": "a tiny c++14 rpc library, supports all platforms (macOS, Linux, Windows, iOS, Android, etc.) and most microchips (Arduino, STM32, ESP32/ESP8266, etc.)",
+  "keywords": "rpc",
+  "authors": {
+    "name": "shuai132",
+    "maintainer": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shuai132/rpc_core.git"
+  },
+  "version": "2.1.0",
+  "build": {
+    "srcDir": "_",
+    "flags": [
+      "-I include"
+    ]
+  }
+}

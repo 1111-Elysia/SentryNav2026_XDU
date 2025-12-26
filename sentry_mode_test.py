@@ -2,7 +2,7 @@
 import sys
 import rclpy
 from rclpy.node import Node
-from rm2_referee_msgs.srv import Tx
+from rm_referee_msgs.srv import Tx
 
 def crc8_maxim_head(hdr4):
     crc = 0xFF
@@ -45,9 +45,9 @@ def main():
 
     rclpy.init()
     node = Node('sentry_posture_tx')
-    cli = node.create_client(Tx, '/rm2_referee/tx')
+    cli = node.create_client(Tx, '/rm_referee/tx')
     if not cli.wait_for_service(timeout_sec=5.0):
-        node.get_logger().error('服务 /rm2_referee/tx 不可用')
+        node.get_logger().error('服务 /rm_referee/tx 不可用')
         return
     req = Tx.Request()
     req.data = frame
