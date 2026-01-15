@@ -1,0 +1,39 @@
+odom_preprocessor:
+  ros__parameters:
+    odom_list: ["odom0", "odom1"]
+    
+    odom0:
+      input_topic: "/Odometry"
+      output_topic: "/odom_processed1"
+      new_frame_id: "odom"
+      new_child_frame_id: "livox_frame"
+      pose_covariance: [1e-3, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 1e-3, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 1e6, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 1e6, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 1e6, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 1e-3]
+      twist_covariance: [1e-3, 0.0, 0.0, 0.0, 0.0, 0.0,
+                         0.0, 1e-3, 0.0, 0.0, 0.0, 0.0,
+                         0.0, 0.0, 1e6, 0.0, 0.0, 0.0,
+                         0.0, 0.0, 0.0, 1e6, 0.0, 0.0,
+                         0.0, 0.0, 0.0, 0.0, 1e6, 0.0,
+                         0.0, 0.0, 0.0, 0.0, 0.0, 1e-3]
+
+    odom1:
+      input_topic: "/kiss/odometry"
+      output_topic: "/odom_processed2"
+      new_frame_id: "odom"
+      new_child_frame_id: "livox_frame"
+      pose_covariance: [1e-3, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 1e-3, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 1e6, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 1e6, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 1e6, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 1e-3]
+      twist_covariance: [1e-3, 0.0, 0.0, 0.0, 0.0, 0.0,
+                         0.0, 1e-3, 0.0, 0.0, 0.0, 0.0,
+                         0.0, 0.0, 1e6, 0.0, 0.0, 0.0,
+                         0.0, 0.0, 0.0, 1e6, 0.0, 0.0,
+                         0.0, 0.0, 0.0, 0.0, 1e6, 0.0,
+                         0.0, 0.0, 0.0, 0.0, 0.0, 1e-3]

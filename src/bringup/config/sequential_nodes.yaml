@@ -16,12 +16,17 @@ sequential_nodes:
   - label: Fast-LIO
     type: execute
     cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
+    wait_after: 0
+
+  - label: kiss-ICP
+    type: execute
+    cmd: ["ros2", "launch", "kiss_icp", "odometry.launch.py"]
     wait_after: 2
 
-  # - label: Surfel-LIO
-  #   type: execute
-  #   cmd: ["ros2", "launch", "lio_ros_wrapper", "lio_mid360.launch.py"]
-  #   wait_after: 2
+  - label: odom-ekf
+    type: execute
+    cmd: ["ros2", "launch", "odom_ekf", "odom_ekf.launch.py"]
+    wait_after: 2
 
   - label: TF-Odom-Publisher
     type: node
