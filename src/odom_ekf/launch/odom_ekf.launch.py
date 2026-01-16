@@ -27,6 +27,6 @@ def generate_launch_description():
             output='screen',
             parameters=[ekf_params],
             # 将 EKF 默认的输出话题重映射为 /odom
-            remappings=[('odometry/filtered', '/odom')]
+            # remappings=[('odometry/filtered', '/odom')]s
         )
     ])

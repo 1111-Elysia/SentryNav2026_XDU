@@ -11,7 +11,7 @@ ekf_filter_node:
 
     map_frame: map
     odom_frame: odom
-    base_link_frame: livox_frame
+    base_link_frame: livox_frame_two
     world_frame: odom
 
     publish_tf: true  # [添加] 必须开启，否则不会发布 odom -> livox_frame 变换
