@@ -2,6 +2,22 @@ odom_preprocessor:
   ros__parameters:
     odom_list: ["odom0", "odom1"]
     
+    # [新增] IMU 参数配置
+    imu_input_topic: "/livox/imu"
+    imu_output_topic: "/imu_processed"
+    # Orientation 协方差 (9个浮点数) - 对应 Roll, Pitch, Yaw 的不确定性
+    imu_orientation_covariance: [1e-3, 0.0, 0.0,
+                                 0.0, 1e-3, 0.0,
+                                 0.0, 0.0, 1e-3]
+    # Angular Velocity 协方差 (9个浮点数)
+    imu_angular_velocity_covariance: [1e-3, 0.0, 0.0,
+                                      0.0, 1e-3, 0.0,
+                                      0.0, 0.0, 1e-3]
+    # Linear Acceleration 协方差 (9个浮点数)
+    imu_linear_acceleration_covariance: [1e-3, 0.0, 0.0,
+                                         0.0, 1e-3, 0.0,
+                                         0.0, 0.0, 1e-3]
+
     odom0:
       input_topic: "/Odometry"
       output_topic: "/odom_processed1"
@@ -9,15 +25,9 @@ odom_preprocessor:
       new_child_frame_id: "livox_frame_two"
       pose_covariance: [1e-3, 0.0, 0.0, 0.0, 0.0, 0.0,
                         0.0, 1e-3, 0.0, 0.0, 0.0, 0.0,
-                        0.0, 0.0, 1e-3, 0.0, 0.0, 0.0,
-                        0.0, 0.0, 0.0, 1e-3, 0.0, 0.0,
-                        0.0, 0.0, 0.0, 0.0, 1e-3, 0.0,
                         0.0, 0.0, 0.0, 0.0, 0.0, 1e-3]
       twist_covariance: [1e-3, 0.0, 0.0, 0.0, 0.0, 0.0,
                          0.0, 1e-3, 0.0, 0.0, 0.0, 0.0,
-                         0.0, 0.0, 1e-3, 0.0, 0.0, 0.0,
-                         0.0, 0.0, 0.0, 1e-3, 0.0, 0.0,
-                         0.0, 0.0, 0.0, 0.0, 1e-3, 0.0,
                          0.0, 0.0, 0.0, 0.0, 0.0, 1e-3]
 
     odom1:
