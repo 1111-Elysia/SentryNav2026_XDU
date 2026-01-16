@@ -32,9 +32,18 @@ public:
 
     // 1. 初始化 Nav2 Client
     ctx.client = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
-        RCLCPP_INFO(get_logger(), "Waiting for Nav2 action server...");
-    if (!ctx.client->wait_for_action_server(std::chrono::seconds(10))) {
-        RCLCPP_ERROR(get_logger(), "Nav2 Action Server not available after waiting");
+    
+    // ==================================================================================
+    // 初始化可视化发布者 (必须加这行，否则 RViz 看不到点)
+    // ==================================================================================
+    ctx.vis_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/bt_target_goal", 10);
+    
+    
+    RCLCPP_INFO(get_logger(), "Waiting for Nav2 action server...");
+    // 建议：循环等待直到连接成功，防止启动过快报错
+    while (!ctx.client->wait_for_action_server(std::chrono::seconds(2))) {
+        if (!rclcpp::ok()) return; // 防止 Ctrl+C 关不掉
+        RCLCPP_WARN(get_logger(), "Nav2 Action Server not available, waiting...");
     }
     RCLCPP_INFO(get_logger(), "Nav2 Action Server is ready.");
     

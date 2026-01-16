@@ -29,6 +29,9 @@ struct BtRosContext
   rclcpp::Node::SharedPtr node;
   rclcpp_action::Client<NavigateToPose>::SharedPtr client;
   
+  // 可视化发布者 (让 RViz 能看到目标)
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vis_pub;
+
   // TF 监听器（用于读取当前坐标）
   std::shared_ptr<tf2_ros::Buffer> tf_buffer;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener;
@@ -127,7 +130,7 @@ public:
       RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 所有点已跑完，任务结束！");
       ctx.current_index = 0; 
       
-      return BT::NodeStatus::FAILURE;  // 终止树的运行   循环跑的话注释掉就行
+      return BT::NodeStatus::FAILURE;  // 终止树的运行
      }
 
     auto goal = ctx.points[ctx.current_index];
@@ -135,9 +138,6 @@ public:
 
     setOutput("goal", goal);
     
-    // RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 准备前往第 %zu 个点 (x=%.2f, y=%.2f)", 
-    //             ctx.current_index + 1, goal.pose.position.x, goal.pose.position.y);
-
     ctx.current_index++; // 准备下一次调用的索引
     return BT::NodeStatus::SUCCESS;
   }
@@ -145,8 +145,6 @@ public:
 
 //=======================================================
 // CheckDistance：检查当前位置与目标点的距离
-// 返回 RUNNING 表示"还没到，继续跑"
-// 返回 SUCCESS 表示"到了/快到了，切下一个点"
 //=======================================================
 class CheckDistance : public BT::StatefulActionNode
 {
@@ -159,14 +157,11 @@ public:
   {
     return {
       BT::InputPort<geometry_msgs::msg::PoseStamped>("goal"),
-      BT::InputPort<double>("threshold", 0.5, "Distance threshold to switch next point")
+      BT::InputPort<double>("threshold", 0.5, "Distance threshold")
     };
   }
 
-  BT::NodeStatus onStart() override
-  {
-    return BT::NodeStatus::RUNNING;
-  }
+  BT::NodeStatus onStart() override { return BT::NodeStatus::RUNNING; }
 
   BT::NodeStatus onRunning() override
   {
@@ -180,66 +175,45 @@ public:
     getInput("threshold", threshold);
 
     try {
-      // 1. 获取机器人当前在 map 下的坐标
-      // 注意：这里假设机器人底盘 frame 是 "base_link"，地图是 "map"
       geometry_msgs::msg::TransformStamped t;
       t = ctx.tf_buffer->lookupTransform("map", "base_link", tf2::TimePointZero);
 
-      double current_x = t.transform.translation.x;
-      double current_y = t.transform.translation.y;
-
-      // 2. 计算欧氏距离
-      double dx = goal.pose.position.x - current_x;
-      double dy = goal.pose.position.y - current_y;
+      double dx = goal.pose.position.x - t.transform.translation.x;
+      double dy = goal.pose.position.y - t.transform.translation.y;
       double dist = std::sqrt(dx*dx + dy*dy);
 
-      // 3. 判断是否到达
       if (dist < threshold) {
-        size_t cur_idx = 0;
-        if (ctx.current_index > 0) cur_idx = ctx.current_index - 1;
-
-        // 获取当前点的坐标字符串
-        std::string cur_str = pointToString(ctx.points[cur_idx]);
-        
-        // 获取下一个点的坐标字符串 (检查越界)
+        // 日志打印逻辑
+        size_t cur_idx = (ctx.current_index > 0) ? ctx.current_index - 1 : 0;
         std::string next_str = "结束/重置";
         if (ctx.current_index < ctx.points.size()) {
-            next_str = pointToString(ctx.points[ctx.current_index]);
-        } else {
-             // 如果是循环模式，下一个可能是第0个
-             if (!ctx.points.empty()) next_str = pointToString(ctx.points[0]) + " (循环)";
+            char buf[32]; 
+            auto p = ctx.points[ctx.current_index];
+            snprintf(buf, 32, "(%.2f, %.2f)", p.pose.position.x, p.pose.position.y);
+            next_str = std::string(buf);
         }
 
         RCLCPP_INFO(ctx.node->get_logger(), 
             "\n>>> [到达] 距离目标 %.2fm (阈值 %.2f) <<<\n"
-            "    |-- 当前目标: P%zu %s\n"
+            "    |-- 当前目标: P%zu\n"
             "    |-- 切换下一站: %s", 
-            dist, threshold, cur_idx + 1, cur_str.c_str(), next_str.c_str());
-        // ----------------------
+            dist, threshold, cur_idx + 1, next_str.c_str());
 
         return BT::NodeStatus::SUCCESS; 
       }
-
       return BT::NodeStatus::RUNNING;
+
     } catch (const tf2::TransformException & ex) {
-      RCLCPP_WARN(ctx.node->get_logger(), "CheckDistance: Could not transform: %s", ex.what());
-      return BT::NodeStatus::RUNNING; // 拿不到坐标就继续等
+      // 这里的 warn 可以稍微降频，防止刷屏
+      return BT::NodeStatus::RUNNING;
     }
   }
 
   void onHalted() override {}
-
-private:
-  // 辅助函数：把 Pose 转成 "(x, y)" 字符串
-  std::string pointToString(const geometry_msgs::msg::PoseStamped& p) {
-      char buffer[64];
-      snprintf(buffer, sizeof(buffer), "(%.2f, %.2f)", p.pose.position.x, p.pose.position.y);
-      return std::string(buffer);
-  }
 };
 
 //=======================================================
-// SendNav2Goal：发送目标点（保持原样，但逻辑配合 Parallel）
+// SendNav2Goal：发送目标点 (增强可视化版)
 //=======================================================
 class SendNav2Goal : public BT::StatefulActionNode
 {
@@ -253,48 +227,96 @@ public:
     return { BT::InputPort<geometry_msgs::msg::PoseStamped>("goal") };
   }
 
+  // -------------------------------------------------------
+  // 1. onStart: 只负责向 Nav2 发送一次核心指令
+  // -------------------------------------------------------
   BT::NodeStatus onStart() override
   {
     auto& ctx = BtRosContext::instance();
-    geometry_msgs::msg::PoseStamped goal_pose;
-    if (!getInput("goal", goal_pose)) return BT::NodeStatus::FAILURE;
+    
+    // 安全检查
+    if (!ctx.client->action_server_is_ready()) {
+        RCLCPP_ERROR(ctx.node->get_logger(), "❌ SendNav2Goal: Nav2 Server 未连接！");
+        return BT::NodeStatus::FAILURE;
+    }
 
-    NavigateToPose::Goal goal_msg;
-    goal_msg.pose = goal_pose;
-    goal_msg.pose.header.stamp = ctx.node->now();
+    // 获取并缓存目标点 (存入成员变量 current_goal_)
+    if (!getInput("goal", current_goal_)) return BT::NodeStatus::FAILURE;
+
+    if (current_goal_.header.frame_id.empty()) {
+        current_goal_.header.frame_id = "map"; 
+    }
+    current_goal_.header.stamp = ctx.node->now();
+
+    // 第一次可视化
+    if (ctx.vis_pub) {
+        ctx.vis_pub->publish(current_goal_);
+    }
+
+    RCLCPP_INFO(ctx.node->get_logger(), 
+        "🏁 [发送目标] -> (%.2f, %.2f)", 
+        current_goal_.pose.position.x, current_goal_.pose.position.y);
 
     {
         std::lock_guard<std::mutex> lk(ctx.nav_mutex);
         ctx.nav_status = BtRosContext::NavStatus::SENDING;
     }
 
+    // 发送 Nav2 指令
+    NavigateToPose::Goal goal_msg;
+    goal_msg.pose = current_goal_;
+
     auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
+    send_goal_options.goal_response_callback = 
+        [ctx_node = ctx.node](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr & handle) {
+            if (!handle) RCLCPP_ERROR(ctx_node->get_logger(), "❌ 目标被拒！");
+            else RCLCPP_INFO(ctx_node->get_logger(), "✅ Nav2已接收");
+        };
     
-    // 我们不需要 result_callback 来决定何时结束，因为 CheckDistance 会抢断我们
-    // 但为了程序健壮性，还是留着回调
-    send_goal_options.result_callback = [this](auto) {
-        // 实际上这个 callback 只有在完全停车后才会触发，
-        // 在我们的 S 型过弯逻辑中，这个可能永远不会触发（因为提前被切断了）
-    };
+    // 不需要 result callback，因为会被 CheckDistance 打断
+    send_goal_options.result_callback = [](auto){};
 
     ctx.client->async_send_goal(goal_msg, send_goal_options);
     
-    // 立即返回 RUNNING，让行为树继续运行 CheckDistance
+    // 记录时间，用于 onRunning 的频率控制
+    last_pub_time_ = ctx.node->now();
+
     return BT::NodeStatus::RUNNING;
   }
 
+  // -------------------------------------------------------
+  // 2. onRunning: 持续刷新 RViz 显示 (这就是区别所在！)
+  // -------------------------------------------------------
   BT::NodeStatus onRunning() override
   {
-    // 一直保持 RUNNING，直到被 Parallel 节点 Halt（中断）
+    auto& ctx = BtRosContext::instance();
+    
+    // 获取当前时间
+    auto now = ctx.node->now();
+
+    // 每隔 0.5 秒 (500ms) 执行一次
+    if ((now - last_pub_time_).seconds() > 0.5) {
+        if (ctx.vis_pub) {
+            // 更新时间戳并发布，确保 RViz 知道这还是新的消息
+            current_goal_.header.stamp = now; 
+            ctx.vis_pub->publish(current_goal_);
+        }
+        last_pub_time_ = now;
+    }
+
     return BT::NodeStatus::RUNNING;
   }
 
+  // -------------------------------------------------------
+  // 3. onHalted: 切换点时什么都不做 (保持平滑)
+  // -------------------------------------------------------
   void onHalted() override
   {
-    // 【关键】当 CheckDistance 成功时，这个节点会被 Halt。
-    // 这里我们**什么都不做**。
-    // 不要 cancel_goal！
-    // 这样，当我们发下一个点时，Nav2 会自动把路径从旧点平滑过渡到新点。
-    // 如果这里 cancel 了，机器人会有一个急刹车动作。
+    // 不取消目标
   }
+
+private:
+  // 私有成员变量，用于在 onStart 和 onRunning 之间共享数据
+  geometry_msgs::msg::PoseStamped current_goal_; 
+  rclcpp::Time last_pub_time_;
 };

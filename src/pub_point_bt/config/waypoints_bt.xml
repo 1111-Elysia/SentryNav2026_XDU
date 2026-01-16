@@ -12,7 +12,7 @@
                         
                         <SendNav2Goal goal="{goal}"/>
 
-                        <CheckDistance goal="{goal}" threshold="0.6"/>
+                        <CheckDistance goal="{goal}" threshold="0.1"/>
                         
                     </Parallel>
                     
