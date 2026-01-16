@@ -337,7 +337,7 @@ private:
         bool used_cached_E = false;
 
         try {
-            E_msg = tf_buffer_.lookupTransform("odom", "livox_frame", rclcpp::Time(0));
+            E_msg = tf_buffer_.lookupTransform("odom", "livox_frame_two", rclcpp::Time(0));
             last_E_msg_ = E_msg;
             have_E_ = true;
             got_E = true;
@@ -350,11 +350,11 @@ private:
                     got_E = true;
                 } else {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                         "E(odom->livox_frame) 不可用且缓存过旧(%.2fs): %s", age, ex.what());
+                                         "E(odom->livox_frame_two) 不可用且缓存过旧(%.2fs): %s", age, ex.what());
                 }
             } else {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "等待 E(odom->livox_frame): %s", ex.what());
+                                     "等待 E(odom->livox_frame_two): %s", ex.what());
             }
         }
 
