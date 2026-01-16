@@ -32,8 +32,7 @@ public:
 
     // 1. 初始化 Nav2 Client
     ctx.client = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
-    ctx.initialpose_pub = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
-    RCLCPP_INFO(get_logger(), "Waiting for Nav2 action server...");
+        RCLCPP_INFO(get_logger(), "Waiting for Nav2 action server...");
     if (!ctx.client->wait_for_action_server(std::chrono::seconds(10))) {
         RCLCPP_ERROR(get_logger(), "Nav2 Action Server not available after waiting");
     }
@@ -45,7 +44,6 @@ public:
 
     // 3. 注册节点
     BT::BehaviorTreeFactory factory;
-    factory.registerNodeType<PublishInitialPose>("PublishInitialPose");
     factory.registerNodeType<InitPoints>("InitPoints");
     factory.registerNodeType<NextPoint>("NextPoint");
     factory.registerNodeType<SendNav2Goal>("SendNav2Goal");

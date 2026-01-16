@@ -1,8 +1,6 @@
 <root main_tree_to_execute="PatrolTree">
     <BehaviorTree ID="PatrolTree">
         <Sequence>
-            <PublishInitialPose x="0.0" y="0.0" yaw_deg="0.0" />
-
             <InitPoints points_param="points"/>
 
             <Repeat num_cycles="-1">
@@ -18,8 +16,28 @@
                         
                     </Parallel>
                     
-                    </Sequence>
+                </Sequence>
             </Repeat>
         </Sequence>
     </BehaviorTree>
-</root>
+
+    <TreeNodesModel>
+       
+        <Action ID="InitPoints">
+            <input_port name="points_param"/>
+        </Action>
+        
+        <Action ID="NextPoint">
+            <output_port name="goal"/>
+        </Action>
+        
+        <Action ID="SendNav2Goal">
+            <input_port name="goal"/>
+        </Action>
+        
+        <Condition ID="CheckDistance">
+            <input_port name="goal"/>
+            <input_port name="threshold"/>
+        </Condition>
+    </TreeNodesModel>
+    </root>

@@ -13,7 +13,6 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
@@ -29,7 +28,6 @@ struct BtRosContext
 {
   rclcpp::Node::SharedPtr node;
   rclcpp_action::Client<NavigateToPose>::SharedPtr client;
-  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_pub;
   
   // TF 监听器（用于读取当前坐标）
   std::shared_ptr<tf2_ros::Buffer> tf_buffer;
@@ -46,65 +44,6 @@ struct BtRosContext
   {
     static BtRosContext ctx;
     return ctx;
-  }
-};
-
-//=======================================================
-// PublishInitialPose：发布初始位姿 (自动初始化)
-//=======================================================
-class PublishInitialPose : public BT::SyncActionNode
-{
-public:
-  PublishInitialPose(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::SyncActionNode(name, config)
-  {}
-
-  static BT::PortsList providedPorts()
-  {
-    return {
-      BT::InputPort<double>("x", 0.0, "Initial X"),
-      BT::InputPort<double>("y", 0.0, "Initial Y"),
-      BT::InputPort<double>("yaw_deg", 0.0, "Initial Yaw in Degrees")
-    };
-  }
-
-  BT::NodeStatus tick() override
-  {
-    auto& ctx = BtRosContext::instance();
-    if (!ctx.initialpose_pub) {
-        RCLCPP_ERROR(ctx.node->get_logger(), "InitialPose publisher not initialized!");
-        return BT::NodeStatus::FAILURE;
-    }
-
-    double x = 0.0, y = 0.0, yaw_deg = 0.0;
-    getInput("x", x);
-    getInput("y", y);
-    getInput("yaw_deg", yaw_deg);
-
-    geometry_msgs::msg::PoseWithCovarianceStamped msg;
-    msg.header.stamp = ctx.node->now();
-    msg.header.frame_id = "map";
-    msg.pose.pose.position.x = x;
-    msg.pose.pose.position.y = y;
-    
-    // 角度转四元数
-    double yaw = yaw_deg * M_PI / 180.0;
-    msg.pose.pose.orientation.z = std::sin(yaw / 2.0);
-    msg.pose.pose.orientation.w = std::cos(yaw / 2.0);
-
-    // 设置协方差 (告诉 Nav2 我很确信我在这个位置)
-    msg.pose.covariance.fill(0.0);
-    msg.pose.covariance[0] = 0.25;  // X 轴不确定度
-    msg.pose.covariance[7] = 0.25;  // Y 轴不确定度
-    msg.pose.covariance[35] = 0.06; // 角度不确定度
-
-    ctx.initialpose_pub->publish(msg);
-    RCLCPP_INFO(ctx.node->get_logger(), ">>> 自动初始化位置完成: (%.2f, %.2f) <<<", x, y);
-    
-    // 给一点时间让 Nav2 处理定位
-    rclcpp::sleep_for(std::chrono::milliseconds(500));
-    
-    return BT::NodeStatus::SUCCESS;
   }
 };
 
