@@ -4,15 +4,19 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
-    # 获取包的共享目录路径，比硬编码路径更健壮
     share_dir = get_package_share_directory('odom_ekf')
-    
-    # 配置文件路径
     odom_list_params = os.path.join(share_dir, 'config', 'odom_list.yaml')
-    # [修正] 文件名应为 ekf_config.yaml 而不是 ekf.yaml
     ekf_params = os.path.join(share_dir, 'config', 'ekf_config.yaml') 
 
     return LaunchDescription([
+        # [新增] 假如你的 IMU frame 是 livox_frame，这里发布一个到 livox_frame_two 的静态变换
+        # 请根据上面 echo 出来的实际 frame_id 修改 args 的最后一个参数
+        Node(
+             package='tf2_ros',
+             executable='static_transform_publisher',
+             arguments = ['0', '0', '0', '0', '0', '0', 'livox_frame_two', 'livox_frame']
+        ),
+
         Node(
             package='odom_ekf',
             executable='odom_preprocessor',
@@ -26,7 +30,6 @@ def generate_launch_description():
             name='ekf_filter_node',
             output='screen',
             parameters=[ekf_params],
-            # 将 EKF 默认的输出话题重映射为 /odom
-            # remappings=[('odometry/filtered', '/odom')]s
+            # remappings=[('odometry/filtered', '/odom')]
         )
     ])
