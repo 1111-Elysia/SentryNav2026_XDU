@@ -6,4 +6,4 @@ data/
 src/bringup/map/
 *.pcd
 *.pgm
-*.ply
+*.ply.vscode/

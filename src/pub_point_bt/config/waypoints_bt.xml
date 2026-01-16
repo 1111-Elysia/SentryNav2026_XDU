@@ -1,110 +1,25 @@
-<?xml version="1.0"?>
-
-<!--
-  这个文件里有两棵行为树：
-
-  1) PatrolTree         : 使用 YAML 中的 points 参数做“多点巡逻”
-  2) ColorNavTree       : 根据颜色（red / blue）选择目标点
-
-  通过 root 标签的 main_tree_to_execute 决定用哪一棵：
-    - 想跑巡逻：    main_tree_to_execute="PatrolTree"
-    - 想跑颜色导航：main_tree_to_execute="ColorNavTree"
--->
-
 <root main_tree_to_execute="PatrolTree">
-
-  <!-- ===========================
-       1. 巡逻行为树（使用 waypoints）
-       =========================== -->
-  <BehaviorTree ID="PatrolTree">
-
-    <!-- 顶层 Sequence：按顺序执行各个步骤 -->
-    <Sequence>
-
-      <!-- 第一步：发布一次初始位姿
-           - x, y, yaw_deg 是你“认为机器人当前在 map 里的位置和朝向”
-           - 这个值相当于你在 RViz 里点 2D Pose Estimate
-           - 这里的 0,0,0 只是示例，你可以改成实际地图中的坐标 -->
-      <PublishInitialPose x="0.0" y="0.0" yaw_deg="0.0"/>
-
-      <!-- 第二步：只初始化一次巡逻路点
-           - 从 ROS 参数里读取：
-              points_param="points"      → YAML 里的 pub_point_bt_node.ros__parameters.points
-              interval_param="interval"  → YAML 里的 pub_point_bt_node.ros__parameters.interval
-           - InitPoints 会把 points 转成多个 PoseStamped 存到全局 ctx.points 里 -->
-      <InitPoints points_param="points"
-                  interval_param="interval"/>
-
-      <!-- 第三步：无限循环地巡逻所有路点
-           - Repeat num_cycles="-1" 表示无限循环
-           - 内部 Sequence 每一轮：取一个点 → 导航到该点 → 等待 interval 秒 -->
-      <Repeat num_cycles="-1">
+    <BehaviorTree ID="PatrolTree">
         <Sequence>
+            <PublishInitialPose x="0.0" y="0.0" yaw_deg="0.0" />
 
-          <!-- NextPoint:
-               - 从 ctx.points[current_index] 取一个路点
-               - 输出到黑板变量 {current_goal}
-               - current_index 自增，到头后回到 0（循环巡逻）-->
-          <NextPoint goal="{current_goal}"/>
+            <InitPoints points_param="points"/>
 
-          <!-- SendNav2Goal:
-               - 从黑板 {current_goal} 读取 PoseStamped
-               - 通过 Action Client 发送给 Nav2 的 navigate_to_pose
-               - 等待导航成功 / 失败 -->
-          <SendNav2Goal goal="{current_goal}"/>
+            <Repeat num_cycles="-1">
+                <Sequence>
+                    
+                    <NextPoint goal="{goal}"/>
 
-          <!-- WaitSeconds:
-               - 根据 InitPoints 中读到的 interval 参数等待一段时间
-               - 比如 interval=2.0 就等 2 秒 -->
-          <WaitSeconds/>
+                    <Parallel success_threshold="1" failure_threshold="1">
+                        
+                        <SendNav2Goal goal="{goal}"/>
 
+                        <CheckDistance goal="{goal}" threshold="0.6"/>
+                        
+                    </Parallel>
+                    
+                    </Sequence>
+            </Repeat>
         </Sequence>
-      </Repeat>
-
-    </Sequence>
-
-  </BehaviorTree>
-
-
-  <!-- ==============================
-       2. 颜色导航行为树（red / blue）
-       ============================== -->
-  <BehaviorTree ID="ColorNavTree">
-
-    <!-- 顶层 Sequence -->
-    <Sequence>
-
-      <!-- 第一步：同样先发布一次初始位姿
-           - 这里写的 0,0,0 只是例子，你可以根据实际改 -->
-      <PublishInitialPose x="0.0" y="0.0" yaw_deg="0.0"/>
-
-      <!-- 第二步：根据颜色选择目标位姿
-           - ColorToGoal 是你在 C++ 里实现的节点：
-               输入端口：color  (std::string)
-               输出端口：goal   (PoseStamped)
-           - 这里先写死 color="red" 或 color="blue"
-             以后你可以改成 color="{target_color}"，
-             然后由别的节点把 target_color 写到黑板里。 -->
-      <!-- 举例：让机器人去“红色点”的位置 -->
-      <ColorToGoal color="red" goal="{current_goal}"/>
-
-      <!-- 第三步：把 ColorToGoal 生成的 {current_goal} 发送给 Nav2 -->
-      <SendNav2Goal goal="{current_goal}"/>
-
-      <!-- 可选：到达后稍微等一会儿 -->
-      <WaitSeconds/>
-
-      <!-- 如果你想根据颜色反复去不同点，可以在外面再套一个 Repeat
-           例如：
-           <Repeat num_cycles="-1">
-             <Sequence>
-               ...
-             </Sequence>
-           </Repeat>
-           这里先给你最简单的一次性版本。 -->
-
-    </Sequence>
-
-  </BehaviorTree>
-
+    </BehaviorTree>
 </root>

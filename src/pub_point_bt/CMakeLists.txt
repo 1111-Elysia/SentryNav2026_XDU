@@ -13,6 +13,9 @@ find_package(nav2_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -38,6 +41,9 @@ ament_target_dependencies(pub_point_bt_node
   geometry_msgs
   behaviortree_cpp_v3
   ament_index_cpp
+  tf2_ros
+  tf2_geometry_msgs
+  tf2
 )
 
 install(TARGETS

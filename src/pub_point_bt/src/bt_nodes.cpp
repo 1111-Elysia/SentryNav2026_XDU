@@ -13,27 +13,29 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
-
+#include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 using namespace std::chrono_literals;
 using NavigateToPose = nav2_msgs::action::NavigateToPose;
 
 //-------------------------------------------------------
-// 全局上下文：保存 Node、Nav2 client、waypoints、interval、当前索引、导航状态
+// 全局上下文：保存 Node、Nav2 client、TF监听、waypoints
 //-------------------------------------------------------
 struct BtRosContext
 {
   rclcpp::Node::SharedPtr node;
   rclcpp_action::Client<NavigateToPose>::SharedPtr client;
-
-  //发布 /initialpose 初始位置
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_pub;
+  
+  // TF 监听器（用于读取当前坐标）
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener;
 
   std::vector<geometry_msgs::msg::PoseStamped> points;
-  double interval_sec{2.0};
   size_t current_index{0};
 
   enum class NavStatus { IDLE, SENDING, RUNNING, SUCCEEDED, FAILED, CANCELED };
@@ -48,7 +50,66 @@ struct BtRosContext
 };
 
 //=======================================================
-// InitPoints：从参数读取 points 与 interval，仅执行一次
+// PublishInitialPose：发布初始位姿 (自动初始化)
+//=======================================================
+class PublishInitialPose : public BT::SyncActionNode
+{
+public:
+  PublishInitialPose(const std::string& name, const BT::NodeConfiguration& config)
+    : BT::SyncActionNode(name, config)
+  {}
+
+  static BT::PortsList providedPorts()
+  {
+    return {
+      BT::InputPort<double>("x", 0.0, "Initial X"),
+      BT::InputPort<double>("y", 0.0, "Initial Y"),
+      BT::InputPort<double>("yaw_deg", 0.0, "Initial Yaw in Degrees")
+    };
+  }
+
+  BT::NodeStatus tick() override
+  {
+    auto& ctx = BtRosContext::instance();
+    if (!ctx.initialpose_pub) {
+        RCLCPP_ERROR(ctx.node->get_logger(), "InitialPose publisher not initialized!");
+        return BT::NodeStatus::FAILURE;
+    }
+
+    double x = 0.0, y = 0.0, yaw_deg = 0.0;
+    getInput("x", x);
+    getInput("y", y);
+    getInput("yaw_deg", yaw_deg);
+
+    geometry_msgs::msg::PoseWithCovarianceStamped msg;
+    msg.header.stamp = ctx.node->now();
+    msg.header.frame_id = "map";
+    msg.pose.pose.position.x = x;
+    msg.pose.pose.position.y = y;
+    
+    // 角度转四元数
+    double yaw = yaw_deg * M_PI / 180.0;
+    msg.pose.pose.orientation.z = std::sin(yaw / 2.0);
+    msg.pose.pose.orientation.w = std::cos(yaw / 2.0);
+
+    // 设置协方差 (告诉 Nav2 我很确信我在这个位置)
+    msg.pose.covariance.fill(0.0);
+    msg.pose.covariance[0] = 0.25;  // X 轴不确定度
+    msg.pose.covariance[7] = 0.25;  // Y 轴不确定度
+    msg.pose.covariance[35] = 0.06; // 角度不确定度
+
+    ctx.initialpose_pub->publish(msg);
+    RCLCPP_INFO(ctx.node->get_logger(), ">>> 自动初始化位置完成: (%.2f, %.2f) <<<", x, y);
+    
+    // 给一点时间让 Nav2 处理定位
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+    
+    return BT::NodeStatus::SUCCESS;
+  }
+};
+
+//=======================================================
+// InitPoints：初始化路点
 //=======================================================
 class InitPoints : public BT::SyncActionNode
 {
@@ -59,82 +120,51 @@ public:
 
   static BT::PortsList providedPorts()
   {
-    return {
-      BT::InputPort<std::string>("points_param"),
-      BT::InputPort<std::string>("interval_param")
-    };
+    return { BT::InputPort<std::string>("points_param") };
   }
 
   BT::NodeStatus tick() override
   {
     auto& ctx = BtRosContext::instance();
-    if (!ctx.node) {
-      throw BT::RuntimeError("InitPoints: ROS node not set");
-    }
+    if (!ctx.node) throw BT::RuntimeError("InitPoints: ROS node not set");
 
-    // 只初始化一次，避免 parameter 已声明错误
     static bool initialized = false;
-    if (initialized) {
-      return BT::NodeStatus::SUCCESS;
-    }
+    if (initialized) return BT::NodeStatus::SUCCESS;
 
     std::string points_param_name;
-    std::string interval_param_name;
     getInput("points_param", points_param_name);
-    getInput("interval_param", interval_param_name);
 
-    // points 参数：如果未声明则声明
     if (!ctx.node->has_parameter(points_param_name)) {
       ctx.node->declare_parameter(points_param_name, std::vector<double>{});
     }
     auto flat = ctx.node->get_parameter(points_param_name).as_double_array();
 
     if (flat.size() % 3 != 0 || flat.empty()) {
-      RCLCPP_ERROR(ctx.node->get_logger(),
-                   "InitPoints: points 必须是 3*N 且非空");
+      RCLCPP_ERROR(ctx.node->get_logger(), "InitPoints: points 必须是 3*N");
       return BT::NodeStatus::FAILURE;
     }
 
-    // interval 参数
-    if (!ctx.node->has_parameter(interval_param_name)) {
-      ctx.node->declare_parameter(interval_param_name, 2.0);
-    }
-    ctx.interval_sec =
-        ctx.node->get_parameter(interval_param_name).as_double();
-
-    // 转换为 PoseStamped
     ctx.points.clear();
-    ctx.points.reserve(flat.size() / 3);
-
     for (size_t i = 0; i < flat.size(); i += 3) {
-      double x = flat[i];
-      double y = flat[i + 1];
-      double yaw_deg = flat[i + 2];
-      double yaw = yaw_deg * M_PI / 180.0;
-
       geometry_msgs::msg::PoseStamped p;
       p.header.frame_id = "map";
-      p.pose.position.x = x;
-      p.pose.position.y = y;
+      p.pose.position.x = flat[i];
+      p.pose.position.y = flat[i + 1];
+      double yaw = flat[i + 2] * M_PI / 180.0;
       p.pose.orientation.z = std::sin(yaw / 2.0);
       p.pose.orientation.w = std::cos(yaw / 2.0);
-
       ctx.points.push_back(p);
     }
 
     ctx.current_index = 0;
-
-    RCLCPP_INFO(ctx.node->get_logger(),
-                "InitPoints: loaded %zu points, interval=%.2f",
-                ctx.points.size(), ctx.interval_sec);
-
+    RCLCPP_INFO(ctx.node->get_logger(), "InitPoints: loaded %zu points", ctx.points.size());
     initialized = true;
     return BT::NodeStatus::SUCCESS;
   }
 };
 
 //=======================================================
-// NextPoint：从 points[current_index] 取一个点，输出到端口 goal，并 index++
+// NextPoint：获取当前目标点并输出
 //=======================================================
 class NextPoint : public BT::SyncActionNode
 {
@@ -145,51 +175,132 @@ public:
 
   static BT::PortsList providedPorts()
   {
-    return {
-      BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal")
-    };
+    return { BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal") };
   }
 
   BT::NodeStatus tick() override
   {
     auto& ctx = BtRosContext::instance();
-    if (!ctx.node) {
-      throw BT::RuntimeError("NextPoint: ROS node not set");
-    }
+    if (ctx.points.empty()) return BT::NodeStatus::FAILURE;
 
-    if (ctx.points.empty()) {
-      RCLCPP_ERROR(ctx.node->get_logger(), "NextPoint: points empty");
-      return BT::NodeStatus::FAILURE;
-    }
-
+    // 循环逻辑
     if (ctx.current_index >= ctx.points.size()) {
-      ctx.current_index = 0;
-    }
+      RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 所有点已跑完，任务结束！");
+      ctx.current_index = 0; 
+      
+      return BT::NodeStatus::FAILURE;  // 终止树的运行   循环跑的话注释掉就行
+     }
 
     auto goal = ctx.points[ctx.current_index];
     goal.header.stamp = ctx.node->now();
 
-    RCLCPP_INFO(ctx.node->get_logger(),
-                "NextPoint: index=%zu, x=%.2f, y=%.2f",
-                ctx.current_index,
-                goal.pose.position.x,
-                goal.pose.position.y);
-
     setOutput("goal", goal);
+    
+    // RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 准备前往第 %zu 个点 (x=%.2f, y=%.2f)", 
+    //             ctx.current_index + 1, goal.pose.position.x, goal.pose.position.y);
 
-    ctx.current_index++;
-    if (ctx.current_index >= ctx.points.size()) {
-      ctx.current_index = 0;
-      RCLCPP_INFO(ctx.node->get_logger(),
-                  "NextPoint: wrap to index 0");
-    }
-
+    ctx.current_index++; // 准备下一次调用的索引
     return BT::NodeStatus::SUCCESS;
   }
 };
 
 //=======================================================
-// SendNav2Goal：发送 Nav2 目标并等待结果（到点检测）
+// CheckDistance：检查当前位置与目标点的距离
+// 返回 RUNNING 表示"还没到，继续跑"
+// 返回 SUCCESS 表示"到了/快到了，切下一个点"
+//=======================================================
+class CheckDistance : public BT::StatefulActionNode
+{
+public:
+  CheckDistance(const std::string& name, const BT::NodeConfiguration& config)
+    : BT::StatefulActionNode(name, config)
+  {}
+
+  static BT::PortsList providedPorts()
+  {
+    return {
+      BT::InputPort<geometry_msgs::msg::PoseStamped>("goal"),
+      BT::InputPort<double>("threshold", 0.5, "Distance threshold to switch next point")
+    };
+  }
+
+  BT::NodeStatus onStart() override
+  {
+    return BT::NodeStatus::RUNNING;
+  }
+
+  BT::NodeStatus onRunning() override
+  {
+    auto& ctx = BtRosContext::instance();
+    if (!ctx.tf_buffer) return BT::NodeStatus::FAILURE;
+
+    geometry_msgs::msg::PoseStamped goal;
+    double threshold = 0.5;
+
+    if (!getInput("goal", goal)) return BT::NodeStatus::FAILURE;
+    getInput("threshold", threshold);
+
+    try {
+      // 1. 获取机器人当前在 map 下的坐标
+      // 注意：这里假设机器人底盘 frame 是 "base_link"，地图是 "map"
+      geometry_msgs::msg::TransformStamped t;
+      t = ctx.tf_buffer->lookupTransform("map", "base_link", tf2::TimePointZero);
+
+      double current_x = t.transform.translation.x;
+      double current_y = t.transform.translation.y;
+
+      // 2. 计算欧氏距离
+      double dx = goal.pose.position.x - current_x;
+      double dy = goal.pose.position.y - current_y;
+      double dist = std::sqrt(dx*dx + dy*dy);
+
+      // 3. 判断是否到达
+      if (dist < threshold) {
+        size_t cur_idx = 0;
+        if (ctx.current_index > 0) cur_idx = ctx.current_index - 1;
+
+        // 获取当前点的坐标字符串
+        std::string cur_str = pointToString(ctx.points[cur_idx]);
+        
+        // 获取下一个点的坐标字符串 (检查越界)
+        std::string next_str = "结束/重置";
+        if (ctx.current_index < ctx.points.size()) {
+            next_str = pointToString(ctx.points[ctx.current_index]);
+        } else {
+             // 如果是循环模式，下一个可能是第0个
+             if (!ctx.points.empty()) next_str = pointToString(ctx.points[0]) + " (循环)";
+        }
+
+        RCLCPP_INFO(ctx.node->get_logger(), 
+            "\n>>> [到达] 距离目标 %.2fm (阈值 %.2f) <<<\n"
+            "    |-- 当前目标: P%zu %s\n"
+            "    |-- 切换下一站: %s", 
+            dist, threshold, cur_idx + 1, cur_str.c_str(), next_str.c_str());
+        // ----------------------
+
+        return BT::NodeStatus::SUCCESS; 
+      }
+
+      return BT::NodeStatus::RUNNING;
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN(ctx.node->get_logger(), "CheckDistance: Could not transform: %s", ex.what());
+      return BT::NodeStatus::RUNNING; // 拿不到坐标就继续等
+    }
+  }
+
+  void onHalted() override {}
+
+private:
+  // 辅助函数：把 Pose 转成 "(x, y)" 字符串
+  std::string pointToString(const geometry_msgs::msg::PoseStamped& p) {
+      char buffer[64];
+      snprintf(buffer, sizeof(buffer), "(%.2f, %.2f)", p.pose.position.x, p.pose.position.y);
+      return std::string(buffer);
+  }
+};
+
+//=======================================================
+// SendNav2Goal：发送目标点（保持原样，但逻辑配合 Parallel）
 //=======================================================
 class SendNav2Goal : public BT::StatefulActionNode
 {
@@ -200,352 +311,51 @@ public:
 
   static BT::PortsList providedPorts()
   {
-    return {
-      BT::InputPort<geometry_msgs::msg::PoseStamped>("goal")
-    };
+    return { BT::InputPort<geometry_msgs::msg::PoseStamped>("goal") };
   }
 
   BT::NodeStatus onStart() override
   {
     auto& ctx = BtRosContext::instance();
-    if (!ctx.node) {
-      throw BT::RuntimeError("SendNav2Goal: ROS node not set");
-    }
-    if (!ctx.client) {
-      RCLCPP_ERROR(ctx.node->get_logger(),
-                   "SendNav2Goal: Nav2 client not initialized");
-      return BT::NodeStatus::FAILURE;
-    }
-
     geometry_msgs::msg::PoseStamped goal_pose;
-    if (!getInput("goal", goal_pose)) {
-      RCLCPP_ERROR(ctx.node->get_logger(),
-                   "SendNav2Goal: no goal on blackboard");
-      return BT::NodeStatus::FAILURE;
-    }
+    if (!getInput("goal", goal_pose)) return BT::NodeStatus::FAILURE;
 
     NavigateToPose::Goal goal_msg;
-    goal_pose.header.stamp = ctx.node->now();
     goal_msg.pose = goal_pose;
+    goal_msg.pose.header.stamp = ctx.node->now();
 
     {
-      std::lock_guard<std::mutex> lk(ctx.nav_mutex);
-      ctx.nav_status = BtRosContext::NavStatus::SENDING;
+        std::lock_guard<std::mutex> lk(ctx.nav_mutex);
+        ctx.nav_status = BtRosContext::NavStatus::SENDING;
     }
 
-    auto node = ctx.node;  // lambda 里使用
+    auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
+    
+    // 我们不需要 result_callback 来决定何时结束，因为 CheckDistance 会抢断我们
+    // 但为了程序健壮性，还是留着回调
+    send_goal_options.result_callback = [this](auto) {
+        // 实际上这个 callback 只有在完全停车后才会触发，
+        // 在我们的 S 型过弯逻辑中，这个可能永远不会触发（因为提前被切断了）
+    };
 
-    rclcpp_action::Client<NavigateToPose>::SendGoalOptions options;
-
-    // goal 是否被接受
-    options.goal_response_callback =
-      [node](std::shared_ptr<rclcpp_action::ClientGoalHandle<NavigateToPose>> handle)
-      {
-        auto& c = BtRosContext::instance();
-        std::lock_guard<std::mutex> lk(c.nav_mutex);
-        if (!handle) {
-          RCLCPP_ERROR(node->get_logger(),
-                       "SendNav2Goal: goal rejected");
-          c.nav_status = BtRosContext::NavStatus::FAILED;
-        } else {
-          RCLCPP_INFO(node->get_logger(),
-                      "SendNav2Goal: goal accepted");
-          c.nav_status = BtRosContext::NavStatus::RUNNING;
-        }
-      };
-
-    // 反馈（可以用来打印距离等，这里先忽略）
-    options.feedback_callback =
-      [node](std::shared_ptr<rclcpp_action::ClientGoalHandle<NavigateToPose>>,
-             const std::shared_ptr<const NavigateToPose::Feedback> feedback)
-      {
-        (void)feedback;
-        // RCLCPP_DEBUG(node->get_logger(), "feedback ...");
-      };
-
-    // 结果：成功 / 失败 / 取消
-    options.result_callback =
-      [node](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult& result)
-      {
-        auto& c = BtRosContext::instance();
-        std::lock_guard<std::mutex> lk(c.nav_mutex);
-
-        switch (result.code)
-        {
-          case rclcpp_action::ResultCode::SUCCEEDED:
-            RCLCPP_INFO(node->get_logger(),
-                        "SendNav2Goal: goal reached successfully");
-            c.nav_status = BtRosContext::NavStatus::SUCCEEDED;
-            break;
-          case rclcpp_action::ResultCode::ABORTED:
-            RCLCPP_ERROR(node->get_logger(),
-                         "SendNav2Goal: goal aborted");
-            c.nav_status = BtRosContext::NavStatus::FAILED;
-            break;
-          case rclcpp_action::ResultCode::CANCELED:
-            RCLCPP_WARN(node->get_logger(),
-                        "SendNav2Goal: goal canceled");
-            c.nav_status = BtRosContext::NavStatus::CANCELED;
-            break;
-          default:
-            RCLCPP_ERROR(node->get_logger(),
-                         "SendNav2Goal: unknown result code");
-            c.nav_status = BtRosContext::NavStatus::FAILED;
-            break;
-        }
-      };
-
-    ctx.client->async_send_goal(goal_msg, options);
-
-    // 开始等待结果
+    ctx.client->async_send_goal(goal_msg, send_goal_options);
+    
+    // 立即返回 RUNNING，让行为树继续运行 CheckDistance
     return BT::NodeStatus::RUNNING;
   }
 
   BT::NodeStatus onRunning() override
   {
-    auto& ctx = BtRosContext::instance();
-    std::lock_guard<std::mutex> lk(ctx.nav_mutex);
-
-    switch (ctx.nav_status)
-    {
-      case BtRosContext::NavStatus::SENDING:
-      case BtRosContext::NavStatus::RUNNING:
-        return BT::NodeStatus::RUNNING;
-
-      case BtRosContext::NavStatus::SUCCEEDED:
-        ctx.nav_status = BtRosContext::NavStatus::IDLE;
-        return BT::NodeStatus::SUCCESS;
-
-      case BtRosContext::NavStatus::FAILED:
-      case BtRosContext::NavStatus::CANCELED:
-        ctx.nav_status = BtRosContext::NavStatus::IDLE;
-        return BT::NodeStatus::FAILURE;
-
-      case BtRosContext::NavStatus::IDLE:
-      default:
-        return BT::NodeStatus::FAILURE;
-    }
+    // 一直保持 RUNNING，直到被 Parallel 节点 Halt（中断）
+    return BT::NodeStatus::RUNNING;
   }
 
   void onHalted() override
   {
-    // 有需要的话可以在这里调用 cancel_goal，这里先留空
+    // 【关键】当 CheckDistance 成功时，这个节点会被 Halt。
+    // 这里我们**什么都不做**。
+    // 不要 cancel_goal！
+    // 这样，当我们发下一个点时，Nav2 会自动把路径从旧点平滑过渡到新点。
+    // 如果这里 cancel 了，机器人会有一个急刹车动作。
   }
 };
-
-//=======================================================
-// PublishInitialPose：向 /initialpose 发布一次初始位姿
-//=======================================================
-class PublishInitialPose : public BT::SyncActionNode
-{
-public:
-  PublishInitialPose(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::SyncActionNode(name, config)
-  {}
-
-  // 输入端口：x, y, yaw_deg（角度）
-  static BT::PortsList providedPorts()
-  {
-    return {
-      BT::InputPort<double>("x"),
-      BT::InputPort<double>("y"),
-      BT::InputPort<double>("yaw_deg")
-    };
-  }
-
-  BT::NodeStatus tick() override
-  {
-    auto& ctx = BtRosContext::instance();
-    if (!ctx.node) {
-      throw BT::RuntimeError("PublishInitialPose: ROS node not set");
-    }
-    if (!ctx.initialpose_pub) {
-      RCLCPP_ERROR(ctx.node->get_logger(),
-                   "PublishInitialPose: initialpose publisher not initialized");
-      return BT::NodeStatus::FAILURE;
-    }
-
-    double x = 0.0, y = 0.0, yaw_deg = 0.0;
-    // 从端口读取（读不到就用默认 0）
-    getInput("x", x);
-    getInput("y", y);
-    getInput("yaw_deg", yaw_deg);
-
-    double yaw = yaw_deg * M_PI / 180.0;
-
-    geometry_msgs::msg::PoseWithCovarianceStamped msg;
-    msg.header.stamp = ctx.node->now();
-    msg.header.frame_id = "map";
-
-    msg.pose.pose.position.x = x;
-    msg.pose.pose.position.y = y;
-    msg.pose.pose.position.z = 0.0;
-
-    // 只绕 Z 轴的四元数
-    msg.pose.pose.orientation.x = 0.0;
-    msg.pose.pose.orientation.y = 0.0;
-    msg.pose.pose.orientation.z = std::sin(yaw / 2.0);
-    msg.pose.pose.orientation.w = std::cos(yaw / 2.0);
-
-    // 协方差：36 个元素
-    // 这里给一个比较常见的 AMCL 初始不确定性：
-    // x, y 方差 0.25 (0.5m)，yaw 方差 ~ (15°)^2
-    msg.pose.covariance.fill(0.0);
-    msg.pose.covariance[0]  = 0.25; // x
-    msg.pose.covariance[7]  = 0.25; // y
-    double yaw_var = (15.0 * M_PI / 180.0);
-    yaw_var *= yaw_var;
-    msg.pose.covariance[35] = yaw_var; // yaw
-
-    ctx.initialpose_pub->publish(msg);
-
-    RCLCPP_INFO(ctx.node->get_logger(),
-                "PublishInitialPose: x=%.2f, y=%.2f, yaw=%.1f deg",
-                x, y, yaw_deg);
-
-    return BT::NodeStatus::SUCCESS;
-  }
-};
-
-//=======================================================
-// ColorToGoal：根据颜色选择不同的目标位姿（只支持 red / blue）
-//=======================================================
-class ColorToGoal : public BT::SyncActionNode
-{
-public:
-  ColorToGoal(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::SyncActionNode(name, config)
-  {}
-
-  // 输入：color (std::string)
-  // 输出：goal (PoseStamped)
-  static BT::PortsList providedPorts()
-  {
-    return {
-      BT::InputPort<std::string>("color"),
-      BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal")
-    };
-  }
-
-  BT::NodeStatus tick() override
-  {
-    auto& ctx = BtRosContext::instance();
-    if (!ctx.node) {
-      throw BT::RuntimeError("ColorToGoal: ROS node not set");
-    }
-
-    // 1) 从输入端口拿颜色字符串
-    std::string color;
-    if (!getInput("color", color))
-    {
-      RCLCPP_ERROR(ctx.node->get_logger(),
-                   "ColorToGoal: input port [color] not set");
-      return BT::NodeStatus::FAILURE;
-    }
-
-    // 2) 根据颜色选择 (x, y, yaw_deg)
-    double x = 0.0;
-    double y = 0.0;
-    double yaw_deg = 0.0;
-
-    if (color == "red")
-    {
-      // 举例：红色目标点
-      x = 1.0;
-      y = 0.0;
-      yaw_deg = 0.0;      // 朝 +X
-    }
-    else if (color == "blue")
-    {
-      // 举例：蓝色目标点
-      x = 0.0;
-      y = 1.0;
-      yaw_deg = 90.0;     // 朝 +Y
-    }
-    else
-    {
-      RCLCPP_ERROR(ctx.node->get_logger(),
-                   "ColorToGoal: unknown color [%s]", color.c_str());
-      return BT::NodeStatus::FAILURE;
-    }
-
-    // 3) 欧拉角（yaw，单位：度） → 弧度 → 四元数
-    double yaw = yaw_deg * M_PI / 180.0;
-
-    geometry_msgs::msg::PoseStamped goal;
-    goal.header.stamp = ctx.node->now();
-    goal.header.frame_id = "map";
-
-    goal.pose.position.x = x;
-    goal.pose.position.y = y;
-    goal.pose.position.z = 0.0;
-
-    // 只绕 Z 轴旋转的四元数
-    goal.pose.orientation.x = 0.0;
-    goal.pose.orientation.y = 0.0;
-    goal.pose.orientation.z = std::sin(yaw / 2.0);
-    goal.pose.orientation.w = std::cos(yaw / 2.0);
-
-    // 4) 写到输出端口 goal
-    setOutput("goal", goal);
-
-    RCLCPP_INFO(ctx.node->get_logger(),
-                "ColorToGoal: color=%s -> (x=%.2f, y=%.2f, yaw=%.1f deg)",
-                color.c_str(), x, y, yaw_deg);
-
-    return BT::NodeStatus::SUCCESS;
-  }
-};
-
-
-//=======================================================
-// WaitSeconds：按 interval_sec 等待
-//=======================================================
-class WaitSeconds : public BT::StatefulActionNode
-{
-public:
-  WaitSeconds(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::StatefulActionNode(name, config)
-  {}
-
-  static BT::PortsList providedPorts()
-  {
-    return {};  // 使用全局 ctx.interval_sec，不用端口
-  }
-
-  BT::NodeStatus onStart() override
-  {
-    auto& ctx = BtRosContext::instance();
-    if (!ctx.node) {
-      throw BT::RuntimeError("WaitSeconds: ROS node not set");
-    }
-
-    double sec = ctx.interval_sec;
-    if (sec <= 0.0) sec = 0.1;
-
-    wait_duration_ = std::chrono::duration<double>(sec);
-    start_time_ = std::chrono::steady_clock::now();
-
-    RCLCPP_INFO(ctx.node->get_logger(),
-                "WaitSeconds: wait %.2f seconds", sec);
-
-    return BT::NodeStatus::RUNNING;
-  }
-
-  BT::NodeStatus onRunning() override
-  {
-    auto now = std::chrono::steady_clock::now();
-    if (now - start_time_ >= wait_duration_) {
-      return BT::NodeStatus::SUCCESS;
-    }
-    return BT::NodeStatus::RUNNING;
-  }
-
-  void onHalted() override {}
-
-private:
-  std::chrono::steady_clock::time_point start_time_;
-  std::chrono::duration<double> wait_duration_{0.0};
-};
-
-// 不要 BT_REGISTER_NODES，这里只定义类，runner 里手动注册

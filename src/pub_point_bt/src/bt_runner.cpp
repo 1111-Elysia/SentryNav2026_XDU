@@ -13,6 +13,9 @@
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+
 // 直接包含节点实现
 #include "bt_nodes.cpp"
 
@@ -27,30 +30,27 @@ public:
   {
     auto &ctx = BtRosContext::instance();
 
-    // 这里只创建 client，真正的 node SharedPtr 在 main 里塞进 ctx.node
-    ctx.client = rclcpp_action::create_client<NavigateToPose>(
-        this, "navigate_to_pose");
+    // 1. 初始化 Nav2 Client
+    ctx.client = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
+    ctx.initialpose_pub = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
+    RCLCPP_INFO(get_logger(), "Waiting for Nav2 action server...");
+    if (!ctx.client->wait_for_action_server(std::chrono::seconds(10))) {
+        RCLCPP_ERROR(get_logger(), "Nav2 Action Server not available after waiting");
+    }
+    RCLCPP_INFO(get_logger(), "Nav2 Action Server is ready.");
     
-      // 发布 /initialpose
-    ctx.initialpose_pub = this->create_publisher<
-        geometry_msgs::msg::PoseWithCovarianceStamped>(
-          "/initialpose", 10);
+    // 2. 初始化 TF Listener (用于 CheckDistance 读取坐标)
+    ctx.tf_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+    ctx.tf_listener = std::make_shared<tf2_ros::TransformListener>(*ctx.tf_buffer);
 
-    RCLCPP_INFO(get_logger(),
-                "等待 Nav2 navigate_to_pose Action 服务器...");
-    ctx.client->wait_for_action_server();
-    RCLCPP_INFO(get_logger(),
-                "Nav2 Action 服务器已就绪");
-
-    // 行为树工厂 & 注册节点
+    // 3. 注册节点
     BT::BehaviorTreeFactory factory;
+    factory.registerNodeType<PublishInitialPose>("PublishInitialPose");
     factory.registerNodeType<InitPoints>("InitPoints");
     factory.registerNodeType<NextPoint>("NextPoint");
     factory.registerNodeType<SendNav2Goal>("SendNav2Goal");
-    factory.registerNodeType<PublishInitialPose>("PublishInitialPose");
-    factory.registerNodeType<ColorToGoal>("ColorToGoal");
-    factory.registerNodeType<WaitSeconds>("WaitSeconds");
-
+    factory.registerNodeType<CheckDistance>("CheckDistance");
+    
     // XML 路径（默认安装在 share/pub_point_bt/config/waypoints_bt.xml）
     std::string xml_path = this->declare_parameter<std::string>(
         "bt_xml",
@@ -73,12 +73,15 @@ public:
                    "Failed to start BT ZMQ publisher: %s", e.what());
     }
 
-    timer_ = create_wall_timer(100ms, [this]()
-                               {
+    timer_ = create_wall_timer(100ms, [this]() {
       auto status = tree_.tickRoot();
-      if (status == BT::NodeStatus::FAILURE) {
-        RCLCPP_WARN(get_logger(), "Behavior tree root FAILURE");
-      } });
+
+      if (status == BT::NodeStatus::SUCCESS || status == BT::NodeStatus::FAILURE) {
+        RCLCPP_INFO(get_logger(), "🛑 任务结束 (状态: %s)，停止运行！", BT::toStr(status).c_str());
+        this->timer_->cancel(); // 关键：取消定时器，不再触发
+        // rclcpp::shutdown();  // 如果想连节点一起关掉，可以把这行解注
+      }
+    });
   }
 
 private:
