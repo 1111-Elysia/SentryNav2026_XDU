@@ -159,6 +159,7 @@ private:
         tf_msg.child_frame_id = "livox_frame";
         tf_msg.transform = tf2::toMsg(tf_C_);
         static_tf_broadcaster_->sendTransform(tf_msg);
+        RCLCPP_INFO(this->get_logger(), "静态变换已发布: base_link -> livox_frame");
     }
 
     void publishStaticAFromAvgD(const rclcpp::Time &stamp_now)
