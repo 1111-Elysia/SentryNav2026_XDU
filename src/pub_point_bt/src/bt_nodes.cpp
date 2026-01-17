@@ -14,6 +14,8 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "geometry_msgs/msg/twist.hpp" 
+
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -22,28 +24,29 @@ using namespace std::chrono_literals;
 using NavigateToPose = nav2_msgs::action::NavigateToPose;
 
 //-------------------------------------------------------
-// 全局上下文：保存 Node、Nav2 client、TF监听、waypoints
+// 全局上下文
 //-------------------------------------------------------
 struct BtRosContext
 {
   rclcpp::Node::SharedPtr node;
   rclcpp_action::Client<NavigateToPose>::SharedPtr client;
-  
-  // 可视化发布者 (让 RViz 能看到目标)
+
+  // 可视化发布者
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vis_pub;
 
-  // TF 监听器（用于读取当前坐标）
+  // [新增] 速度发布者 (用于终点急刹)
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
+
+  // TF 监听器
   std::shared_ptr<tf2_ros::Buffer> tf_buffer;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener;
 
   std::vector<geometry_msgs::msg::PoseStamped> points;
   size_t current_index{0};
 
-  enum class NavStatus { IDLE, SENDING, RUNNING, SUCCEEDED, FAILED, CANCELED };
-  NavStatus nav_status{NavStatus::IDLE};
   std::mutex nav_mutex;
 
-  static BtRosContext& instance()
+  static BtRosContext &instance()
   {
     static BtRosContext ctx;
     return ctx;
@@ -56,18 +59,18 @@ struct BtRosContext
 class InitPoints : public BT::SyncActionNode
 {
 public:
-  InitPoints(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::SyncActionNode(name, config)
+  InitPoints(const std::string &name, const BT::NodeConfiguration &config)
+      : BT::SyncActionNode(name, config)
   {}
 
   static BT::PortsList providedPorts()
   {
-    return { BT::InputPort<std::string>("points_param") };
+    return {BT::InputPort<std::string>("points_param")};
   }
 
   BT::NodeStatus tick() override
   {
-    auto& ctx = BtRosContext::instance();
+    auto &ctx = BtRosContext::instance();
     if (!ctx.node) throw BT::RuntimeError("InitPoints: ROS node not set");
 
     static bool initialized = false;
@@ -106,73 +109,74 @@ public:
 };
 
 //=======================================================
-// NextPoint：获取当前目标点并输出
+// NextPoint：获取当前目标点
 //=======================================================
 class NextPoint : public BT::SyncActionNode
 {
 public:
-  NextPoint(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::SyncActionNode(name, config)
+  NextPoint(const std::string &name, const BT::NodeConfiguration &config)
+      : BT::SyncActionNode(name, config)
   {}
 
   static BT::PortsList providedPorts()
   {
-    return { BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal") };
+    return {BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal")};
   }
 
   BT::NodeStatus tick() override
   {
-    auto& ctx = BtRosContext::instance();
+    auto &ctx = BtRosContext::instance();
     if (ctx.points.empty()) return BT::NodeStatus::FAILURE;
 
-    // 循环逻辑
     if (ctx.current_index >= ctx.points.size()) {
       RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 所有点已跑完，任务结束！");
-      ctx.current_index = 0; 
-      
-      return BT::NodeStatus::FAILURE;  // 终止树的运行
-     }
+      ctx.current_index = 0;
+      return BT::NodeStatus::FAILURE;
+    }
 
     auto goal = ctx.points[ctx.current_index];
     goal.header.stamp = ctx.node->now();
 
     setOutput("goal", goal);
-    
-    ctx.current_index++; // 准备下一次调用的索引
+    ctx.current_index++;
     return BT::NodeStatus::SUCCESS;
   }
 };
 
 //=======================================================
-// CheckDistance：检查当前位置与目标点的距离
+// CheckDistance：检查距离 (含终点暴力刹车逻辑)
 //=======================================================
 class CheckDistance : public BT::StatefulActionNode
 {
 public:
-  CheckDistance(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::StatefulActionNode(name, config)
+  CheckDistance(const std::string &name, const BT::NodeConfiguration &config)
+      : BT::StatefulActionNode(name, config)
   {}
 
   static BT::PortsList providedPorts()
   {
     return {
-      BT::InputPort<geometry_msgs::msg::PoseStamped>("goal"),
-      BT::InputPort<double>("threshold", 0.5, "Distance threshold")
-    };
+        BT::InputPort<geometry_msgs::msg::PoseStamped>("goal"),
+        BT::InputPort<double>("threshold", 0.5, "Distance threshold")};
   }
 
   BT::NodeStatus onStart() override { return BT::NodeStatus::RUNNING; }
 
   BT::NodeStatus onRunning() override
   {
-    auto& ctx = BtRosContext::instance();
+    auto &ctx = BtRosContext::instance();
     if (!ctx.tf_buffer) return BT::NodeStatus::FAILURE;
 
+    // 1. 懒加载：确保 vel_pub 存在 (为了终点刹车)
+    if (!ctx.vel_pub && ctx.node) {
+        ctx.vel_pub = ctx.node->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 100);
+    }
+
     geometry_msgs::msg::PoseStamped goal;
-    double threshold = 0.5;
+    double xml_threshold = 0.5;
 
     if (!getInput("goal", goal)) return BT::NodeStatus::FAILURE;
-    getInput("threshold", threshold);
+    getInput("threshold", xml_threshold);
 
     try {
       geometry_msgs::msg::TransformStamped t;
@@ -180,31 +184,54 @@ public:
 
       double dx = goal.pose.position.x - t.transform.translation.x;
       double dy = goal.pose.position.y - t.transform.translation.y;
-      double dist = std::sqrt(dx*dx + dy*dy);
+      double dist = std::sqrt(dx * dx + dy * dy);
 
-      if (dist < threshold) {
-        // 日志打印逻辑
+      // --- 关键逻辑：区分普通点和终点 ---
+      bool is_last_point = (ctx.current_index >= ctx.points.size());
+      double effective_threshold = xml_threshold;
+      std::string mode_str = "巡逻模式";
+
+      if (is_last_point) {
+        effective_threshold = 0.3; 
+        mode_str = "终点锁定";
+      }
+      
+      if (dist < effective_threshold) {
         size_t cur_idx = (ctx.current_index > 0) ? ctx.current_index - 1 : 0;
-        std::string next_str = "结束/重置";
-        if (ctx.current_index < ctx.points.size()) {
-            char buf[32]; 
-            auto p = ctx.points[ctx.current_index];
-            snprintf(buf, 32, "(%.2f, %.2f)", p.pose.position.x, p.pose.position.y);
-            next_str = std::string(buf);
+        
+        // 🚨【新增逻辑】如果是最后一个点，执行“混合急刹”
+        if (is_last_point) {
+            RCLCPP_WARN(ctx.node->get_logger(), "🛑 到达终点 (%.2fm) -> 触发强制急刹！", dist);
+
+            // A. Soft Stop: 告诉 Nav2 别算了，订单取消
+            if (ctx.client) {
+                ctx.client->async_cancel_all_goals();
+            }
+
+            // B. Hard Stop: 向 /cmd_vel 连发 0 速度，按死车轮
+            if (ctx.vel_pub) {
+                geometry_msgs::msg::Twist stop_msg;
+                stop_msg.linear.x = 0.0;
+                stop_msg.linear.y = 0.0;
+                stop_msg.angular.z = 0.0;
+                // 连发3次，确保底层收到
+                ctx.vel_pub->publish(stop_msg);
+                ctx.vel_pub->publish(stop_msg);
+                ctx.vel_pub->publish(stop_msg);
+            }
+        } 
+        else {
+            // 普通点：只打印日志，平滑切过
+            RCLCPP_INFO(ctx.node->get_logger(),
+                    "\n>>> [到达 P%zu] %s | 距离 %.2fm (阈值 %.2f) <<<\n",
+                    cur_idx, mode_str.c_str(), dist, effective_threshold);
         }
 
-        RCLCPP_INFO(ctx.node->get_logger(), 
-            "\n>>> [到达] 距离目标 %.2fm (阈值 %.2f) <<<\n"
-            "    |-- 当前目标: P%zu\n"
-            "    |-- 切换下一站: %s", 
-            dist, threshold, cur_idx + 1, next_str.c_str());
-
-        return BT::NodeStatus::SUCCESS; 
+        return BT::NodeStatus::SUCCESS;
       }
       return BT::NodeStatus::RUNNING;
-
-    } catch (const tf2::TransformException & ex) {
-      // 这里的 warn 可以稍微降频，防止刷屏
+    }
+    catch (const tf2::TransformException &ex) {
       return BT::NodeStatus::RUNNING;
     }
   }
@@ -213,110 +240,113 @@ public:
 };
 
 //=======================================================
-// SendNav2Goal：发送目标点 (增强可视化版)
+// SendNav2Goal：发送目标 (含时间源修复)
 //=======================================================
 class SendNav2Goal : public BT::StatefulActionNode
 {
 public:
-  SendNav2Goal(const std::string& name, const BT::NodeConfiguration& config)
-    : BT::StatefulActionNode(name, config)
+  SendNav2Goal(const std::string &name, const BT::NodeConfiguration &config)
+      : BT::StatefulActionNode(name, config)
   {}
 
   static BT::PortsList providedPorts()
   {
-    return { BT::InputPort<geometry_msgs::msg::PoseStamped>("goal") };
+    return {BT::InputPort<geometry_msgs::msg::PoseStamped>("goal")};
   }
 
-  // -------------------------------------------------------
-  // 1. onStart: 只负责向 Nav2 发送一次核心指令
-  // -------------------------------------------------------
+  enum class InternalState { IDLE, SENDING, ACCEPTED, REJECTED };
+
   BT::NodeStatus onStart() override
   {
-    auto& ctx = BtRosContext::instance();
-    
-    // 安全检查
-    if (!ctx.client->action_server_is_ready()) {
-        RCLCPP_ERROR(ctx.node->get_logger(), "❌ SendNav2Goal: Nav2 Server 未连接！");
-        return BT::NodeStatus::FAILURE;
+    internal_state_ = InternalState::IDLE;
+    retry_count_ = 0;
+
+    auto clock_type = BtRosContext::instance().node->get_clock()->get_clock_type();
+    last_attempt_time_ = rclcpp::Time(0, 0, clock_type);
+    last_vis_time_ = rclcpp::Time(0, 0, clock_type);
+
+    if (!getInput("goal", current_goal_)) {
+      RCLCPP_ERROR(BtRosContext::instance().node->get_logger(), "❌ 无法获取 goal 输入");
+      return BT::NodeStatus::FAILURE;
     }
-
-    // 获取并缓存目标点 (存入成员变量 current_goal_)
-    if (!getInput("goal", current_goal_)) return BT::NodeStatus::FAILURE;
-
     if (current_goal_.header.frame_id.empty()) {
-        current_goal_.header.frame_id = "map"; 
+      current_goal_.header.frame_id = "map";
     }
-    current_goal_.header.stamp = ctx.node->now();
-
-    // 第一次可视化
-    if (ctx.vis_pub) {
-        ctx.vis_pub->publish(current_goal_);
-    }
-
-    RCLCPP_INFO(ctx.node->get_logger(), 
-        "🏁 [发送目标] -> (%.2f, %.2f)", 
-        current_goal_.pose.position.x, current_goal_.pose.position.y);
-
-    {
-        std::lock_guard<std::mutex> lk(ctx.nav_mutex);
-        ctx.nav_status = BtRosContext::NavStatus::SENDING;
-    }
-
-    // 发送 Nav2 指令
-    NavigateToPose::Goal goal_msg;
-    goal_msg.pose = current_goal_;
-
-    auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
-    send_goal_options.goal_response_callback = 
-        [ctx_node = ctx.node](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr & handle) {
-            if (!handle) RCLCPP_ERROR(ctx_node->get_logger(), "❌ 目标被拒！");
-            else RCLCPP_INFO(ctx_node->get_logger(), "✅ Nav2已接收");
-        };
-    
-    // 不需要 result callback，因为会被 CheckDistance 打断
-    send_goal_options.result_callback = [](auto){};
-
-    ctx.client->async_send_goal(goal_msg, send_goal_options);
-    
-    // 记录时间，用于 onRunning 的频率控制
-    last_pub_time_ = ctx.node->now();
 
     return BT::NodeStatus::RUNNING;
   }
 
-  // -------------------------------------------------------
-  // 2. onRunning: 持续刷新 RViz 显示 (这就是区别所在！)
-  // -------------------------------------------------------
   BT::NodeStatus onRunning() override
   {
-    auto& ctx = BtRosContext::instance();
-    
-    // 获取当前时间
+    auto &ctx = BtRosContext::instance();
     auto now = ctx.node->now();
 
-    // 每隔 0.5 秒 (500ms) 执行一次
-    if ((now - last_pub_time_).seconds() > 0.5) {
-        if (ctx.vis_pub) {
-            // 更新时间戳并发布，确保 RViz 知道这还是新的消息
-            current_goal_.header.stamp = now; 
-            ctx.vis_pub->publish(current_goal_);
+    switch (internal_state_)
+    {
+    case InternalState::IDLE:
+    case InternalState::REJECTED:
+    {
+      if ((now - last_attempt_time_).seconds() < 2.0) return BT::NodeStatus::RUNNING;
+      
+      if (!ctx.client->action_server_is_ready()) {
+        RCLCPP_WARN(ctx.node->get_logger(), "⚠️ Nav2 未就绪...");
+        last_attempt_time_ = now;
+        return BT::NodeStatus::RUNNING;
+      }
+
+      RCLCPP_INFO(ctx.node->get_logger(),
+                  "🔄 [发送目标] -> (%.2f, %.2f) ...",
+                  current_goal_.pose.position.x, current_goal_.pose.position.y);
+
+      current_goal_.header.stamp = now;
+      if (ctx.vis_pub) ctx.vis_pub->publish(current_goal_);
+
+      NavigateToPose::Goal goal_msg;
+      goal_msg.pose = current_goal_;
+
+      auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
+
+      send_goal_options.goal_response_callback =
+          [this, logger = ctx.node->get_logger()](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
+      {
+        if (!handle) {
+          RCLCPP_ERROR(logger, "❌ [被拒] 目标被 Nav2 拒绝！");
+          internal_state_ = InternalState::REJECTED;
+        } else {
+          RCLCPP_INFO(logger, "✅ [已接受] Nav2 开始规划路径");
+          internal_state_ = InternalState::ACCEPTED;
         }
-        last_pub_time_ = now;
+      };
+
+      ctx.client->async_send_goal(goal_msg, send_goal_options);
+      internal_state_ = InternalState::SENDING;
+      last_attempt_time_ = now;
+      break;
+    }
+
+    case InternalState::SENDING:
+      break;
+
+    case InternalState::ACCEPTED:
+      if ((now - last_vis_time_).seconds() > 0.5) {
+        if (ctx.vis_pub) {
+          current_goal_.header.stamp = now;
+          ctx.vis_pub->publish(current_goal_);
+        }
+        last_vis_time_ = now;
+      }
+      break;
     }
 
     return BT::NodeStatus::RUNNING;
   }
 
-  // -------------------------------------------------------
-  // 3. onHalted: 切换点时什么都不做 (保持平滑)
-  // -------------------------------------------------------
-  void onHalted() override
-  {
-    // 不取消目标
-  }
+  void onHalted() override {}
 
 private:
-  // 私有成员变量，用于在 onStart 和 onRunning 之间共享数据
-  geometry_msgs::msg::PoseStamped current_goal_; 
-  rclcpp::Time last_pub_time_;
+  geometry_msgs::msg::PoseStamped current_goal_;
+  InternalState internal_state_{InternalState::IDLE};
+  rclcpp::Time last_attempt_time_;
+  rclcpp::Time last_vis_time_;
+  int retry_count_{0};
 };

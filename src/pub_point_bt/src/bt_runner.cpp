@@ -34,7 +34,7 @@ public:
     ctx.client = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
     
     // ==================================================================================
-    // 初始化可视化发布者 (必须加这行，否则 RViz 看不到点)
+    // 初始化可视化发布者
     // ==================================================================================
     ctx.vis_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/bt_target_goal", 10);
     
