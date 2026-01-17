@@ -374,6 +374,20 @@ public:
 
   void onHalted() override 
   {
+      auto &ctx = BtRosContext::instance();
+      
+      // 只有在已经发送或者接受状态下，才需要去取消
+      // 避免 IDLE 状态下乱发取消指令
+      if (internal_state_ == InternalState::SENDING || internal_state_ == InternalState::ACCEPTED) {
+          if (ctx.client) {
+              RCLCPP_WARN(ctx.node->get_logger(), "✂️ [切点] 距离达标，强制 Cancel 上一个 Nav2 目标！");
+              ctx.client->async_cancel_all_goals();
+          }
+      }
+      
+      // 重置状态，确保下一次使用该节点（发下一个点）时是清清白白的
+      internal_state_ = InternalState::IDLE;
+      retry_count_ = 0;
   }
 
 private:

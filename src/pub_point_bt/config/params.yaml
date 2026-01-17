@@ -2,5 +2,7 @@ pub_point_bt_node:
   ros__parameters:
     points: [
       2.0, 0.0, 90.0,   
+      2.0, 1.0, 0.0,
       -2.0, 1.0, 90.0
+
     ]
