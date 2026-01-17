@@ -1,17 +1,27 @@
-source ./install/setup.bash 
+#!/bin/bash
+source ./install/setup.bash
 echo "导航，启动！"
+
+# 捕获 Ctrl+C，直接退出脚本
+trap 'echo "[INFO] Ctrl+C 被按下，退出脚本"; exit 0' SIGINT
+
 while true; do
-  echo
-  ros2 launch bringup monitored_start.launch.py
-  exit_code=$?
+    echo
+    
+    # 直接运行 launch
+    ros2 launch bringup monitored_start.launch.py
+    EXIT_CODE=$?
 
-  echo "[ERROR] 导航异常重启: $exit_code"
+    echo "[INFO] Launch 退出，exit code=$EXIT_CODE"
 
-  # Ctrl+C → 130 (SIGINT)
-  if [ "$exit_code" -eq 130 ]; then
-    echo "检测到 Ctrl+C，退出监控程序"
-    exit 0
-  fi
+    # Ctrl+C 触发的退出由 trap 捕获，脚本直接退出
 
-  echo "[ERROR] 机魂不悦，自动重启中..."
+    # 非 0 异常退出 → 重启
+    if [ "$EXIT_CODE" -ne 0 ]; then
+        echo "[ERROR] 导航异常退出，自动重启中..."
+        sleep 1
+    else
+        # 正常退出（0）也退出循环
+        break
+    fi
 done

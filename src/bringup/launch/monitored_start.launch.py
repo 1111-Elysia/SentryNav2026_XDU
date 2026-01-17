@@ -20,7 +20,7 @@ def generate_launch_description():
     monitor_timer = TimerAction(
         period=20.0,  # 增加到30秒，确保所有节点完全启动
         actions=[
-            # 监控节点
+            # 代价地图监控节点
             Node(
                 package='bringup',
                 executable='costmap_monitor.py',
@@ -29,8 +29,21 @@ def generate_launch_description():
                 parameters=[{
                     'global_costmap_topic': '/global_costmap/costmap',
                     'local_costmap_topic': '/local_costmap/costmap',
-                    'timeout_seconds': 6.0,  
-                    'check_interval': 2.0,     # 每2秒检查一次
+                    'timeout_seconds': 3.0,  
+                    'check_interval': 1.0,     # 每1秒检查一次
+                    'max_consecutive_timeouts': 2  # 连续2次超时触发
+                }]
+            ),
+            # scan监控节点
+            Node(
+                package='bringup',
+                executable='scan_monitor.py',
+                name='scan_monitor',
+                output='screen',
+                parameters=[{
+                    'scan_topic': '/scan',
+                    'timeout_seconds': 3.0,  
+                    'check_interval': 1.0,     # 每1秒检查一次
                     'max_consecutive_timeouts': 2  # 连续2次超时触发
                 }]
             ),
