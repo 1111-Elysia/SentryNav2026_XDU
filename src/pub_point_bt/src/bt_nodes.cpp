@@ -34,7 +34,7 @@ struct BtRosContext
   // 可视化发布者
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vis_pub;
 
-  // [新增] 速度发布者 (用于终点急刹)
+  // 速度发布者 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
 
   // TF 监听器
@@ -144,7 +144,7 @@ public:
 };
 
 //=======================================================
-// CheckDistance：检查距离 (含终点暴力刹车逻辑)
+// CheckDistance：检查距离 
 //=======================================================
 class CheckDistance : public BT::StatefulActionNode
 {
@@ -167,7 +167,7 @@ public:
     auto &ctx = BtRosContext::instance();
     if (!ctx.tf_buffer) return BT::NodeStatus::FAILURE;
 
-    // 1. 懒加载：确保 vel_pub 存在 (为了终点刹车)
+    // 1. 确保 vel_pub 存在 (为了终点刹车)
     if (!ctx.vel_pub && ctx.node) {
         ctx.vel_pub = ctx.node->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 100);
     }
@@ -240,7 +240,7 @@ public:
 };
 
 //=======================================================
-// SendNav2Goal：发送目标 (含时间源修复)
+// SendNav2Goal：发送目标 
 //=======================================================
 class SendNav2Goal : public BT::StatefulActionNode
 {
@@ -262,6 +262,7 @@ public:
     retry_count_ = 0;
 
     auto clock_type = BtRosContext::instance().node->get_clock()->get_clock_type();
+    // 初始化为一个很早的时间，确保第一次立刻触发
     last_attempt_time_ = rclcpp::Time(0, 0, clock_type);
     last_vis_time_ = rclcpp::Time(0, 0, clock_type);
 
@@ -281,23 +282,33 @@ public:
     auto &ctx = BtRosContext::instance();
     auto now = ctx.node->now();
 
+    // 0. 基础检查：Nav2 动作服务器是否在线
+    if (!ctx.client->action_server_is_ready()) {
+      // 降低日志频率：每 2 秒报一次错，避免刷屏，但保持 RUNNING 等待
+      if ((now - last_attempt_time_).seconds() > 2.0) {
+        RCLCPP_WARN(ctx.node->get_logger(), "⚠️ Nav2 Action Server 未连接，正在等待...");
+        last_attempt_time_ = now;
+      }
+      return BT::NodeStatus::RUNNING;
+    }
+
     switch (internal_state_)
     {
+    // ----------------------------------------------------------------
+    // 状态：空闲 或 上次被拒 -> 准备发送
+    // ----------------------------------------------------------------
     case InternalState::IDLE:
     case InternalState::REJECTED:
     {
-      if ((now - last_attempt_time_).seconds() < 2.0) return BT::NodeStatus::RUNNING;
-      
-      if (!ctx.client->action_server_is_ready()) {
-        RCLCPP_WARN(ctx.node->get_logger(), "⚠️ Nav2 未就绪...");
-        last_attempt_time_ = now;
-        return BT::NodeStatus::RUNNING;
+      if ((now - last_attempt_time_).seconds() < 0.2) {
+          return BT::NodeStatus::RUNNING;
       }
 
       RCLCPP_INFO(ctx.node->get_logger(),
-                  "🔄 [发送目标] -> (%.2f, %.2f) ...",
+                  "🚀 [尝试发送] -> (%.2f, %.2f) ...",
                   current_goal_.pose.position.x, current_goal_.pose.position.y);
 
+      // 可视化
       current_goal_.header.stamp = now;
       if (ctx.vis_pub) ctx.vis_pub->publish(current_goal_);
 
@@ -306,27 +317,47 @@ public:
 
       auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
 
+      // 回调函数：处理 Nav2 的反馈
       send_goal_options.goal_response_callback =
           [this, logger = ctx.node->get_logger()](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
       {
         if (!handle) {
-          RCLCPP_ERROR(logger, "❌ [被拒] 目标被 Nav2 拒绝！");
-          internal_state_ = InternalState::REJECTED;
+          RCLCPP_ERROR(logger, "❌ [被拒] 目标被 Nav2 拒绝，准备重发...");
+          internal_state_ = InternalState::REJECTED; // 触发下一次循环的重发
         } else {
-          RCLCPP_INFO(logger, "✅ [已接受] Nav2 开始规划路径");
-          internal_state_ = InternalState::ACCEPTED;
+          RCLCPP_INFO(logger, "✅ [已接受] Nav2 接收成功！");
+          internal_state_ = InternalState::ACCEPTED; // 锁定状态，不再重发
         }
       };
 
+      // 发送请求
       ctx.client->async_send_goal(goal_msg, send_goal_options);
+      
+      // 更新状态和时间
       internal_state_ = InternalState::SENDING;
       last_attempt_time_ = now;
       break;
     }
 
+    // ----------------------------------------------------------------
+    // 状态：正在发送 (等待回调)
+    // ----------------------------------------------------------------
     case InternalState::SENDING:
+    {
+      // 超时看门狗 (Watchdog)
+      // 如果发送后 1.0 秒内没有收到 callback (既没变 ACCEPTED 也没变 REJECTED)
+      // 说明消息丢了或者卡住了。直接强制重置回 IDLE，触发下一次 tick 重新发。
+      double wait_time = (now - last_attempt_time_).seconds();
+      if (wait_time > 1.0) {
+          RCLCPP_WARN(ctx.node->get_logger(), "⏰ [超时] 等待 Nav2 响应 %.1fs 无果，强制重发！", wait_time);
+          internal_state_ = InternalState::IDLE; 
+      }
       break;
+    }
 
+    // ----------------------------------------------------------------
+    // 状态：已接受
+    // ----------------------------------------------------------------
     case InternalState::ACCEPTED:
       if ((now - last_vis_time_).seconds() > 0.5) {
         if (ctx.vis_pub) {
@@ -341,7 +372,9 @@ public:
     return BT::NodeStatus::RUNNING;
   }
 
-  void onHalted() override {}
+  void onHalted() override 
+  {
+  }
 
 private:
   geometry_msgs::msg::PoseStamped current_goal_;
