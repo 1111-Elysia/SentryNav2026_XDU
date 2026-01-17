@@ -1,5 +1,0 @@
-std_msgs/Header header
-uint8 bullet_type
-uint8 shooter_number
-uint8 launching_frequency
-float32 initial_speed

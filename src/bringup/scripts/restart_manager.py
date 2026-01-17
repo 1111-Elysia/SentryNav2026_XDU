@@ -12,8 +12,7 @@ import signal
 import time
 import psutil
 import threading
-from datetime import datetime
-import sys
+import shutil
 
 class RestartManager(Node):
     def __init__(self):
@@ -27,6 +26,10 @@ class RestartManager(Node):
         self.restart_delay = self.get_parameter('restart_delay').value
         self.max_restarts = self.get_parameter('max_restarts_per_hour').value
         
+        # 记录当前终端TTY和会话SID
+        self.current_tty, self.current_sid = self._get_current_tty_and_sid()
+        self.get_logger().info(f'重启管理器启动（限制到 TTY={self.current_tty}, SID={self.current_sid}）')
+
         # 重启历史
         self.restart_timestamps = []
         self.restarting = False
@@ -41,45 +44,129 @@ class RestartManager(Node):
         
         self.get_logger().info('重启管理器启动')
     
-    def cleanup_ros_nodes(self):
-        """清理所有ROS节点 - 使用正确的ROS 2命令"""
-        self.get_logger().info('开始清理ROS节点...')
-        
+    def _get_current_tty_and_sid(self):
+        """获取当前进程的TTY和会话SID（如果本进程没有TTY则尝试父进程）"""
         try:
-            # 方法1: 使用ros2 lifecycle命令
+            p = psutil.Process(os.getpid())
+            tty = p.terminal()
+            if not tty:
+                for parent in p.parents():
+                    tty = parent.terminal()
+                    if tty:
+                        break
+            sid = os.getsid(os.getpid())
+            return tty, sid
+        except Exception:
+            return None, os.getsid(os.getpid())
+        
+    def _belongs_to_current_session(self, proc: psutil.Process) -> bool:
+        """只处理同一TTY或同一会话SID的进程"""
+        try:
+            if self.current_tty:
+                if proc.terminal() == self.current_tty:
+                    return True
+            return os.getsid(proc.pid) == self.current_sid
+        except Exception:
+            return False
+
+    def _is_terminal_or_shell(self, proc: psutil.Process) -> bool:
+        """避免杀掉终端/外壳/VS Code等宿主"""
+        try:
+            name = (proc.name() or '').lower()
+            cmd0 = ''
+            try:
+                cmd = proc.cmdline()
+                cmd0 = (cmd[0] if cmd else '').lower()
+            except Exception:
+                pass
+            safe = {
+                'bash','zsh','fish','sh','tmux','screen',
+                'gnome-terminal','konsole','xterm','kitty',
+                'alacritty','wezterm','code','code-oss','python','python3'
+            }
+            return name in safe or cmd0 in safe
+        except Exception:
+            return False
+
+    def kill_ui_windows(self):
+        """
+        杀掉当前TTY/会话中的UI窗口
+        1. PID>0 用 psutil terminate/kill
+        2. PID=0 或特殊窗口标题，用 wmctrl 或 xdotool 尝试关闭
+        """
+        try:
+            self.get_logger().info("开始关闭UI窗口...")
+            # Step 1: 使用 wmctrl 列出窗口
+            wmctrl_available = shutil.which('wmctrl') is not None
+            xdotool_available = shutil.which('xdotool') is not None
+
+            if wmctrl_available:
+                out = subprocess.run(['wmctrl', '-lp'], capture_output=True, text=True, timeout=2.0)
+                for line in out.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) < 5:
+                        continue
+                    win_id, desktop, pid_str, host = parts[:4]
+                    title = ' '.join(parts[4:])
+                    
+                    # PID>0，尝试杀 ROS/UI 进程
+                    if pid_str.isdigit() and int(pid_str) > 0:
+                        pid = int(pid_str)
+                        try:
+                            proc = psutil.Process(pid)
+                            if self._is_terminal_or_shell(proc):
+                                continue
+                            self.get_logger().info(f"终止窗口进程 PID={pid} 名称={proc.name()}")
+                            proc.terminate()
+                            proc.wait(timeout=1.0)
+                        except Exception:
+                            try:
+                                psutil.Process(pid).kill()
+                            except Exception:
+                                pass
+                    else:
+                        # PID=0 或特殊标题
+                        if 'UI' in title or 'N/A UI' in title:
+                            self.get_logger().info(f"尝试关闭无PID窗口 {win_id} 标题={title}")
+                            try:
+                                if wmctrl_available:
+                                    subprocess.run(['wmctrl', '-i', '-c', win_id], timeout=1.0)
+                                elif xdotool_available:
+                                    subprocess.run(['xdotool', 'windowclose', win_id], timeout=1.0)
+                            except Exception as e:
+                                self.get_logger().warn(f"关闭窗口失败 {win_id}: {e}")
+
+            self.get_logger().info("UI窗口关闭完成。")
+        except Exception as e:
+            self.get_logger().error(f"关闭UI窗口失败: {e}")
+
+    def cleanup_ros_nodes(self):
+        """清理所有ROS节点"""
+        self.get_logger().info('开始清理ROS节点...')
+        try:
+            # 发送 lifecycle shutdown
             lifecycle_nodes = [
-                '/amcl',
-                '/bt_navigator',
-                '/controller_server',
-                '/planner_server',
-                '/recoveries_server',
-                '/waypoint_follower'
+                '/amcl','/bt_navigator','/controller_server',
+                '/planner_server','/recoveries_server','/waypoint_follower'
             ]
-            
             for node in lifecycle_nodes:
                 try:
-                    subprocess.run(['ros2', 'lifecycle', 'set', node, 'shutdown'], 
-                                 timeout=2.0, capture_output=True)
+                    subprocess.run(['ros2','lifecycle','set',node,'shutdown'],
+                                   timeout=2.0, capture_output=True)
                 except:
                     pass
             
-            # 方法2: 使用kill命令发送信号
+            # kill ROS nodes
             try:
-                # 获取所有节点进程
-                nodes_result = subprocess.run(['ros2', 'node', 'list'], 
-                                            capture_output=True, text=True, timeout=5.0)
-                
+                nodes_result = subprocess.run(['ros2','node','list'], capture_output=True, text=True, timeout=5.0)
                 if nodes_result.stdout:
                     nodes = nodes_result.stdout.strip().split('\n')
                     self.get_logger().info(f'找到节点: {nodes}')
-                    
-                    # 发送SIGINT信号
                     for node in nodes:
                         if node:
                             try:
-                                # 获取节点PID
-                                info_result = subprocess.run(['ros2', 'node', 'info', node],
-                                                           capture_output=True, text=True, timeout=3.0)
+                                info_result = subprocess.run(['ros2','node','info',node],
+                                                             capture_output=True, text=True, timeout=3.0)
                                 for line in info_result.stdout.split('\n'):
                                     if 'PID:' in line:
                                         pid = line.split(':')[-1].strip()
@@ -88,124 +175,72 @@ class RestartManager(Node):
                                             self.get_logger().info(f'发送SIGINT到节点 {node} (PID: {pid})')
                             except Exception as e:
                                 self.get_logger().warn(f'无法停止节点 {node}: {e}')
-            
             except Exception as e:
                 self.get_logger().error(f'获取节点列表失败: {e}')
-            
         except Exception as e:
             self.get_logger().error(f'清理节点时出错: {e}')
-    
+
     def kill_all_ros_processes(self):
-        """杀死所有ROS相关进程"""
-        self.get_logger().info('清理ROS进程...')
-        
+        """杀死当前TTY/会话中的ROS相关进程"""
+        self.get_logger().info('清理ROS进程（仅限当前TTY/会话）...')
         try:
-            # 查找并杀死所有ros2、rviz2、gazebo等进程
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
-                    if proc.pid == os.getpid():  # 跳过自己
+                    if proc.pid == os.getpid():
                         continue
-                        
+                    if not self._belongs_to_current_session(proc):
+                        continue
                     cmdline = ' '.join(proc.cmdline()) if proc.cmdline() else ''
-                    
-                    # 判断是否是ROS相关进程
-                    is_ros_process = any(keyword in cmdline.lower() for keyword in [
-                        'ros2', 'roscore', 'rviz', 'gazebo', 'python3',
-                        'livox', 'fast_lio', 'lightning', 'navigation'
+                    lower = cmdline.lower()
+                    is_ros_process = any(keyword in lower for keyword in [
+                        'ros2','roscore','rviz','rviz2','gazebo','rqt',
+                        'nav2','amcl','bt_navigator','controller_server',
+                        'planner_server','recoveries_server','waypoint_follower',
+                        'livox','fast_lio','lightning','navigation'
                     ])
-                    
                     if is_ros_process:
-                        self.get_logger().info(f'终止进程: {proc.pid} - {proc.name()}')
+                        self.get_logger().info(f'终止进程: {proc.pid} - {proc.name()} ({proc.terminal()})')
                         try:
-                            proc.terminate()  # 先尝试正常终止
+                            proc.terminate()
                             proc.wait(timeout=1.0)
-                        except:
+                        except Exception:
                             try:
-                                proc.kill()  # 强制终止
-                            except:
+                                proc.kill()
+                            except Exception:
                                 pass
                 except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError):
                     pass
-            
-            # 额外的清理命令
-            cleanup_commands = [
-                ['pkill', '-f', 'ros2'],
-                ['pkill', '-f', 'rviz2'],
-                ['pkill', '-f', 'gazebo'],
-                ['pkill', '-f', 'python.*livox'],
-                ['pkill', '-f', 'python.*navigation'],
-                ['pkill', '-f', 'fast_lio'],
-                ['pkill', '-f', 'lightning'],
-            ]
-            
-            for cmd in cleanup_commands:
-                try:
-                    subprocess.run(cmd, timeout=1.0, capture_output=True)
-                except:
-                    pass
-            
-            time.sleep(1.0)  # 等待清理完成
-            
+
+            # 可选回退命令
+            if self.current_tty:
+                cleanup_commands = [
+                    ['pkill', '-t', self.current_tty, '-f', 'ros2'],
+                    ['pkill', '-t', self.current_tty, '-f', 'rviz2'],
+                    ['pkill', '-t', self.current_tty, '-f', 'gazebo'],
+                    ['pkill', '-t', self.current_tty, '-f', 'livox'],
+                    ['pkill', '-t', self.current_tty, '-f', 'fast_lio'],
+                    ['pkill', '-t', self.current_tty, '-f', 'lightning'],
+                    ['pkill', '-t', self.current_tty, '-f', 'navigation'],
+                ]
+                for cmd in cleanup_commands:
+                    try:
+                        subprocess.run(cmd, timeout=1.0, capture_output=True)
+                    except Exception:
+                        pass
+            time.sleep(1.0)
         except Exception as e:
             self.get_logger().error(f'清理进程时出错: {e}')
-    
+
     def restart_entire_system(self):
-        """重启整个系统（外部脚本方式）"""
-        self.get_logger().info('执行外部重启脚本...')
-        
-        try:
-            # 创建一个重启脚本并执行
-            restart_script = '''
-#!/bin/bash
-# 等待一小段时间让当前进程清理
-sleep 2
+        self.get_logger().error("Requesting full system restart. Exiting launch tree.")
+        time.sleep(0.5)
+        os._exit(1)
 
-# 清理所有ROS进程
-pkill -f ros2
-pkill -f rviz2
-pkill -f python3.*ros
-sleep 1
-
-# 重新启动系统
-cd ~/SentryNav2026_XDU
-source install/setup.bash
-ros2 launch bringup monitored_start.launch.py &
-exit 0
-'''
-            
-            # 将脚本写入临时文件
-            script_path = '/tmp/restart_nav_system.sh'
-            with open(script_path, 'w') as f:
-                f.write(restart_script)
-            
-            os.chmod(script_path, 0o755)
-            
-            # 在新的进程中执行重启脚本
-            subprocess.Popen(['bash', script_path],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL,
-                           preexec_fn=os.setsid)
-            
-            # 当前进程可以退出了
-            self.get_logger().info('重启脚本已启动，管理器退出')
-            
-            # 延迟退出，确保消息发送完成
-            time.sleep(0.5)
-            
-            # 自我终止
-            os._exit(0)
-            
-        except Exception as e:
-            self.get_logger().error(f'重启失败: {e}')
-            self.restarting = False
-    
     def handle_restart_request(self, msg):
         """处理重启请求"""
         if msg.data and not self.restarting:
             self.restarting = True
             self.get_logger().warn('收到重启请求，开始重启流程')
-            
-            # 在新线程中执行重启
             restart_thread = threading.Thread(target=self._perform_restart)
             restart_thread.daemon = True
             restart_thread.start()
@@ -213,21 +248,12 @@ exit 0
     def _perform_restart(self):
         """执行重启流程"""
         try:
-            # 1. 清理ROS节点
+            self.kill_ui_windows()
             self.cleanup_ros_nodes()
-            
-            # 2. 等待
             time.sleep(1.0)
-            
-            # 3. 清理所有进程
             self.kill_all_ros_processes()
-            
-            # 4. 等待清理完成
             time.sleep(self.restart_delay)
-            
-            # 5. 重启整个系统
             self.restart_entire_system()
-            
         except Exception as e:
             self.get_logger().error(f'重启过程中出错: {e}')
             self.restarting = False
@@ -235,7 +261,6 @@ exit 0
 def main(args=None):
     rclpy.init(args=args)
     manager = RestartManager()
-    
     try:
         rclpy.spin(manager)
     except KeyboardInterrupt:
