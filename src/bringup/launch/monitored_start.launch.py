@@ -20,6 +20,19 @@ def generate_launch_description():
     monitor_timer = TimerAction(
         period=20.0,  # 增加到30秒，确保所有节点完全启动
         actions=[
+            # 栅格地图监控节点
+            Node(
+                package='bringup',
+                executable='map_monitor.py',
+                name='map_monitor',
+                output='screen',
+                parameters=[{
+                    'map_topic': '/map',
+                    'timeout_seconds': 3.0,  
+                    'check_interval': 1.0,     # 每1秒检查一次
+                    'max_empty_counts': 2  # 连续2次空数据触发
+                }]
+            ),
             # 代价地图监控节点
             Node(
                 package='bringup',
