@@ -8,6 +8,8 @@ find_package(ament_cmake_python REQUIRED)
 install(PROGRAMS
   scripts/costmap_monitor.py
   scripts/restart_manager.py
+  scripts/scan_monitor.py
+  scripts/map_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
