@@ -153,7 +153,9 @@ int main(int argc, char** argv) {
     // --- 9. 输出 YAML ---
     std::ofstream yaml_out(yaml_file);
     if (!yaml_out) return -1;
-    yaml_out << "image: " << pgm_file << "\n";
+    std::filesystem::path pgm_path(pgm_file);
+    std::string pgm_abs_path = std::filesystem::absolute(pgm_path).string();
+    yaml_out << "image: " << pgm_abs_path << "\n";
     yaml_out << "mode: trinary\n";
     yaml_out << "resolution: " << resolution << "\n";
     yaml_out << "origin: [" << origin_x << ", " << origin_y << ", 0.0]\n";

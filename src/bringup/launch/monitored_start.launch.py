@@ -18,7 +18,7 @@ def generate_launch_description():
     
     # 2. 延迟启动监控器（等待更长的时间）
     monitor_timer = TimerAction(
-        period=30.0,  # 增加到30秒，确保所有节点完全启动
+        period=20.0,  # 增加到30秒，确保所有节点完全启动
         actions=[
             # 栅格地图监控节点
             Node(
