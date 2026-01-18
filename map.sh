@@ -1,3 +1,5 @@
+rm -rf ./data/new_map/*.yaml ./data/new_map/*.pgm
+cp ./data/new_map/* ./src/bringup/map/
 cd ./src/pcd_to_nav_map
 rm -rf build
 mkdir build
