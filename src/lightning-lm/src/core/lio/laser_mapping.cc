@@ -221,7 +221,7 @@ bool LaserMapping::Run() {
     //           << ", end: " << measures_.lidar_end_time_;
 
     if (last_lidar_time_ > 0 && (measures_.lidar_begin_time_ - last_lidar_time_) > 0.5) {
-        LOG(ERROR) << "检测到雷达断流，时长：" << (measures_.lidar_begin_time_ - last_lidar_time_);
+        // LOG(ERROR) << "检测到雷达断流，时长：" << (measures_.lidar_begin_time_ - last_lidar_time_);
     }
 
     last_lidar_time_ = measures_.lidar_begin_time_;

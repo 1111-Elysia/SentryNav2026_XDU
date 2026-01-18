@@ -209,7 +209,7 @@ inline void ImuProcess::UndistortPcl(const MeasureGroup &meas, ESKF &kf_state, C
         gyro = angvel_avr;
 
         if (dt > 0.1) {
-            LOG(ERROR) << "get abnormal dt: " << dt;
+            // LOG(ERROR) << "get abnormal dt: " << dt;
             kf_state.SetTime((*it_imu)->timestamp);
             break;
         }

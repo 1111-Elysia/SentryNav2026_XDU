@@ -375,7 +375,7 @@ bool PGO::ExtrapolateLocResult(LocalizationResult& output_result) {
     // 其他数据源时间检测imu时间
     if (!dr_pose_queue.empty() && latest_time - dr_pose_queue.back().timestamp_ > imu_interruption_time_thd_) {
         imu_interruption_tag_ = true;
-        LOG(ERROR) << "长时间未获取到DR数据, IMU存在断流, 断流时间: " << latest_time - dr_pose_queue.back().timestamp_;
+        // LOG(ERROR) << "长时间未获取到DR数据, IMU存在断流, 断流时间: " << latest_time - dr_pose_queue.back().timestamp_;
     } else {
         imu_interruption_tag_ = false;
     }
