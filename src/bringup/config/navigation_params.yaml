@@ -4,150 +4,173 @@
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 95.0            
-    odom_topic: "odom" 
-    min_x_velocity_threshold: 0.1
-    min_y_velocity_threshold: 0.1
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.05
+    min_y_velocity_threshold: 0.05
     min_theta_velocity_threshold: 0.1
-    
-    allow_late_callbacks: true
-
-    failure_tolerance: 0.3
+    failure_tolerance: 0.3 # 控制器插件允许失败的最大持续时间（秒）
+    odom_topic: "state_estimation"
     progress_checker_plugin: "progress_checker"
-    goal_checker_plugins: ["general_goal_checker"]
-    controller_plugins: ["FollowPath"]    
+    goal_checker_plugins: ["general_goal_checker"] 
+    controller_plugins: ["FollowPath"]
 
+    # ========================
+    # 进度检查器参数
+    # ========================
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.5
-      movement_time_allowance: 10.0
+      required_movement_radius: 0.5      # 认为“有进展”所需的最小位移半径（米）
+      movement_time_allowance: 3.0        # 允许在该时间内没有明显移动（秒）
 
+    # ========================
+    # 目标检查器参数
+    # ========================
     general_goal_checker:
-      stateful: True
+      stateful: False
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.2            # 位置容忍（m）
-      yaw_goal_tolerance: 0.6           # 朝向容忍（rad）
+      xy_goal_tolerance: 0.3              # 到达目标的平面位置容许误差（米）
+      yaw_goal_tolerance: 3.14            # 到达目标的航向角容许误差（弧度）
 
-    # ===== MPPI 控制器配置 =====
-    FollowPath:
-      plugin: "nav2_mppi_controller::MPPIController"  
-      
-      # ----- 基本参数 -----
-      time_steps: 60                      # 预测时间步数（越多越精确但计算量大）
-      model_dt: 0.05                      # 模型时间步长 
-      batch_size: 400                    # 采样轨迹数量（越多越优但计算量大）
-      
-      # 总预测时长 = time_steps × model_dt = 56 × 0.05 = 2.8秒
-      
-      # ----- 速度限制（全向轮）-----
-      vx_std: 0.2
-      vy_std: 0.2
-      wz_std: 0.2
-      
-      vx_max: 0.5
-      vx_min: -0.5                        # 允许倒退
-      vy_max: 0.5                         # 允许左移
-      vy_min: -0.5                        # ← 修复：允许右移
-      wz_max: 1.0
-      iteration_count: 16                  # 优化迭代次数
-      # ----- 加速度限制（全向轮）-----
-      ax_max: 1.0
-      ax_min: -1.0
-      ay_max: 1.0
-      ay_min: -1.0                        # ← 修复：Y轴负加速度
-      az_max: 2.0
-      
-      # ----- 代价函数权重（决定行为） -----
-      # 这些权重需要根据实际情况调整
-      motion_model: "Omni"                # 全向轮运动模型
-      
-      critics: [
-        "ConstraintCritic",               # 约束评分（速度/加速度限制）
-        "ObstaclesCritic",                # 障碍物评分
-        "GoalCritic",                     # 目标评分
-        # "GoalAngleCritic",                # 目标角度评分
-        "PathAlignCritic",                # 路径对齐评分
-        "PathFollowCritic",               # 路径跟随评分
-        # "PathAngleCritic",                # 路径角度评分
-        "PreferForwardCritic",            # 前进偏好评分
-      ]
-      
-      # ----- 各评分权重 -----
-      ConstraintCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 4.0                  # 约束违反的惩罚
-      
+    FollowPath:    
+      plugin: "nav2_mppi_controller::MPPIController"
+
+      # ========================
+      # 姿态调整相关参数
+      # ========================
+      adjustThre: 14.0        # 当坡度角（slopeDegree）大于该值时，触发航向调整行为
+      minAngleDiff: 365.0     # 当角度差大于该值时，机器人持续进行航向调整
+      adjustHeadingSpeed: 0.2 # 调整航向时使用的角速度
+
+      # ========================
+      # MPPI 核心参数
+      # ========================
+      time_steps: 56          # 预测时间步数，预测时域 = time_steps × model_dt = 3 秒
+      model_dt: 0.05          # 运动模型时间步长（≈ 1 / controller_frequency）
+      batch_size: 2000        # 每次迭代随机采样的轨迹数量
+                              # 50Hz 下 1000 条或 30Hz 下 2000 条通常效果较好
+      vx_std: 0.5             # x 方向线速度采样标准差
+      vy_std: 0.5             # y 方向线速度采样标准差
+      wz_std: 0.1             # z 方向角速度采样标准差
+
+      vx_max: 0.8             # 最大前向速度（m/s）
+                              # 预测距离 = 预测时间 × vx_max = 3m
+                              # 局部代价地图尺寸应 ≥ 6m
+      vx_min: -0.8            # 最大倒退速度（m/s）
+      vy_max: 0.8             # 最大侧向速度（m/s）
+      wz_max: 0.1             # 最大角速度（rad/s）
+
+      iteration_count: 1      # 迭代次数，推荐保持为 1，优先增大 batch_size
+      prune_distance: 4.0     # 轨迹裁剪距离，与最大速度和预测时域相关
+      transform_tolerance: 0.1 # TF 变换允许的时间误差（秒）
+      temperature: 0.3        # 温度参数
+                              # 0：选择最小代价轨迹
+                              # 很大：对所有轨迹求平均，忽略代价
+      gamma: 0.065            # 平滑性（大）与能耗（小）之间的权衡参数
+      motion_model: "Omni"    # 运动模型（全向）
+      visualize: false        # 是否可视化采样轨迹（开启会显著降低性能）
+      reset_period: 1.0       # 无运动多长时间后重置优化器（Humble 版本）
+      regenerate_noises: false
+      retry_attempt_limit: 3  # 失败时软重置并尝试寻找可行轨迹的次数
+
+      TrajectoryVisualizer:
+        trajectory_step: 5    # 轨迹显示步进
+        time_step: 3          # 时间步显示间隔
+
+      # AckermannConstraints:
+      #   min_turning_r: 0.2   # 阿克曼车辆最小转弯半径
+
+      # ========================
+      # 代价函数（Critics）
+      # ========================
+      critics: ["ObstaclesCritic", "GoalCritic", "PathAlignCritic", "PathFollowCritic", "TwirlingCritic"]
+
       GoalCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0                  # 距离目标的代价
-        threshold_to_consider: 1.4        # 考虑目标的距离阈值 (m)
-      
-      # GoalAngleCritic:
-      #   enabled: true
-      #   cost_power: 1
-      #   cost_weight: 1.0                  # 目标角度偏差代价
-      #   threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
-      
-      PreferForwardCritic:
+        cost_weight: 5.0
+        threshold_to_consider: 1.5 # 当机器人与目标距离大于该值时才考虑目标代价
+                                   # 通常设置为预测距离，保证与路径跟随的平滑切换
+
+      PreferForwardCritic:     # 偏好前进而非倒退
         enabled: false
         cost_power: 1
-        cost_weight: 1.0                  # 前进偏好权重
-        threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
-      
-      ObstaclesCritic:
+        cost_weight: 5.0
+        threshold_to_consider: 1.5 # 距离目标小于该值后，允许倒退，由目标代价主导
+
+      ObstaclesCritic:         # 若易撞到低矮障碍物，需先确认地形分析是否正确
         enabled: true
         cost_power: 1
-        repulsion_weight: 1.5             # 障碍物排斥权重
-        critical_weight: 20.0             # 关键障碍物权重（很近的障碍）
-        consider_footprint: true          # 考虑机器人轮廓
-        collision_cost: 10000.0           # 碰撞代价
-        collision_margin_distance: 0.08    # 碰撞边界 (m)
-        near_goal_distance: 0.25           # 接近目标距离 (m)
-        inflation_radius: 0.25            # 膨胀半径 (m)
-        cost_scaling_factor: 10.0         # 代价缩放因子
-      
+        repulsion_weight: 0.2  # 排斥权重
+                               # 膨胀半径越大，该值通常应越小
+        critical_weight: 20.0  # 临界碰撞惩罚权重
+        consider_footprint: false # 是否考虑机器人轮廓（开启会增加计算量）
+        collision_cost: 10.0
+        collision_margin_distance: 0.05 # 碰撞惩罚边界距离（米）
+                                         # 建议 0.05~0.2
+        near_goal_distance: 0.1 # 距离目标小于该值时不再受障碍物排斥
+        inflation_radius: 0.4   # 障碍物膨胀半径（需与 inflation layer 一致）
+        cost_scaling_factor: 10.0 # 膨胀代价指数衰减系数
+        inflation_layer_name: ["local_inflation_layer","global_inflation_layer"]
+
       PathAlignCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.0                 # 路径对齐权重
-        max_path_occupancy_ratio: 0.05    # 最大路径占用率
-        trajectory_point_step: 3          # 轨迹点步长
-        threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
-        offset_from_furthest: 20          # 从最远点的偏移
-        use_path_orientations: false      # 不使用路径方向
-      
-      PathFollowCritic:
+        cost_weight: 14.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 3
+        threshold_to_consider: 1.5 # 距离目标小于该值后不再考虑路径对齐
+        offset_from_furthest: 8    # 从最远路径点向后的偏移量
+                                   # 推荐为最大投影距离的 ~30%
+
+      PathFollowCritic:        # 鼓励沿路径前进
         enabled: true
         cost_power: 1
-        cost_weight: 5.0                  # 路径跟随权重
-        offset_from_furthest: 5           # 从最远点的偏移
-        threshold_to_consider: 1.4        # 考虑的距离阈值 (m)
-      
-      # PathAngleCritic:
-      #   enabled: true
-      #   cost_power: 1
-      #   cost_weight: 8.0                  # 路径角度权重
-      #   offset_from_furthest: 4           # 从最远点的偏移
-      #   threshold_to_consider: 0.8        # 考虑的距离阈值 (m)
-      #   max_angle_to_furthest: 0.4        # 最大角度 (rad)
-      #   mode: 0                           # 模式：0=前向，1=偏好前向，2=无偏好
-      
-      # ----- 噪声生成器 -----
-      # MPPI 使用随机采样生成轨迹
-      temperature: 0.1                    # 温度参数（越小越贪婪，越大越探索）
-      gamma: 0.015                        # 折扣因子
-      
-      # ----- 可视化（调试用）-----
-      visualize: false                    # 是否可视化采样轨迹（影响性能）
-      
-      # ----- TF 参数 -----
-      transform_tolerance: 20.0            # TF容差 (s)
-      
-      # ----- 全向轮特定优化 -----
-      # MPPI 会自动利用全向轮的横向移动能力
-      # motion_model: "Omni" 已启用
+        cost_weight: 5.0
+        offset_from_furthest: 4
+        threshold_to_consider: 1.5 # 接近目标后由 GoalCritic 接管
+
+      PathAngleCritic:         # 惩罚与路径夹角过大的轨迹
+                                # 有助于在角度误差大时进行急转
+        enabled: false
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 1.5
+        max_angle_to_furthest: 1.0
+        mode: 0
+
+      TwirlingCritic:
+        enabled: true
+        twirling_cost_power: 1
+        twirling_cost_weight: 10.0
+
+      # ========================
+      # 备用：Regulated Pure Pursuit 控制器参数
+      # ========================
+      # plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      # desired_linear_vel: 0.5
+      # lookahead_dist: 0.6
+      # min_lookahead_dist: 0.3
+      # max_lookahead_dist: 0.9
+      # lookahead_time: 1.5
+      # rotate_to_heading_angular_vel: 1.8
+      # transform_tolerance: 0.1
+      # use_velocity_scaled_lookahead_dist: false
+      # min_approach_linear_velocity: 0.05
+      # approach_velocity_scaling_dist: 0.6
+      # use_collision_detection: true
+      # max_allowed_time_to_collision_up_to_carrot: 1.0
+      # use_regulated_linear_velocity_scaling: true
+      # use_fixed_curvature_lookahead: false
+      # curvature_lookahead_dist: 0.25
+      # use_cost_regulated_linear_velocity_scaling: false
+      # regulated_linear_scaling_min_radius: 0.9
+      # regulated_linear_scaling_min_speed: 0.25
+      # use_rotate_to_heading: false
+      # allow_reversing: true
+      # rotate_to_heading_min_angle: 0.785
+      # max_angular_accel: 3.2
+      # max_robot_pose_search_dist: 10.0
 
 # =======================================================================================
 # Local Costmap (局部代价地图) - 用于避障和局部路径规划
@@ -164,7 +187,7 @@ local_costmap:
       width: 10                           # 地图宽度 (m) 
       height: 10                          # 地图高度 (m)
       resolution: 0.05                    # 地图分辨率 (m/cell) - 5cm精度
-      transform_tolerance: 60.0  
+      transform_tolerance: 0.5 
       # robot_radius: 0.25                  # 机器人半径 (m) - 根据实际车体调整！
       footprint: "[[0.175, 0.175], [0.175, -0.175], [-0.175, -0.175], [-0.175, 0.175]]"
       footprint_padding: 0.01
@@ -175,7 +198,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"    # 膨胀层插件
         cost_scaling_factor: 3.0          # 代价衰减因子 - 越大衰减越慢
-        inflation_radius: 0.2            # 膨胀半径 (m) - 障碍物周围0.35米不可通行
+        inflation_radius: 0.1            # 膨胀半径 (m) - 障碍物周围0.5米不可通行
 
       # ----- 体素层：3D障碍物检测和清除 -----
       voxel_layer:
@@ -227,13 +250,14 @@ global_costmap:
         observation_sources: scan         # 观测数据源
         scan:                             # 激光扫描配置（与局部地图相同）
           topic: /scan
+          min_obstacle_height: -0.5  
           max_obstacle_height: 2.0
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 3.0
+          raytrace_max_range: 10.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 10.0
           obstacle_min_range: 0.0
 
       # ----- 静态层：加载静态地图 -----
@@ -245,7 +269,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 2.0
-        inflation_radius: 0.2
+        inflation_radius: 0.1
 
       always_send_full_costmap: True      # 始终发布完整地图
 
@@ -266,19 +290,20 @@ planner_server:
     use_sim_time: false                    # 使用仿真时间
     planner_plugins: ["GridBased"]        # 规划器插件列表
 
-    # ----- NavFn 规划器：基于Dijkstra/A*的网格规划器 -----
-    # GridBased:
-    #   plugin: "nav2_navfn_planner/NavfnPlanner"      # NavFn规划器插件
-    #   tolerance: 0.5                      # 目标容差 (m) - 允许在目标附近结束
-    #   use_astar: false                    # 使用Dijkstra（false）或A*（true）
-    #   allow_unknown: true                 # 允许路径穿过未知区域
+    # ----- GridBased 规划器：基于theta*的网格规划器 -----
+    GridBased:
+      plugin: "nav2_theta_star_planner/ThetaStarPlanner"     
+      how_many_corners: 8
+      w_euc_cost: 1.0
+      w_traversal_cost: 20.0
+      w_heuristic_cost: 1.0               
 
     # ===== 可选：SMAC Hybrid A* 规划器（适合全向轮）=====
-    SmacHybrid:
-      plugin: "nav2_smac_planner/SmacPlannerHybrid"
-      tolerance: 0.5                    # 目标容差 (m)
-      motion_model_for_search: "REEDS_SHEPP"  # 运动模型：Reeds-Shepp曲线
-      allow_unknown: true               # 允许未知区域
+    # SmacHybrid:
+    #   plugin: "nav2_smac_planner/SmacPlannerHybrid"
+    #   tolerance: 0.5                    # 目标容差 (m)
+    #   motion_model_for_search: "REEDS_SHEPP"  # 运动模型：Reeds-Shepp曲线
+    #   allow_unknown: false               # 允许未知区域
 
 # =======================================================================================
 # Smoother Server (路径平滑服务器) - 对全局路径进行平滑处理
@@ -331,7 +356,7 @@ behavior_server:
     # ----- 行为通用参数 -----
     global_frame: odom                    # 全局坐标系
     robot_base_frame: base_link           # 机器人坐标系
-    transform_tolerance: 20.0            # TF变换容差 (s)
+    transform_tolerance: 0.5               # TF变换容差 (s)
     use_sim_time: false                    # 使用仿真时间
     simulate_ahead_time: 2.0              # 前瞻仿真时间 (s)
     max_rotational_vel: 1.0               # 最大旋转速度 (rad/s)
