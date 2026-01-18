@@ -44,10 +44,10 @@ controller_server:
       vy_std: 0.2
       wz_std: 0.2
       
-      vx_max: 0.4
-      vx_min: -0.4                        # 允许倒退
-      vy_max: 0.4                         # 允许左移
-      vy_min: -0.4                        # ← 修复：允许右移
+      vx_max: 0.5
+      vx_min: -0.5                        # 允许倒退
+      vy_max: 0.5                         # 允许左移
+      vy_min: -0.5                        # ← 修复：允许右移
       wz_max: 1.0
       iteration_count: 16                  # 优化迭代次数
       # ----- 加速度限制（全向轮）-----
@@ -91,7 +91,7 @@ controller_server:
       #   threshold_to_consider: 0.5        # 考虑角度的距离阈值 (m)
       
       PreferForwardCritic:
-        enabled: true
+        enabled: false
         cost_power: 1
         cost_weight: 1.0                  # 前进偏好权重
         threshold_to_consider: 0.5        # 考虑的距离阈值 (m)
@@ -104,8 +104,8 @@ controller_server:
         consider_footprint: true          # 考虑机器人轮廓
         collision_cost: 10000.0           # 碰撞代价
         collision_margin_distance: 0.08    # 碰撞边界 (m)
-        near_goal_distance: 0.4           # 接近目标距离 (m)
-        inflation_radius: 0.45            # 膨胀半径 (m)
+        near_goal_distance: 0.25           # 接近目标距离 (m)
+        inflation_radius: 0.25            # 膨胀半径 (m)
         cost_scaling_factor: 10.0         # 代价缩放因子
       
       PathAlignCritic:
@@ -161,8 +161,8 @@ local_costmap:
       robot_base_frame: base_link         # 机器人本体坐标系
       use_sim_time: False                  # 使用仿真时间
       rolling_window: true                # 滚动窗口模式 - 地图跟随机器人移动
-      width: 3                           # 地图宽度 (m) 
-      height: 2                          # 地图高度 (m)
+      width: 10                           # 地图宽度 (m) 
+      height: 10                          # 地图高度 (m)
       resolution: 0.05                    # 地图分辨率 (m/cell) - 5cm精度
       transform_tolerance: 60.0  
       # robot_radius: 0.25                  # 机器人半径 (m) - 根据实际车体调整！
@@ -175,28 +175,29 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"    # 膨胀层插件
         cost_scaling_factor: 3.0          # 代价衰减因子 - 越大衰减越慢
-        inflation_radius: 0.5            # 膨胀半径 (m) - 障碍物周围0.35米不可通行
+        inflation_radius: 0.2            # 膨胀半径 (m) - 障碍物周围0.35米不可通行
 
       # ----- 体素层：3D障碍物检测和清除 -----
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"        # 3D体素层插件
         enabled: True                     # 启用该层
         publish_voxel_map: True           # 发布3D体素地图（用于调试）
-        origin_z: 0.0                     # Z轴原点高度 (m)
+        origin_z: -0.5                     # Z轴原点高度 (m)
         z_resolution: 0.05                # Z轴分辨率 (m/voxel)
-        z_voxels: 40                      # Z轴体素数量
+        z_voxels: 60                      # Z轴体素数量
         max_obstacle_height: 3.0          # 障碍物最大高度 (m)
         mark_threshold: 0                 # 标记障碍物的阈值（点数）
         observation_sources: scan         # 观测数据源列表
         scan:                             # 激光扫描数据源配置
           topic: /scan                    # 订阅的激光话题
+          min_obstacle_height: -0.5           
           max_obstacle_height: 2.0        # 该传感器检测的最大障碍物高度 (m)
           clearing: True                  # 允许清除障碍物（光线追踪）
           marking: True                   # 允许标记障碍物
           data_type: "LaserScan"          # 数据类型
-          raytrace_max_range: 3.0         # 光线追踪最大范围 (m) - 清除自由空间
+          raytrace_max_range: 10.0         # 光线追踪最大范围 (m) - 清除自由空间
           raytrace_min_range: 0.0         # 光线追踪最小范围 (m)
-          obstacle_max_range: 2.5         # 标记障碍物最大范围 (m)
+          obstacle_max_range: 10.0         # 标记障碍物最大范围 (m)
           obstacle_min_range: 0.0         # 标记障碍物最小范围 (m)
 
       always_send_full_costmap: True      # 始终发布完整地图（而非更新）
@@ -243,8 +244,8 @@ global_costmap:
       # ----- 膨胀层：与局部地图配置相同 -----
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.5
+        cost_scaling_factor: 2.0
+        inflation_radius: 0.2
 
       always_send_full_costmap: True      # 始终发布完整地图
 
