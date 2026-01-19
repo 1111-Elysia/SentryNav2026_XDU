@@ -10,7 +10,6 @@ install(PROGRAMS
   scripts/restart_manager.py
   scripts/scan_monitor.py
   scripts/map_monitor.py
-  scripts/nav_loc_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
