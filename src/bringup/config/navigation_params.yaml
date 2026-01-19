@@ -59,7 +59,7 @@ controller_server:
       vy_max: 0.8             # 最大侧向速度（m/s）
       wz_max: 0.1             # 最大角速度（rad/s）
 
-      iteration_count: 1      # 迭代次数，推荐保持为 1，优先增大 batch_size
+      iteration_count: 2      # 迭代次数，推荐保持为 1，优先增大 batch_size
       prune_distance: 4.0     # 轨迹裁剪距离，与最大速度和预测时域相关
       transform_tolerance: 0.1 # TF 变换允许的时间误差（秒）
       temperature: 0.3        # 温度参数
@@ -187,7 +187,7 @@ local_costmap:
       width: 10                           # 地图宽度 (m) 
       height: 10                          # 地图高度 (m)
       resolution: 0.05                    # 地图分辨率 (m/cell) - 5cm精度
-      transform_tolerance: 0.5 
+      transform_tolerance: 1.5 
       # robot_radius: 0.25                  # 机器人半径 (m) - 根据实际车体调整！
       footprint: "[[0.175, 0.175], [0.175, -0.175], [-0.175, -0.175], [-0.175, 0.175]]"
       footprint_padding: 0.01
@@ -356,7 +356,7 @@ behavior_server:
     # ----- 行为通用参数 -----
     global_frame: odom                    # 全局坐标系
     robot_base_frame: base_link           # 机器人坐标系
-    transform_tolerance: 0.5               # TF变换容差 (s)
+    transform_tolerance: 1.5               # TF变换容差 (s)
     use_sim_time: false                    # 使用仿真时间
     simulate_ahead_time: 2.0              # 前瞻仿真时间 (s)
     max_rotational_vel: 1.0               # 最大旋转速度 (rad/s)

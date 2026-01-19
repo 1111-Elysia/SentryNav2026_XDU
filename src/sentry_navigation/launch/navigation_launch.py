@@ -114,18 +114,6 @@ def generate_launch_description():
             )
         ],
     )
-
-    # ---------------------------
-    # TF / Odom publisher
-    # ---------------------------
-    # tf_odom_node = Node(
-    #     package='sentry_navigation',
-    #     executable='tf_odom_publisher',
-    #     name='tf_odom_publisher',
-    #     output='screen',
-    #     parameters=[lidar_params_file],
-    # )
-
     # ---------------------------
     # Nav2 navigation stack
     # ---------------------------
@@ -189,7 +177,6 @@ def generate_launch_description():
     return LaunchDescription(
         declare_args
         + [
-            # tf_odom_node,   
             rviz_node,
             tf_monitor_node,
             wait_for_tf_handler
