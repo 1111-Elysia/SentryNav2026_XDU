@@ -6,7 +6,10 @@ from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     TimerAction,
+    RegisterEventHandler,
+    LogInfo
 )
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
@@ -19,18 +22,10 @@ def generate_launch_description():
     # ---------------------------
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
     bringup_dir = get_package_share_directory('bringup')
-
+    
     # ---------------------------
-    # Static (non-substitution) defaults
-    # ⚠️ 关键：不要在 default 里用 LaunchConfiguration
-    # ---------------------------
-    default_map_yaml = os.path.join(bringup_dir, 'map', 'map.yaml')
-    default_params = os.path.join(bringup_dir, 'config', 'navigation_params.yaml')
-    default_lidar_params = os.path.join(bringup_dir, 'config', 'lidar.yaml')
-    default_rviz_config = os.path.join(bringup_dir, 'config', 'nav2_default_view.rviz')
-
-    # ---------------------------
-    # LaunchConfigurations
+    # Launch Configuration Variables (Fix for NameError)
+    # 必须显式定义这些变量，才能在后面的 Node 中使用
     # ---------------------------
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_rviz = LaunchConfiguration('use_rviz')
@@ -38,6 +33,14 @@ def generate_launch_description():
     params_file = LaunchConfiguration('params_file')
     lidar_params_file = LaunchConfiguration('lidar_params_file')
     rviz_config_file = LaunchConfiguration('rviz_config')
+
+    # ---------------------------
+    # Static (non-substitution) defaults
+    # ---------------------------
+    default_map_yaml = os.path.join(bringup_dir, 'map', 'map.yaml')
+    default_params = os.path.join(bringup_dir, 'config', 'navigation_params.yaml')
+    default_lidar_params = os.path.join(bringup_dir, 'config', 'lidar.yaml')
+    default_rviz_config = os.path.join(bringup_dir, 'config', 'nav2_default_view.rviz')
 
     # ---------------------------
     # Declare launch arguments
@@ -75,6 +78,9 @@ def generate_launch_description():
         ),
     ]
 
+    # ...existing code...
+    # (保留之前的 map_server_node, map_lifecycle_manager, tf_odom_node, nav2_navigation 定义)
+    
     # ---------------------------
     # Map server (NO lifecycle here)
     # ---------------------------
@@ -85,14 +91,12 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'use_sim_time': use_sim_time},
-            # ⚠️ 关键：configure 时一定是确定值
             {'yaml_filename': map_yaml},
         ],
     )
 
     # ---------------------------
     # Lifecycle manager for map_server
-    # ⚠️ 关键：延迟启动，避免 configure 竞态
     # ---------------------------
     map_lifecycle_manager = TimerAction(
         period=1.0,
@@ -112,19 +116,18 @@ def generate_launch_description():
     )
 
     # ---------------------------
-    # TF / Odom publisher (Livox / 自定义)
+    # TF / Odom publisher
     # ---------------------------
-    tf_odom_node = Node(
-        package='sentry_navigation',
-        executable='tf_odom_publisher',
-        name='tf_odom_publisher',
-        output='screen',
-        parameters=[lidar_params_file],
-    )
+    # tf_odom_node = Node(
+    #     package='sentry_navigation',
+    #     executable='tf_odom_publisher',
+    #     name='tf_odom_publisher',
+    #     output='screen',
+    #     parameters=[lidar_params_file],
+    # )
 
     # ---------------------------
     # Nav2 navigation stack
-    # （与 map_server lifecycle 解耦）
     # ---------------------------
     nav2_navigation = TimerAction(
         period=2.0,
@@ -142,7 +145,7 @@ def generate_launch_description():
     )
 
     # ---------------------------
-    # RViz (optional)
+    # RViz
     # ---------------------------
     rviz_node = Node(
         condition=IfCondition(use_rviz),
@@ -155,15 +158,40 @@ def generate_launch_description():
     )
 
     # ---------------------------
+    # TF Monitor Node
+    # ---------------------------
+    tf_monitor_node = Node(
+        package='sentry_navigation',
+        executable='tf_monitor.py', 
+        name='tf_monitor',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
+
+    # ---------------------------
+    # Event Handler: Wait for TF Monitor to finish
+    # ---------------------------
+    wait_for_tf_handler = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=tf_monitor_node,
+            on_exit=[
+                LogInfo(msg="TF Chain Ready (map->odom->base_link->livox_frame). Starting Navigation Stack..."),
+                map_server_node,
+                map_lifecycle_manager,
+                nav2_navigation
+            ]
+        )
+    )
+
+    # ---------------------------
     # LaunchDescription
     # ---------------------------
     return LaunchDescription(
         declare_args
         + [
-            map_server_node,
-            map_lifecycle_manager,
-            tf_odom_node,
-            nav2_navigation,
+            # tf_odom_node,   
             rviz_node,
+            tf_monitor_node,
+            wait_for_tf_handler
         ]
     )

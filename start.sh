@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo rm /dev/shm/*fastrtps*
 source ./install/setup.bash
 echo "导航，启动！"
 
@@ -20,7 +21,7 @@ while true; do
     # 非 0 异常退出 → 重启
     if [ "$EXIT_CODE" -ne 0 ]; then
         echo "[ERROR] 导航异常退出，自动重启中..."
-        sleep 1
+        sleep 2
     else
         # 正常退出，退出循环
         break

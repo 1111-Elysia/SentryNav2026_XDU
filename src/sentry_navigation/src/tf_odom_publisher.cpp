@@ -154,7 +154,7 @@ private:
     {
         // 发布静态 TF: C (base_link → livox_frame)
         geometry_msgs::msg::TransformStamped tf_msg;
-        tf_msg.header.stamp = this->now();
+        tf_msg.header.stamp = rclcpp::Time(0);
         tf_msg.header.frame_id = "base_link";
         tf_msg.child_frame_id = "livox_frame";
         tf_msg.transform = tf2::toMsg(tf_C_);
@@ -203,7 +203,7 @@ private:
         // ===== end =====
 
         geometry_msgs::msg::TransformStamped A_msg;
-        A_msg.header.stamp = stamp_now;
+        A_msg.header.stamp = rclcpp::Time(0);
         A_msg.header.frame_id = map_frame_for_A_;
         A_msg.child_frame_id = odom_frame_;
         A_msg.transform = tf2::toMsg(tf_A);
@@ -325,6 +325,10 @@ private:
                 if (elapsed >= a_collect_duration_sec_) {
                     publishStaticAFromAvgD(now);
                     d_samples_.clear();
+                    if (!static_A_published_) {
+                        RCLCPP_WARN(this->get_logger(), "采集时间结束但发布失败（采样不足），重置状态以重新开始采集...");
+                        d_collecting_ = false; 
+                    }
                 }
             }
         }

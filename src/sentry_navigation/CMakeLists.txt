@@ -45,6 +45,11 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/tf_monitor.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # ===== 安装其他文件 =====
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
   install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)

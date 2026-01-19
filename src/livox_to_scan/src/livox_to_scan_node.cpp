@@ -65,12 +65,12 @@ private:
     geometry_msgs::msg::TransformStamped transform;
     bool tf_ok = true;
 
-    /* ---------- 关键点：使用 TimePointZero ---------- */
+    /* ------ 关键点：使用 TimePointZero ---------- */
     try {
       transform = tf_buffer_.lookupTransform(
         target_frame_,
         msg->header.frame_id,
-        tf2::TimePointZero   // ★ 关键修正
+        tf2::TimePointZero
       );
     } catch (const tf2::TransformException &ex) {
       tf_ok = false;
@@ -85,7 +85,28 @@ private:
     }
 
     sensor_msgs::msg::LaserScan scan;
-    initScan(scan, msg->header.stamp);
+
+    /* ---------- 时间戳修正与延迟保护 ---------- */
+    // 1. 基础修正：FAST-LIO 通常输出扫描结束时刻的位姿，所以加 scan_time
+    rclcpp::Time start_stamp = msg->header.stamp;
+    rclcpp::Time end_stamp = start_stamp + rclcpp::Duration::from_seconds(scan_time_);
+    
+    // 2. 延迟检测与保护 (Fix for "Message Filter dropping message")
+    rclcpp::Time now = this->now();
+    double lag = (now - end_stamp).seconds();
+    
+    // 如果滞后超过 0.15s (约1.5帧)，说明处理队列堵塞或 TF 已经跑到了未来
+    // 强制将时间戳拉回到 now()，确保 Costmap 能接受数据进行避障
+    if (lag > 0.15) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+            "Scan data lag detected (%.3fs). Resetting stamp to now() to prevent drop.", lag);
+        end_stamp = now;
+    } else if (lag < -1.0) {
+       // 防止严重的系统时间回跳或错误的时间戳
+       end_stamp = now;
+    }
+
+    initScan(scan, end_stamp);
 
     /* ---------- TF 不可用：仍然发布空 scan ---------- */
     if (!tf_ok) {
