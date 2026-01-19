@@ -35,9 +35,6 @@ function nuclear_cleanup() {
     # 5. 清理 ROS 2 守护进程 (可选，有时候 daemon 会缓存旧参数)
     # ros2 daemon stop
     
-    # 6. 清理 FastDDS 共享内存 (防止 DDS 通信卡死)
-    sudo rm -rf /dev/shm/*fastrtps* 2>/dev/null
-    
     echo "[SYSTEM] 清理完毕，内存已释放。"
     echo "---------------------------------------------------------"
 }
