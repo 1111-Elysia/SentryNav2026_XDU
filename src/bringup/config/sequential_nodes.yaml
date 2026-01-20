@@ -13,19 +13,24 @@ sequential_nodes:
     use_config_dir_as_cwd: true
     wait_after: 2
 
-  - label: Fast-LIO
-    type: execute
-    cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
-    wait_after: 0
+  # - label: Fast-LIO
+  #   type: execute
+  #   cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
+  #   wait_after: 0
 
-  - label: kiss-ICP
-    type: execute
-    cmd: ["ros2", "launch", "kiss_icp", "odometry.launch.py"]
-    wait_after: 2
+  # - label: kiss-ICP
+  #   type: execute
+  #   cmd: ["ros2", "launch", "kiss_icp", "odometry.launch.py"]
+  #   wait_after: 2
 
-  - label: odom-ekf
+  # - label: odom-ekf
+  #   type: execute
+  #   cmd: ["ros2", "launch", "odom_ekf", "odom_ekf.launch.py"]
+  #   wait_after: 2
+
+  - label: Super-LIO
     type: execute
-    cmd: ["ros2", "launch", "odom_ekf", "odom_ekf.launch.py"]
+    cmd: ["ros2", "launch", "super_lio", "Livox_mid360.py"]
     wait_after: 2
 
   - label: TF-Odom-Publisher
@@ -60,9 +65,9 @@ sequential_nodes:
     ]
     wait_after: 3
 
-  - label: behavior-tree-nodes
-    type: execute
-    cmd: ["ros2", "launch", "pub_point_bt", "pub_point_bt.launch.py"]
-    wait_after: 0
+  # - label: behavior-tree-nodes
+  #   type: execute
+  #   cmd: ["ros2", "launch", "pub_point_bt", "pub_point_bt.launch.py"]
+  #   wait_after: 0
 
 
