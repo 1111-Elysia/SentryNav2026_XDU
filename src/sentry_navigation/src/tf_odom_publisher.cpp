@@ -41,7 +41,7 @@ public:
         this->declare_parameter<int>("a_min_samples", 30);
 
         // frame 名称参数
-        this->declare_parameter<std::string>("map_frame_for_D", "map_one");
+        this->declare_parameter<std::string>("map_frame_for_D", "map_reloc");
         this->declare_parameter<std::string>("map_frame_for_A", "map");
         this->declare_parameter<std::string>("odom_frame", "odom");
 
@@ -112,7 +112,7 @@ public:
         publishStaticTransform();
 
         RCLCPP_INFO(this->get_logger(),
-                    "A(map->odom) 启动后收集 %.2fs 的 D(%s->livox_frame_one)，仅当匹配到 %s 且 confidence>%.3f（|dt|<=%.3fs）才纳入平均。",
+                    "A(map->odom) 启动后收集 %.2fs 的 D(%s->livox_frame_reloc)，仅当匹配到 %s 且 confidence>%.3f（|dt|<=%.3fs）才纳入平均。",
                     a_collect_duration_sec_, map_frame_for_D_.c_str(),
                     confidence_topic_.c_str(), confidence_threshold_, confidence_time_tolerance_sec_);
     }
@@ -282,11 +282,11 @@ private:
             bool got_D = false;
 
             try {
-                D_msg = tf_buffer_.lookupTransform(map_frame_for_D_, "livox_frame_one", rclcpp::Time(0));
+                D_msg = tf_buffer_.lookupTransform(map_frame_for_D_, "livox_frame_reloc", rclcpp::Time(0));
                 got_D = true;
             } catch (const tf2::TransformException &ex) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "等待 D(%s->livox_frame_one) 用于静态A: %s",
+                                     "等待 D(%s->livox_frame_reloc) 用于静态A: %s",
                                      map_frame_for_D_.c_str(), ex.what());
             }
 
@@ -296,7 +296,7 @@ private:
                     d_collect_start_time_ = now;
                     d_samples_.clear();
                     RCLCPP_INFO(this->get_logger(),
-                                "开始收集 D(%s->livox_frame_one)，持续 %.2fs（confidence过滤）...",
+                                "开始收集 D(%s->livox_frame_reloc)，持续 %.2fs（confidence过滤）...",
                                 map_frame_for_D_.c_str(), a_collect_duration_sec_);
                 }
 
@@ -474,7 +474,7 @@ private:
     int a_min_samples_ = 30;
     std::vector<tf2::Transform> d_samples_;
 
-    std::string map_frame_for_D_ = "map_one";
+    std::string map_frame_for_D_ = "map_reloc";
     std::string map_frame_for_A_ = "map";
     std::string odom_frame_ = "odom";
 
