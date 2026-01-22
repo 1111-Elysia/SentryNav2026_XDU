@@ -13,5 +13,8 @@ cd ../../../../..
 bash depend_install.sh
 # 3、lightning-lm安装，注意，不建议把lightning-lm与其他包同时编译
 colcon build --packages-select lightning --cmake-args -DCMAKE_BUILD_TYPE=Release
+# 3.5、地图文件占位
+touch ./src/bringup/map/map.yaml
+touch ./src/bringup/map/map.pgm
 # 4、导航系统编译安装
 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
