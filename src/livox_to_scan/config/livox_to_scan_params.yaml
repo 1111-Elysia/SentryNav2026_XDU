@@ -7,11 +7,11 @@ livox_to_scan_node:
     # 角度范围参数（弧度）
     angle_min: -3.14159265359  # -180度
     angle_max: 3.14159265359   # 180度
-    angle_increment: 0.005     # 约 0.286 度
+    angle_increment: 0.01     # 约 0.572 度
     
     # 距离过滤参数（米）
     range_min: 0.1
-    range_max: 100.0
+    range_max: 20.0
     
     # 扫描时间参数（秒）
     scan_time: 0.1

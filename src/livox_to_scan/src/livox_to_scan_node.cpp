@@ -87,11 +87,9 @@ private:
     sensor_msgs::msg::LaserScan scan;
 
     /* ---------- 时间戳修正与延迟保护 ---------- */
-    // 1. 基础修正：FAST-LIO 通常输出扫描结束时刻的位姿，所以加 scan_time
     rclcpp::Time start_stamp = msg->header.stamp;
     rclcpp::Time end_stamp = start_stamp + rclcpp::Duration::from_seconds(scan_time_);
     
-    // 2. 延迟检测与保护 (Fix for "Message Filter dropping message")
     rclcpp::Time now = this->now();
     double lag = (now - end_stamp).seconds();
     
