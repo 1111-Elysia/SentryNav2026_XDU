@@ -99,9 +99,9 @@ geometry_msgs::msg::TransformStamped LocalizationResult::ToGeoMsg() const {
     debugPub().publish(timestamp_, confidence_);
 
     geometry_msgs::msg::TransformStamped msg;
-    msg.header.frame_id = "map_one";
+    msg.header.frame_id = "map_reloc";
     msg.header.stamp = math::FromSec(timestamp_);
-    msg.child_frame_id = "livox_frame_one";
+    msg.child_frame_id = "livox_frame_reloc";
 
     msg.transform.translation.x = pose_.translation().x();
     msg.transform.translation.y = pose_.translation().y();
