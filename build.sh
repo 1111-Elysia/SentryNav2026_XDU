@@ -12,8 +12,14 @@ sudo make install
 cd ../../../../..
 bash depend_install.sh
 # 3、lightning-lm安装，注意，不建议把lightning-lm与其他包同时编译
-colcon build --packages-select lightning --cmake-args -DCMAKE_BUILD_TYPE=Release
+colcon build --packages-select lightning rm_referee_msgs
+if [ $? -ne 0 ]; then
+    echo "lightning-lm 编译失败，终止脚本"
+    exit 1
+fi
+echo "lightning-lm 编译完成，继续执行"
 # 3.5、地图文件占位
+mkdir ./src/bringup/map
 touch ./src/bringup/map/map.yaml
 touch ./src/bringup/map/map.pgm
 # 4、导航系统编译安装
