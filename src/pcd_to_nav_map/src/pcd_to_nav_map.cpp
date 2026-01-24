@@ -4,166 +4,136 @@
 #include <string>
 #include <cmath>
 #include <limits>
-#include <stdexcept>
+#include <filesystem>
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/common/common.h>
-#include <pcl/filters/passthrough.h>
 #include <pcl/filters/voxel_grid.h>
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-// --- 旋转函数（绕 roll, pitch, yaw） ---
-void rotatePoint(pcl::PointXYZ& point, double roll_rad, double pitch_rad, double yaw_rad) {
-    // Roll 绕 X
-    double y1 = std::cos(roll_rad) * point.y - std::sin(roll_rad) * point.z;
-    double z1 = std::sin(roll_rad) * point.y + std::cos(roll_rad) * point.z;
-    point.y = y1;
-    point.z = z1;
-
-    // Pitch 绕 Y
-    double x2 = std::cos(pitch_rad) * point.x + std::sin(pitch_rad) * point.z;
-    double z2 = -std::sin(pitch_rad) * point.x + std::cos(pitch_rad) * point.z;
-    point.x = x2;
-    point.z = z2;
-
-    // Yaw 绕 Z
-    double x3 = std::cos(yaw_rad) * point.x - std::sin(yaw_rad) * point.y;
-    double y3 = std::sin(yaw_rad) * point.x + std::cos(yaw_rad) * point.y;
-    point.x = x3;
-    point.y = y3;
+// ------------------- 工具函数 -------------------
+void rotatePoint(pcl::PointXYZ& point, double roll, double pitch, double yaw) {
+    double y1 = cos(roll) * point.y - sin(roll) * point.z;
+    double z1 = sin(roll) * point.y + cos(roll) * point.z;
+    point.y = y1; point.z = z1;
+    double x2 = cos(pitch) * point.x + sin(pitch) * point.z;
+    double z2 = -sin(pitch) * point.x + cos(pitch) * point.z;
+    point.x = x2; point.z = z2;
+    double x3 = cos(yaw) * point.x - sin(yaw) * point.y;
+    double y3 = sin(yaw) * point.x + cos(yaw) * point.y;
+    point.x = x3; point.y = y3;
 }
 
+inline bool worldToMap(double wx, double wy, double origin_x, double origin_y,
+                       double resolution, int width, int height, int& mx, int& my) {
+    mx = static_cast<int>(std::floor((wx - origin_x) / resolution));
+    my = static_cast<int>(std::floor((wy - origin_y) / resolution));
+    return (mx >= 0 && mx < width && my >= 0 && my < height);
+}
+
+void bresenham(int x0, int y0, int x1, int y1, std::vector<unsigned char>& map,
+               int width, int height, unsigned char free_val) {
+    int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy, x = x0, y = y0;
+    while (true) {
+        int idx = x + (height - 1 - y) * width;
+        if (idx >= 0 && idx < map.size()) map[idx] = free_val;
+        if (x == x1 && y == y1) break;
+        int e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x += sx; }
+        if (e2 <= dx) { err += dx; y += sy; }
+    }
+}
+
+// ------------------- 主程序 -------------------
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        std::cerr << "用法: " << argv[0] << " <输入.pcd> <配置.json>" << std::endl;
-        return -1;
-    }
+    if (argc != 3) { std::cerr << "用法: " << argv[0] << " <PCD> <config.json>\n"; return -1; }
+    std::string pcd_file = argv[1], config_file = argv[2];
 
-    std::string pcd_file = argv[1];
-    std::string config_file = argv[2];
-
-    // --- 读取 JSON 配置 ---
+    // --- 读取 JSON ---
     json config;
-    try {
-        std::ifstream config_stream(config_file);
-        if (!config_stream.is_open()) throw std::runtime_error("无法打开配置文件: " + config_file);
-        config = json::parse(config_stream);
-    } catch (const std::exception& e) {
-        std::cerr << "JSON读取/解析失败: " << e.what() << std::endl;
-        return -1;
-    }
+    std::ifstream f(config_file);
+    config = json::parse(f);
 
-    // --- 参数 ---
-    std::string output_prefix = config.at("output_prefix").get<std::string>();
-    double resolution = config.at("resolution").get<double>();
-    double min_z_height = config.at("min_z_height").get<double>();
-    double max_z_height = config.at("max_z_height").get<double>();
-    double voxel_leaf_size = config.at("voxel_leaf_size").get<double>();
-    int occupied_value = config.value("occupied_value", 0);
-    int free_value = config.value("free_value", 255);
-    int unknown_value = config.value("unknown_value", 205);
-    double occupied_thresh = config.at("occupied_thresh").get<double>();
-    double free_thresh = config.at("free_thresh").get<double>();
-    double map_padding = config.at("map_padding").get<double>();
-
-    double roll_deg = config.value("lidar_roll_deg", 0.0);
-    double pitch_deg = config.value("lidar_pitch_deg", 0.0);
-    double yaw_deg = config.value("lidar_yaw_deg", 0.0);
-    double roll_rad = roll_deg * M_PI / 180.0;
-    double pitch_rad = pitch_deg * M_PI / 180.0;
-    double yaw_rad = yaw_deg * M_PI / 180.0;
+    std::string output_prefix = config["output_prefix"];
+    double resolution = config["resolution"];
+    double min_z = config["min_z_height"];
+    double max_z = config["max_z_height"];
+    double voxel_size = config["voxel_leaf_size"];
+    int occ_val = config.value("occupied_value", 0);
+    int free_val = config.value("free_value", 255);
+    double map_pad = config["map_padding"];
+    double roll = config.value("lidar_roll_deg", 0.0) * M_PI/180.0;
+    double pitch = config.value("lidar_pitch_deg", 0.0) * M_PI/180.0;
+    double yaw = config.value("lidar_yaw_deg", 0.0) * M_PI/180.0;
+    double lidar_x = config.value("lidar_origin_x", 0.0);
+    double lidar_y = config.value("lidar_origin_y", 0.0);
 
     std::string pgm_file = output_prefix + ".pgm";
     std::string yaml_file = output_prefix + ".yaml";
 
-    // --- 1. 加载 PCD ---
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_raw(new pcl::PointCloud<pcl::PointXYZ>);
-    if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_file, *cloud_raw) == -1) {
-        std::cerr << "无法读取文件 " << pcd_file << std::endl;
-        return -1;
-    }
-    std::cout << "原始点云大小: " << cloud_raw->size() << std::endl;
-    if (cloud_raw->empty()) return -1;
+    // --- 加载点云 ---
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::io::loadPCDFile(pcd_file, *cloud);
+    if (cloud->empty()) return -1;
 
-    // --- 2. 雷达旋转补偿（先旋转点云） ---
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_rotated(new pcl::PointCloud<pcl::PointXYZ>);
-    *cloud_rotated = *cloud_raw;
-    for (auto& point : cloud_rotated->points) {
-        rotatePoint(point, roll_rad, pitch_rad, yaw_rad);
-    }
-    std::cout << "已进行雷达三轴旋转补偿" << std::endl;
+    // --- 旋转补偿 ---
+    for (auto& pt : cloud->points) rotatePoint(pt, roll, pitch, yaw);
 
-    // --- 3. 高度过滤（使用旋转后的点云 Z） ---
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PassThrough<pcl::PointXYZ> pass_z;
-    pass_z.setInputCloud(cloud_rotated);
-    pass_z.setFilterFieldName("z");
-    pass_z.setFilterLimits(min_z_height, max_z_height);
-    pass_z.filter(*cloud_filtered_z);
-    std::cout << "高度过滤后: " << cloud_filtered_z->size() << std::endl;
-    if (cloud_filtered_z->empty()) return -1;
+    // --- 高度分层 + 体素下采样 ---
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+    for (auto& pt : cloud->points)
+        if (pt.z >= min_z && pt.z <= max_z) cloud_filtered->push_back(pt);
 
-    // --- 4. 体素下采样 ---
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_voxel(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::VoxelGrid<pcl::PointXYZ> vg;
-    vg.setInputCloud(cloud_filtered_z);
-    vg.setLeafSize(voxel_leaf_size, voxel_leaf_size, voxel_leaf_size);
-    vg.filter(*cloud_downsampled);
-    std::cout << "下采样后: " << cloud_downsampled->size() << std::endl;
-    if (cloud_downsampled->empty()) return -1;
+    vg.setInputCloud(cloud_filtered);
+    vg.setLeafSize(voxel_size, voxel_size, voxel_size);
+    vg.filter(*cloud_voxel);
+    if (cloud_voxel->empty()) return -1;
 
-    // --- 5. 确定地图边界 ---
+    // --- 地图边界 ---
     pcl::PointXYZ min_pt, max_pt;
-    pcl::getMinMax3D(*cloud_downsampled, min_pt, max_pt);
-    double origin_x = min_pt.x - map_padding;
-    double origin_y = min_pt.y - map_padding;
-    double map_width_m = (max_pt.x + map_padding) - origin_x;
-    double map_height_m = (max_pt.y + map_padding) - origin_y;
-    int map_width_px = static_cast<int>(std::ceil(map_width_m / resolution));
-    int map_height_px = static_cast<int>(std::ceil(map_height_m / resolution));
-    if (map_width_px <=0 || map_height_px <=0) return -1;
-    std::cout << "地图尺寸: " << map_width_px << " x " << map_height_px << std::endl;
+    pcl::getMinMax3D(*cloud_voxel, min_pt, max_pt);
+    double origin_x = min_pt.x - map_pad, origin_y = min_pt.y - map_pad;
+    int width = static_cast<int>(std::ceil((max_pt.x + map_pad - origin_x)/resolution));
+    int height = static_cast<int>(std::ceil((max_pt.y + map_pad - origin_y)/resolution));
 
-    // --- 6. 初始化地图 ---
-    std::vector<unsigned char> map_data(map_width_px * map_height_px, static_cast<unsigned char>(unknown_value));
+    std::vector<unsigned char> map_data(width*height, free_val);
 
-    // --- 7. 栅格化点云 ---
-    for (const auto& point : cloud_downsampled->points) {
-        int px = static_cast<int>(std::floor((point.x - origin_x) / resolution));
-        int py = static_cast<int>(std::floor((point.y - origin_y) / resolution));
-        if (px >=0 && px < map_width_px && py >=0 && py < map_height_px) {
-            int idx = px + (map_height_px - 1 - py) * map_width_px;
-            if (idx >=0 && idx < map_data.size()) {
-                map_data[idx] = static_cast<unsigned char>(occupied_value);
-            }
-        }
+    // --- 雷达 origin 像素 ---
+    int lx, ly;
+    worldToMap(lidar_x, lidar_y, origin_x, origin_y, resolution, width, height, lx, ly);
+
+    // --- 投射 + 占据 ---
+    for (auto& pt : cloud_voxel->points) {
+        int px, py;
+        if (!worldToMap(pt.x, pt.y, origin_x, origin_y, resolution, width, height, px, py)) continue;
+        bresenham(lx, ly, px, py, map_data, width, height, free_val);
+        int idx = px + (height-1 - py)*width;
+        if (idx >=0 && idx < map_data.size()) map_data[idx] = occ_val;
     }
 
-    // --- 8. 输出 PGM ---
-    std::ofstream pgm_out(pgm_file, std::ios::binary);
-    if (!pgm_out) return -1;
-    pgm_out << "P5\n" << map_width_px << " " << map_height_px << "\n255\n";
-    pgm_out.write(reinterpret_cast<const char*>(map_data.data()), map_data.size());
-    pgm_out.close();
-    std::cout << "已保存 PGM: " << pgm_file << std::endl;
+    // --- 输出 PGM ---
+    std::ofstream pgm(pgm_file, std::ios::binary);
+    pgm << "P5\n" << width << " " << height << "\n255\n";
+    pgm.write(reinterpret_cast<char*>(map_data.data()), map_data.size());
+    pgm.close();
 
-    // --- 9. 输出 YAML ---
-    std::ofstream yaml_out(yaml_file);
-    if (!yaml_out) return -1;
-    std::filesystem::path pgm_path(pgm_file);
-    std::string pgm_abs_path = std::filesystem::canonical(pgm_path).string();
-    yaml_out << "image: " << pgm_abs_path << "\n";
-    yaml_out << "mode: trinary\n";
-    yaml_out << "resolution: " << resolution << "\n";
-    yaml_out << "origin: [" << origin_x << ", " << origin_y << ", 0.0]\n";
-    yaml_out << "negate: 0\n";
-    yaml_out << "occupied_thresh: " << occupied_thresh << "\n";
-    yaml_out << "free_thresh: " << free_thresh << "\n";
-    yaml_out.close();
-    std::cout << "已保存 YAML: " << yaml_file << std::endl;
+    // --- 输出 YAML ---
+    std::ofstream yaml(yaml_file);
+    yaml << "image: " << std::filesystem::canonical(pgm_file).string() << "\n";
+    yaml << "mode: trinary\n";
+    yaml << "resolution: " << resolution << "\n";
+    yaml << "origin: [" << origin_x << ", " << origin_y << ", 0.0]\n";
+    yaml << "negate: 0\n";
+    yaml << "occupied_thresh: 0.65\n";
+    yaml << "free_thresh: 0.196\n";
+    yaml.close();
 
     return 0;
 }
