@@ -175,6 +175,7 @@ private:
             return;
         }
 
+        // 平移平均
         tf2::Vector3 sum_t(0, 0, 0);
         std::vector<tf2::Quaternion> qs;
         qs.reserve(d_samples_.size());
@@ -186,24 +187,34 @@ private:
         const tf2::Vector3 mean_t = sum_t * (1.0 / static_cast<double>(d_samples_.size()));
         const tf2::Quaternion mean_q = averageQuaternionHemisphereSafe(qs);
 
+        // 平移 + 旋转构造 D_avg
         tf2::Transform tf_D_avg;
         tf_D_avg.setOrigin(mean_t);
         tf_D_avg.setRotation(mean_q);
 
-        // 启动时不动：map->base_link 近似 map->odom
-        const tf2::Transform tf_A_raw = tf_D_avg * tf_C_inv_;
+        // A_raw = D_avg * C_inv
+        tf2::Transform tf_A_raw = tf_D_avg * tf_C_inv_;
 
-        // ===== 按你的要求处理 tfA：平移保留，旋转再乘一个 C 的旋转 =====
+        // =============================
+        // 修正逻辑：Z 固定，roll/pitch=0，只保留 yaw
+        // =============================
         tf2::Transform tf_A = tf_A_raw;
-        tf_A.setOrigin(tf_A_raw.getOrigin());  // 平移保持不变
 
-        tf2::Quaternion qA = tf_A_raw.getRotation();
-        tf2::Quaternion qC = tf_C_.getRotation();  // C: base_link->livox_frame 的旋转部分
-        tf2::Quaternion q_new = qA * qC;           // 旋转再乘 C 的旋转
-        q_new.normalize();
-        tf_A.setRotation(q_new);
-        // ===== end =====
+        // 平移 Z 固定
+        tf2::Vector3 t = tf_A.getOrigin();
+        t.setZ(0.0);
+        tf_A.setOrigin(t);
 
+        // 旋转只保留 yaw
+        tf2::Quaternion q = tf_A.getRotation();
+        double roll, pitch, yaw;
+        tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+        tf2::Quaternion q_yaw;
+        q_yaw.setRPY(0.0, 0.0, yaw);
+        tf_A.setRotation(q_yaw);
+        // =============================
+
+        // 发布静态 A
         geometry_msgs::msg::TransformStamped A_msg;
         A_msg.header.stamp = rclcpp::Time(0);
         A_msg.header.frame_id = map_frame_for_A_;
@@ -217,6 +228,7 @@ private:
                     "已发布静态 A(%s->%s)，有效采样数=%zu。",
                     map_frame_for_A_.c_str(), odom_frame_.c_str(), d_samples_.size());
     }
+
 
     void lioOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
