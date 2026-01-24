@@ -286,8 +286,8 @@ private:
                 got_D = true;
             } catch (const tf2::TransformException &ex) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "等待 D(%s->livox_frame_reloc) 用于静态A: %s",
-                                     map_frame_for_D_.c_str(), ex.what());
+                                    "等待 D(%s->livox_frame_reloc) 用于静态A: %s",
+                                    map_frame_for_D_.c_str(), ex.what());
             }
 
             if (got_D && D_msg.header.frame_id == map_frame_for_D_) {
@@ -302,7 +302,6 @@ private:
 
                 rclcpp::Time d_stamp(D_msg.header.stamp, this->get_clock()->get_clock_type());
                 if (D_msg.header.stamp.sec == 0 && D_msg.header.stamp.nanosec == 0) {
-                    // 若 TF 没给有效 stamp，则退化用 now（避免永远匹配不到）
                     d_stamp = now;
                 }
 
@@ -311,12 +310,12 @@ private:
 
                 if (!have_conf) {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                                         "丢弃 D：±%.3fs 内未找到 %s 匹配（D_stamp=%.3f）",
-                                         confidence_time_tolerance_sec_, confidence_topic_.c_str(), d_stamp.seconds());
+                                        "丢弃 D：±%.3fs 内未找到 %s 匹配（D_stamp=%.3f）",
+                                        confidence_time_tolerance_sec_, confidence_topic_.c_str(), d_stamp.seconds());
                 } else if (conf <= confidence_threshold_) {
                     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                                         "丢弃 D：confidence=%.3f <= %.3f（D_stamp=%.3f）",
-                                         conf, confidence_threshold_, d_stamp.seconds());
+                                        "丢弃 D：confidence=%.3f <= %.3f（D_stamp=%.3f）",
+                                        conf, confidence_threshold_, d_stamp.seconds());
                 } else {
                     tf2::Transform tf_D;
                     tf2::fromMsg(D_msg.transform, tf_D);
@@ -329,25 +328,24 @@ private:
                     d_samples_.clear();
                     if (!static_A_published_) {
                         RCLCPP_WARN(this->get_logger(), "采集时间结束但发布失败（采样不足），重置状态以重新开始采集...");
-                        d_collecting_ = false; 
+                        d_collecting_ = false;
                     }
                 }
             }
         }
 
         // ==========================
-        // 2) 用 /lio/robo/odom 构造 E(odom->livox_frame_two) → 计算/发布 B 与 /odom
+        // 2) 构造 E(odom->livox_frame_two) → 计算/发布 B + /odom
         // ==========================
         bool got_E = false;
-        geometry_msgs::msg::TransformStamped E_msg;
         if (!have_lio_odom_) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                 "等待 /lio/robo/odom（nav_msgs/Odometry）以构造 E(odom->livox_frame_two)...");
+                                "等待 /lio/robo/odom（nav_msgs/Odometry）以构造 E(odom->livox_frame_two)...");
         } else {
             const double age = (now - last_lio_odom_.header.stamp).seconds();
             if (age > 5.0) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "/lio/robo/odom 过旧(%.2fs)，暂不更新 B", age);
+                                    "/lio/robo/odom 过旧(%.2fs)，暂不更新 B", age);
             } else {
                 got_E = true;
             }
@@ -356,13 +354,11 @@ private:
         if (!got_E) return;
 
         try {
-            // 构造 E: odom -> livox_frame_two
             tf2::Transform tf_E;
             tf_E.setOrigin(tf2::Vector3(
                 last_lio_odom_.pose.pose.position.x,
                 last_lio_odom_.pose.pose.position.y,
                 last_lio_odom_.pose.pose.position.z));
-
             tf2::Quaternion qE(
                 last_lio_odom_.pose.pose.orientation.x,
                 last_lio_odom_.pose.pose.orientation.y,
@@ -371,40 +367,73 @@ private:
             qE.normalize();
             tf_E.setRotation(qE);
 
-            // 兼容检查：期望 child_frame_id 为 livox_frame_two
-            // if (last_lio_odom_.child_frame_id != "livox_frame_two") {
-            //     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
-            //                          "/lio/robo/odom child_frame_id=%s，期望=livox_frame_two，仍按位姿计算",
-            //                          last_lio_odom_.child_frame_id.c_str());
-            // }
-            // if (last_lio_odom_.header.frame_id != "odom") {
-            //     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
-            //                          "/lio/robo/odom header.frame_id=%s，期望=odom",
-            //                          last_lio_odom_.header.frame_id.c_str());
-            // }
-
-            // 计算 B = E * C_inv
             tf2::Transform tf_B = tf_E * tf_C_inv_;
 
-            // 发布 B(odom->base_link) TF
+            // ==========================
+            // EMA 平滑
+            // ==========================
+            if (!ema_initialized_) {
+                ema_translation_ = tf_B.getOrigin();
+                ema_rotation_ = tf_B.getRotation();
+                ema_initialized_ = true;
+            } else {
+                // 平移 EMA
+                tf2::Vector3 t_new = tf_B.getOrigin();
+                ema_translation_ = ema_alpha_ * t_new + (1.0 - ema_alpha_) * ema_translation_;
+
+                // 旋转 EMA 用 slerp
+                tf2::Quaternion q_new = tf_B.getRotation();
+                ema_rotation_ = ema_rotation_.slerp(q_new, ema_alpha_);
+                ema_rotation_.normalize();
+            }
+
+            // ==========================
+            // 收敛判定
+            // ==========================
+            tf2::Vector3 delta_t = tf_B.getOrigin() - ema_translation_;
+            double delta_r = (ema_rotation_.inverse() * tf_B.getRotation()).getAngle();
+
+            delta_trans_window_.push_back(delta_t);
+            delta_rot_window_.push_back(delta_r);
+            if (delta_trans_window_.size() > convergence_window_) delta_trans_window_.pop_front();
+            if (delta_rot_window_.size() > convergence_window_) delta_rot_window_.pop_front();
+
+            bool translation_stable = true;
+            bool rotation_stable = true;
+            for (const auto &d : delta_trans_window_) if (d.length() > epsilon_translation_) translation_stable = false;
+            for (const auto &dr : delta_rot_window_) if (dr > epsilon_rotation_) rotation_stable = false;
+
+            if (translation_stable && rotation_stable && !map_odom_converged_) {
+                map_odom_converged_ = true;
+                RCLCPP_INFO(this->get_logger(), "map->odom 已收敛，冻结 EMA 结果");
+            }
+
+            // ==========================
+            // 发布 B(odom->base_link)
+            // ==========================
             geometry_msgs::msg::TransformStamped B_msg;
             B_msg.header.stamp = last_lio_odom_.header.stamp;
             B_msg.header.frame_id = "odom";
             B_msg.child_frame_id = "base_link";
-            B_msg.transform = tf2::toMsg(tf_B);
+            tf2::Transform tf_B_publish;
+            tf_B_publish.setOrigin(ema_translation_);
+            tf_B_publish.setRotation(ema_rotation_);
+            B_msg.transform = tf2::toMsg(tf_B_publish);
             tf_broadcaster_->sendTransform(B_msg);
 
-            // 发布 /odom（保持原来速度/协方差映射）
+            // ==========================
+            // 发布 /odom
+            // ==========================
             if (have_lio_odom_) {
                 nav_msgs::msg::Odometry odom_msg;
                 odom_msg.header.stamp = B_msg.header.stamp;
                 odom_msg.header.frame_id = "odom";
                 odom_msg.child_frame_id = "base_link";
 
-                odom_msg.pose.pose.position.x = tf_B.getOrigin().x();
-                odom_msg.pose.pose.position.y = tf_B.getOrigin().y();
-                odom_msg.pose.pose.position.z = tf_B.getOrigin().z();
-                odom_msg.pose.pose.orientation = tf2::toMsg(tf_B.getRotation());
+                odom_msg.pose.pose.position.x = ema_translation_.x();
+                odom_msg.pose.pose.position.y = ema_translation_.y();
+                odom_msg.pose.pose.position.z = ema_translation_.z();
+                odom_msg.pose.pose.orientation = tf2::toMsg(ema_rotation_);
 
                 tf2::Vector3 linear_vel(
                     last_lio_odom_.twist.twist.linear.x,
@@ -433,7 +462,7 @@ private:
 
         } catch (const std::exception &e) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                 "计算/发布 B 失败: %s", e.what());
+                                "计算/发布 B 失败: %s", e.what());
         }
     }
 
@@ -487,6 +516,20 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr confidence_subscriber_;
     mutable std::mutex conf_mtx_;
     std::deque<ConfidenceSample> conf_buf_;
+
+    // EMA(指数移动平均，避免tf跳变炸nav2) + 收敛判断
+    tf2::Vector3 ema_translation_;      // 平移 EMA
+    tf2::Quaternion ema_rotation_;      // 旋转 EMA
+    bool ema_initialized_ = false;
+
+    std::deque<tf2::Vector3> delta_trans_window_;
+    std::deque<double> delta_rot_window_;
+    size_t convergence_window_ = 5;    // N帧滑动窗口
+    double epsilon_translation_ = 0.05; // 平移收敛阈值 (m)
+    double epsilon_rotation_ = 0.0087;  // 旋转收敛阈值 (rad ~0.5°)
+    double ema_alpha_ = 0.3;            // EMA 融合系数
+    bool map_odom_converged_ = false;   // 是否冻结
+
 };
 
 int main(int argc, char **argv)

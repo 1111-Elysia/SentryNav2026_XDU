@@ -91,10 +91,6 @@ public:
 
         odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 50);
 
-        fastlio_odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/Odometry", 50,
-            std::bind(&TfOdomPublisher::fastlioOdomCallback, this, std::placeholders::_1));
-
         // 监听 /confidence_lightninglm: Float64MultiArray
         // data[0] = timestamp(sec), data[1] = confidence
         confidence_subscriber_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
@@ -102,6 +98,12 @@ public:
             rclcpp::QoS(rclcpp::KeepLast(300)).best_effort().durability_volatile(),
             std::bind(&TfOdomPublisher::confidenceCallback, this, std::placeholders::_1));
 
+        // 新增：订阅 /lio/robo/odom 用于构造 E(odom->livox_frame_two)
+        lio_odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/lio/robo/odom",
+            rclcpp::QoS(rclcpp::KeepLast(200)).best_effort().durability_volatile(),
+            std::bind(&TfOdomPublisher::lioOdomCallback, this, std::placeholders::_1));
+        
         auto period = std::chrono::duration<double>(1.0 / publish_rate);
         timer_ = this->create_wall_timer(
             std::chrono::duration_cast<std::chrono::milliseconds>(period),
@@ -216,11 +218,13 @@ private:
                     map_frame_for_A_.c_str(), odom_frame_.c_str(), d_samples_.size());
     }
 
-    void fastlioOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+    void lioOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        last_fastlio_odom_ = *msg;
-        have_fastlio_odom_ = true;
+        if (!msg) return;
+        last_lio_odom_ = *msg;
+        have_lio_odom_ = true;
     }
+
 
     void confidenceCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
     {
@@ -271,9 +275,7 @@ private:
         rclcpp::Time now = this->now();
 
         // ==========================
-        // 1) 采集 D：启动后前 N 秒求平均，用于静态发布 A(map->odom)
-        //    规则：对每一帧 D，查找 ±0.2s 内的 /confidence_lightninglm；
-        //         若找到且 confidence > 2.3，则该 D 有效并存储；否则丢弃
+        // 1) 收集 D 用于静态 A
         // ==========================
         if (!static_A_published_) {
             geometry_msgs::msg::TransformStamped D_msg;
@@ -334,50 +336,66 @@ private:
         }
 
         // ==========================
-        // 2) 继续动态发布 B(odom->base_link) 与 /odom（保持原逻辑）
+        // 2) 用 /lio/robo/odom 构造 E(odom->livox_frame_two) → 计算/发布 B 与 /odom
         // ==========================
-        geometry_msgs::msg::TransformStamped E_msg;
         bool got_E = false;
-        bool used_cached_E = false;
-
-        try {
-            E_msg = tf_buffer_.lookupTransform("odom", "livox_frame_two", rclcpp::Time(0));
-            last_E_msg_ = E_msg;
-            have_E_ = true;
-            got_E = true;
-        } catch (const tf2::TransformException &ex) {
-            if (have_E_) {
-                const double age = (now - last_E_msg_.header.stamp).seconds();
-                if (age < 5.0) {
-                    E_msg = last_E_msg_;
-                    used_cached_E = true;
-                    got_E = true;
-                } else {
-                    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                         "E(odom->livox_frame_two) 不可用且缓存过旧(%.2fs): %s", age, ex.what());
-                }
-            } else {
+        geometry_msgs::msg::TransformStamped E_msg;
+        if (!have_lio_odom_) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                                 "等待 /lio/robo/odom（nav_msgs/Odometry）以构造 E(odom->livox_frame_two)...");
+        } else {
+            const double age = (now - last_lio_odom_.header.stamp).seconds();
+            if (age > 5.0) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "等待 E(odom->livox_frame_two): %s", ex.what());
+                                     "/lio/robo/odom 过旧(%.2fs)，暂不更新 B", age);
+            } else {
+                got_E = true;
             }
         }
 
         if (!got_E) return;
 
         try {
+            // 构造 E: odom -> livox_frame_two
             tf2::Transform tf_E;
-            tf2::fromMsg(E_msg.transform, tf_E);
+            tf_E.setOrigin(tf2::Vector3(
+                last_lio_odom_.pose.pose.position.x,
+                last_lio_odom_.pose.pose.position.y,
+                last_lio_odom_.pose.pose.position.z));
 
+            tf2::Quaternion qE(
+                last_lio_odom_.pose.pose.orientation.x,
+                last_lio_odom_.pose.pose.orientation.y,
+                last_lio_odom_.pose.pose.orientation.z,
+                last_lio_odom_.pose.pose.orientation.w);
+            qE.normalize();
+            tf_E.setRotation(qE);
+
+            // 兼容检查：期望 child_frame_id 为 livox_frame_two
+            // if (last_lio_odom_.child_frame_id != "livox_frame_two") {
+            //     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+            //                          "/lio/robo/odom child_frame_id=%s，期望=livox_frame_two，仍按位姿计算",
+            //                          last_lio_odom_.child_frame_id.c_str());
+            // }
+            // if (last_lio_odom_.header.frame_id != "odom") {
+            //     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+            //                          "/lio/robo/odom header.frame_id=%s，期望=odom",
+            //                          last_lio_odom_.header.frame_id.c_str());
+            // }
+
+            // 计算 B = E * C_inv
             tf2::Transform tf_B = tf_E * tf_C_inv_;
 
+            // 发布 B(odom->base_link) TF
             geometry_msgs::msg::TransformStamped B_msg;
-            B_msg.header.stamp = used_cached_E ? now : rclcpp::Time(E_msg.header.stamp, this->get_clock()->get_clock_type());
+            B_msg.header.stamp = last_lio_odom_.header.stamp;
             B_msg.header.frame_id = "odom";
             B_msg.child_frame_id = "base_link";
             B_msg.transform = tf2::toMsg(tf_B);
             tf_broadcaster_->sendTransform(B_msg);
 
-            if (have_fastlio_odom_) {
+            // 发布 /odom（保持原来速度/协方差映射）
+            if (have_lio_odom_) {
                 nav_msgs::msg::Odometry odom_msg;
                 odom_msg.header.stamp = B_msg.header.stamp;
                 odom_msg.header.frame_id = "odom";
@@ -389,13 +407,13 @@ private:
                 odom_msg.pose.pose.orientation = tf2::toMsg(tf_B.getRotation());
 
                 tf2::Vector3 linear_vel(
-                    last_fastlio_odom_.twist.twist.linear.x,
-                    last_fastlio_odom_.twist.twist.linear.y,
-                    last_fastlio_odom_.twist.twist.linear.z);
+                    last_lio_odom_.twist.twist.linear.x,
+                    last_lio_odom_.twist.twist.linear.y,
+                    last_lio_odom_.twist.twist.linear.z);
                 tf2::Vector3 angular_vel(
-                    last_fastlio_odom_.twist.twist.angular.x,
-                    last_fastlio_odom_.twist.twist.angular.y,
-                    last_fastlio_odom_.twist.twist.angular.z);
+                    last_lio_odom_.twist.twist.angular.x,
+                    last_lio_odom_.twist.twist.angular.y,
+                    last_lio_odom_.twist.twist.angular.z);
 
                 tf2::Vector3 linear_vel_bl = tf_C_inv_.getBasis() * linear_vel;
                 tf2::Vector3 angular_vel_bl = tf_C_inv_.getBasis() * angular_vel;
@@ -407,15 +425,15 @@ private:
                 odom_msg.twist.twist.angular.y = angular_vel_bl.y();
                 odom_msg.twist.twist.angular.z = angular_vel_bl.z();
 
-                odom_msg.pose.covariance = last_fastlio_odom_.pose.covariance;
-                odom_msg.twist.covariance = last_fastlio_odom_.twist.covariance;
+                odom_msg.pose.covariance = last_lio_odom_.pose.covariance;
+                odom_msg.twist.covariance = last_lio_odom_.twist.covariance;
 
                 odom_publisher_->publish(odom_msg);
             }
 
         } catch (const std::exception &e) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                 "计算/发布 TF 失败: %s", e.what());
+                                 "计算/发布 B 失败: %s", e.what());
         }
     }
 
@@ -427,7 +445,7 @@ private:
     tf2_ros::TransformListener tf_listener_;
 
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr fastlio_odom_subscriber_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr lio_odom_subscriber_; // 新增
     rclcpp::TimerBase::SharedPtr timer_;
 
     // C: base_link -> livox_frame
@@ -444,9 +462,9 @@ private:
     geometry_msgs::msg::TransformStamped last_E_msg_;
     bool have_E_ = false;
 
-    // FAST-LIO odom 缓存
-    nav_msgs::msg::Odometry last_fastlio_odom_;
-    bool have_fastlio_odom_ = false;
+    // E 来源改为 /lio/robo/odom
+    nav_msgs::msg::Odometry last_lio_odom_; // 新增
+    bool have_lio_odom_ = false;            // 新增
 
     // A 静态化：D 的平均
     bool static_A_published_ = false;
