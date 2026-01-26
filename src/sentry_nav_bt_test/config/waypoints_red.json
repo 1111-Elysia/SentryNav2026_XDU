@@ -1,0 +1,40 @@
+{
+  "waypoints": [
+    {
+      "name": "init", 
+      "x": 0.0, 
+      "y": 0.0, 
+      "yaw": 0.0 
+    },
+    {
+      "name": "supply_point",
+      "x": 0.0,
+      "y": 1.2,
+      "yaw": 0.0
+    },
+    {
+      "name": "tunnel_rune_point",
+      "x": 1.0,
+      "y": 0.6,
+      "yaw": 1.57
+    },
+    {
+      "name": "highway_defense",
+      "x": 0.0,
+      "y": -1.2,
+      "yaw": -1.57
+    },
+    {
+      "name": "fortress",
+      "x": -1.0,
+      "y": -0.6,
+      "yaw": 3.14
+    },
+    {
+      "name": "base_defense_point",
+      "x": 1.0,
+      "y": -0.6,
+      "yaw": 0.0
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+dr16_node:
+  ros__parameters:
+    tty_device: "/dev/ttyACM0"

@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Sequence name="主循环_Root">
+      
+      <Sequence name="前置检查">
+         <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
+      </Sequence>
+
+      <Fallback name="主逻辑_MainLogic">
+
+          <Sequence name="生存模式">
+             <Fallback>
+                <Inverter><CheckCondition key_name="current_hp" comparison="gte" threshold="150"/></Inverter>
+                <!-- <Inverter><CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="10"/></Inverter> -->
+             </Fallback>
+        
+             <PrintNode message="[生存] 状态危急，回补给区休整"/>
+             
+             <Action ID="SetSentryPosture" mode="3"/> 
+             
+             <GoalSelector goal_name="supply_point" goal="{goal}"/>
+             <RetryUntilSuccessful num_attempts="100">
+                 <NavigateToPose goal="{goal}"/>
+             </RetryUntilSuccessful>
+             
+             <Action ID="SetSentryPosture" mode="2"/> 
+             <SetBlackboardValue key="vw" value="0.0" type="float"/>
+             
+             <PrintNode message="[生存] 到达补给区，原地防御，等待血量/弹丸恢复"/>
+             
+             <Wait wait_duration="2.0"/>
+             <RetryUntilSuccessful num_attempts="1000">
+                <Sequence>
+                    <CheckCondition key_name="current_hp" comparison="gte" threshold="400"/>
+                </Sequence>
+             </RetryUntilSuccessful>
+             
+             <PrintNode message="[生存] 状态恢复，重返战场"/>
+          </Sequence>
+
+          <Sequence name="遭遇战">
+             <CheckCondition key_name="hurt_armor" comparison="gt" threshold="0"/>
+             
+             <PrintNode message="[遭遇] 发现敌人，切换进攻姿态并小陀螺"/>
+             
+             <RetryUntilSuccessful num_attempts="3">
+                 <Action ID="SetSentryPosture" mode="1"/>
+             </RetryUntilSuccessful>
+             
+             <SetBlackboardValue key="vw" value="10.0" type="float"/> 
+             
+             <Wait wait_duration="5.0"/> 
+
+             <SetBlackboardValue key="hurt_armor" value="0" type="int"/>
+          </Sequence>
+
+          <ReactiveFallback name="全场策略机">
+
+            <Sequence name="前期_小符_Phase1">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="390"/>
+               
+               <Inverter><CheckCondition key_name="small_rune_status" comparison="eq" threshold="1"/></Inverter>
+               <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+               
+               <PrintNode message="[Phase 1] 前往激活小能量机关"/>
+               
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="tunnel_rune_point" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="1"/>
+               <SetBlackboardValue key="vw" value="0.0" type="float"/> 
+               
+               <Action ID="RequestActivateRune" posture="1"/> 
+               
+               <PrintNode message="[Phase 1] 请求发送完毕，等待30秒增益生效..."/>
+               <Wait wait_duration="30.0"/>
+               
+               <Action ID="AutoAimAndFire" target_type="small_rune"/>
+            </Sequence>
+
+            <Sequence name="前期_压制_Phase2">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
+               <PrintNode message="[Phase 2] 压制公路/前哨站"/>
+               
+               <Action ID="SetSentryPosture" mode="3"/> <GoalSelector goal_name="highway_defense" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="1"/> <SetBlackboardValue key="vw" value="2.0" type="float"/> 
+            </Sequence>
+
+            <Sequence name="前期_小符_Phase3">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="300"/>
+               
+               <Inverter><CheckCondition key_name="small_rune_status" comparison="eq" threshold="1"/></Inverter>
+               <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+
+               <PrintNode message="[Phase 3] 再次尝试激活小符"/>
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="tunnel_rune_point" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="1"/>
+               <SetBlackboardValue key="vw" value="0.0" type="float"/>
+               
+               <Action ID="RequestActivateRune" posture="1"/> 
+               <Wait wait_duration="30.0"/>
+               
+               <Action ID="AutoAimAndFire" target_type="small_rune"/>
+            </Sequence>
+
+            <Sequence name="中期_前哨站_Phase4">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
+               
+               <Action ID="SetSentryPosture" mode="3"/>
+               <Fallback>
+                   <Sequence>
+                       <CheckCondition key_name="ally_outpost_hp" comparison="lte" threshold="0"/>
+                       <PrintNode message="[Phase 4] 前哨站已失，退守堡垒"/>
+                       <GoalSelector goal_name="fortress" goal="{goal}"/>
+                   </Sequence>
+                   
+                   <Sequence>
+                       <PrintNode message="[Phase 4] 坚守前哨站外围"/>
+                       <GoalSelector goal_name="highway_defense" goal="{goal}"/>
+                   </Sequence>
+               </Fallback>
+               
+               <NavigateToPose goal="{goal}"/>
+               <Action ID="SetSentryPosture" mode="1"/>
+               <SetBlackboardValue key="vw" value="5.0" type="float"/>
+            </Sequence>
+
+            <Sequence name="中期_大符_Phase5">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="210"/>
+               
+               <Inverter><CheckCondition key_name="large_rune_status" comparison="eq" threshold="1"/></Inverter>
+               <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+
+               <PrintNode message="[Phase 5] 激活大能量机关"/>
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="tunnel_rune_point" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="1"/>
+               <SetBlackboardValue key="vw" value="0.0" type="float"/>
+               
+               <Action ID="RequestActivateRune" posture="1"/> 
+               <Wait wait_duration="30.0"/>
+               
+               <Action ID="AutoAimAndFire" target_type="big_rune"/>
+            </Sequence>
+
+            <Sequence name="中期_堡垒_Phase6">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
+               <PrintNode message="[Phase 6] 强攻/驻守堡垒"/>
+               
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="fortress" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="1"/>
+               <SetBlackboardValue key="vw" value="8.0" type="float"/>
+            </Sequence>
+
+            <Sequence name="中期_大符_Phase7">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="135"/>
+               
+               <Inverter><CheckCondition key_name="large_rune_status" comparison="eq" threshold="1"/></Inverter>
+               <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+
+               <PrintNode message="[Phase 7] 补打大能量机关"/>
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="tunnel_rune_point" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="1"/>
+               
+               <Action ID="RequestActivateRune" posture="1"/>
+               <Wait wait_duration="30.0"/>
+               
+               <Action ID="AutoAimAndFire" target_type="big_rune"/>
+            </Sequence>
+
+            <Sequence name="后期_堡垒_Phase8">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
+               <PrintNode message="[Phase 8] 后期堡垒游走"/>
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="fortress" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               <Action ID="SetSentryPosture" mode="1"/>
+               <SetBlackboardValue key="vw" value="10.0" type="float"/>
+            </Sequence>
+
+            <Sequence name="后期_条件大符_Phase9">
+               <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="60"/>
+               
+               <Fallback>
+                   <Sequence>
+                       <CheckCondition key_name="ally_base_hp" comparison="gt" threshold="2000"/>
+                       <Inverter><CheckCondition key_name="large_rune_status" comparison="eq" threshold="1"/></Inverter>
+                       <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+                       
+                       <PrintNode message="[Phase 9] 优势局，尝试打大符刷分"/>
+                       <Action ID="SetSentryPosture" mode="3"/>
+                       <GoalSelector goal_name="tunnel_rune_point" goal="{goal}"/>
+                       <NavigateToPose goal="{goal}"/>
+                       <Action ID="SetSentryPosture" mode="1"/>
+                       
+                       <Action ID="RequestActivateRune" posture="1"/>
+                       <Wait wait_duration="30.0"/>
+                       
+                       <Action ID="AutoAimAndFire" target_type="big_rune"/>
+                   </Sequence>
+                   <AlwaysFailure/>
+               </Fallback>
+            </Sequence>
+
+            <Sequence name="终局_守家_Phase10">
+               <PrintNode message="[Phase 10] 终局，死守基地"/>
+               <Action ID="SetSentryPosture" mode="3"/>
+               <GoalSelector goal_name="base_defense_point" goal="{goal}"/>
+               <NavigateToPose goal="{goal}"/>
+               
+               <Action ID="SetSentryPosture" mode="2"/> 
+               <SetBlackboardValue key="vw" value="20.0" type="float"/> 
+            </Sequence>
+
+          </ReactiveFallback>
+      </Fallback>
+    </Sequence>
+  </BehaviorTree>
+  
+  <TreeNodesModel>
+      <Action ID="SetSentryPosture">
+          <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      </Action>
+      
+      <Action ID="RequestActivateRune">
+          <input_port name="posture" type="int">请求时保持的姿态</input_port>
+          <input_port name="protocol_ver" type="string">old or new</input_port>
+      </Action>
+      
+      <Action ID="CheckCondition">
+          <input_port name="key_name"/>
+          <input_port name="comparison"/>
+          <input_port name="threshold"/>
+      </Action>
+      <Action ID="GoalSelector">
+          <input_port name="goal_name"/>
+          <output_port name="goal"/>
+      </Action>
+      <Action ID="NavigateToPose">
+          <input_port name="goal"/>
+      </Action>
+      <Action ID="PrintNode">
+          <input_port name="message"/>
+      </Action>
+      <Action ID="SetBlackboardValue">
+          <input_port name="key"/>
+          <input_port name="value"/>
+          <input_port name="type"/>
+      </Action>
+      <Action ID="Wait">
+          <input_port name="wait_duration"/>
+      </Action>
+      <Action ID="AutoAimAndFire">
+          <input_port name="target_type"/>
+      </Action>
+  </TreeNodesModel>
+</root>
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Sequence name="Global_Loop">
+      
+      <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
+
+      <ReactiveFallback name="Root_Logic">
+      
+          <Sequence name="Survival_Logic">
+             <CheckCondition key_name="is_under_attack" comparison="eq" threshold="true"/>
+             <CheckCondition key_name="current_hp" comparison="lt" threshold="200"/>
+             
+             <PrintNode message="!!! 触发生存模式: 撤退回补给区 !!!"/>
+             <ForceSuccess><Action ID="SetSentryPosture" mode="2"/></ForceSuccess>
+             
+             <GoalSelector goal_name="supply_point" goal="{goal}"/>
+             <NavigateToPose goal="{goal}"/>
+             
+             <PrintNode message="到达补给区，等待回血..."/>
+             <SetBlackboardValue key="vw" value="0.0" type="float"/>
+             <Wait wait_duration="5.0"/>
+             
+             <SetBlackboardValue key="is_under_attack" value="false" type="bool"/>
+          </Sequence>
+
+          <Sequence name="Combat_Logic">
+             <CheckCondition key_name="is_under_attack" comparison="eq" threshold="true"/>
+             
+             <PrintNode message="!!! 遭遇敌人: 原地反击 !!!"/>
+             <ForceSuccess><Action ID="SetSentryPosture" mode="1"/></ForceSuccess>
+             <SetBlackboardValue key="vw" value="15.0" type="float"/>
+             
+             <Wait wait_duration="1.0"/>
+             
+             <SetBlackboardValue key="is_under_attack" value="false" type="bool"/>
+          </Sequence>
+
+          <Fallback name="Timeline_Selector">
+
+                <Sequence name="Phase_EndGame_Base_Defense">
+                    <CheckCondition key_name="stage_remain_time" comparison="lte" threshold="60"/>
+                    
+                    <PrintNode message="[EndGame] 最后1分钟，死守基地!"/>
+                    <ForceSuccess><Action ID="SetSentryPosture" mode="1"/></ForceSuccess> <GoalSelector goal_name="base_defense_point" goal="{goal}"/>
+                    <NavigateToPose goal="{goal}"/>
+                    
+                    <Wait wait_duration="2.0"/>
+                </Sequence>
+
+                <Sequence name="Task_Activate_Rune_Generic">
+                    <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+                    
+                    <Inverter>
+                         <Sequence>
+                             <CheckCondition key_name="stage_remain_time" comparison="lte" threshold="90"/>
+                             <CheckCondition key_name="ally_base_hp" comparison="lt" threshold="2000"/>
+                             <PrintNode message=">>> [警告] 基地血量危急，放弃最后一次打符，回防!"/>
+                         </Sequence>
+                    </Inverter>
+
+                    <PrintNode message=">>> 收到激活权限，前往能量机关点位..."/>
+                    <ForceSuccess><Action ID="SetSentryPosture" mode="3"/></ForceSuccess> <GoalSelector goal_name="tunnel_rune_point" goal="{goal}"/>
+                    <ForceSuccess><NavigateToPose goal="{goal}"/></ForceSuccess>
+
+                    <PrintNode message=">>> 到达符点，请求激活..."/>
+                    
+                    <RetryUntilSuccessful num_attempts="50">
+                        <Fallback>
+                            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+                            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
+                            
+                            <Sequence>
+                                <Action ID="RequestActivateRune" posture="3"/>
+                                <Wait wait_duration="1.0"/>
+                            </Sequence>
+                        </Fallback>
+                    </RetryUntilSuccessful>
+
+                    <PrintNode message=">>> 激活成功，正在输出..."/>
+                    <ForceSuccess><Action ID="SetSentryPosture" mode="2"/></ForceSuccess>
+                    <Wait wait_duration="20.0"/>
+                </Sequence>
+
+
+                <Sequence name="Phase_MidLate_Fortress">
+                    <CheckCondition key_name="stage_remain_time" comparison="lte" threshold="240"/>
+                    
+                    <PrintNode message="[Mid-Late] 坚守堡垒，提供火力支援..."/>
+                    <ForceSuccess><Action ID="SetSentryPosture" mode="1"/></ForceSuccess>
+                    
+                    <GoalSelector goal_name="fortress" goal="{goal}"/>
+                    <NavigateToPose goal="{goal}"/>
+                    
+                    <Wait wait_duration="2.0"/>
+                </Sequence>
+
+
+                <Sequence name="Phase_Mid_Decision">
+                    <CheckCondition key_name="stage_remain_time" comparison="lte" threshold="300"/>
+                    
+                    <Fallback>
+                        <Sequence>
+                             <CheckCondition key_name="ally_outpost_hp" comparison="lt" threshold="100"/>
+                             <PrintNode message="[Mid] 前哨站已毁，退守堡垒..."/>
+                             <GoalSelector goal_name="fortress" goal="{goal}"/>
+                             <NavigateToPose goal="{goal}"/>
+                        </Sequence>
+                        
+                        <Sequence>
+                             <PrintNode message="[Mid] 前哨站存活，继续防守公路..."/>
+                             <GoalSelector goal_name="highway_defense" goal="{goal}"/>
+                             <NavigateToPose goal="{goal}"/>
+                        </Sequence>
+                    </Fallback>
+                    <Wait wait_duration="2.0"/>
+                </Sequence>
+
+
+                <Sequence name="Phase_Early_Highway">
+                    <PrintNode message="[Early] 公路防守 / 协助进攻..."/>
+                    <ForceSuccess><Action ID="SetSentryPosture" mode="2"/></ForceSuccess>
+                    
+                    <GoalSelector goal_name="highway_defense" goal="{goal}"/>
+                    <NavigateToPose goal="{goal}"/>
+                    
+                    <Wait wait_duration="2.0"/>
+                </Sequence>
+
+            </Fallback>
+
+      </ReactiveFallback>
+    </Sequence>
+  </BehaviorTree>
+  
+  <TreeNodesModel>
+      <Action ID="SetSentryPosture">
+          <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      </Action>
+      <Action ID="RequestActivateRune">
+          <input_port name="posture" type="int">3</input_port>
+      </Action>
+      <Action ID="CheckCondition">
+          <input_port name="key_name"/>
+          <input_port name="comparison"/>
+          <input_port name="threshold"/>
+      </Action>
+      <Action ID="GoalSelector">
+          <input_port name="goal_name"/>
+          <output_port name="goal"/>
+      </Action>
+      <Action ID="NavigateToPose">
+          <input_port name="goal"/>
+      </Action>
+      <Action ID="PrintNode">
+          <input_port name="message"/>
+      </Action>
+      <Action ID="SetBlackboardValue">
+          <input_port name="key"/>
+          <input_port name="value"/>
+          <input_port name="type"/>
+      </Action>
+      <Action ID="Wait">
+          <input_port name="wait_duration"/>
+      </Action>
+      <Decorator ID="RetryUntilSuccessful">
+          <input_port name="num_attempts"/>
+      </Decorator>
+      <Decorator ID="ForceSuccess"/>
+      <Decorator ID="Inverter"/>
+  </TreeNodesModel>
+</root>
