@@ -192,11 +192,15 @@ local_costmap:
       plugins: ["local_obstacle_layer", "local_inflation_layer"]
 
       local_obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
+        plugin: "costmap_intensity::ObstacleLayerIntensity"
+        # nav2_costmap_2d::ObstacleLayer
+        # costmap_intensity::ObstacleLayerIntensity
         enabled: true
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         min_obstacle_height: -0.5
+        max_obstacle_intensity: 2.0
+        min_obstacle_intensity: 0.3
         combination_method: 1
         observation_sources: "pointcloud"
         pointcloud:
