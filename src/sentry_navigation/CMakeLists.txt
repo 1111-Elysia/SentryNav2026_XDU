@@ -39,9 +39,25 @@ ament_target_dependencies(tf_odom_publisher
   tf2
 )
 
+# 新增：仅发布静态 map->odom + odom 的节点
+add_executable(tf_only_odom
+  src/tf_only_odom.cpp
+)
+
+ament_target_dependencies(tf_only_odom
+  rclcpp
+  tf2_ros
+  tf2_geometry_msgs
+  geometry_msgs
+  nav_msgs
+  tf2_msgs
+  tf2
+)
+
 # ===== 安装可执行文件 =====
 install(TARGETS
   tf_odom_publisher
+  tf_only_odom
   DESTINATION lib/${PROJECT_NAME}
 )
 
