@@ -177,8 +177,8 @@ namespace sentry_nav_bt_test
                     // bb->set("ally_3_robot_hp", msg->ally_3_robot_hp);
                     // bb->set("ally_4_robot_hp", msg->ally_4_robot_hp);
                     // bb->set("ally_7_robot_hp", msg->ally_7_robot_hp);
-                    bb->set("ally_outpost_hp", msg->ally_outpost_hp); // 前哨站
-                    bb->set("ally_base_hp", msg->ally_base_hp);       // 基地
+                    // bb->set("ally_outpost_hp", msg->ally_outpost_hp); // 前哨站
+                    // bb->set("ally_base_hp", msg->ally_base_hp);       // 基地
                     // bb->set("enemy_1_robot_hp", msg->enemy_1_robot_hp);   可以改为敌方机器人，需要从雷达获取
                     // bb->set("enemy_2_robot_hp", msg->enemy_2_robot_hp);
                     // bb->set("enemy_3_robot_hp", msg->enemy_3_robot_hp);
@@ -326,7 +326,7 @@ namespace sentry_nav_bt_test
                     bb->set("projectile_allowance_17mm", msg->projectile_allowance_17mm);
                     bb->set("projectile_allowance_42mm", msg->projectile_allowance_42mm);
                     bb->set("remaining_gold_coin", msg->remaining_gold_coin);
-                    bb->set("projectile_allowance_fortress", msg->projectile_allowance_fortress); // 堡垒增益点提供的储备17mm弹丸允许发弹量
+                    // bb->set("projectile_allowance_fortress", msg->projectile_allowance_fortress); // 堡垒增益点提供的储备17mm弹丸允许发弹量
                     RCLCPP_DEBUG(
                         node_->get_logger(),
                         "黑板更新: '%s' 从话题 '%s'",

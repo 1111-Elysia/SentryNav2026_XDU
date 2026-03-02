@@ -52,11 +52,11 @@ controller_server:
       vy_std: 0.5             # y 方向线速度采样标准差
       wz_std: 0.1             # z 方向角速度采样标准差
 
-      vx_max: 0.4             # 最大前向速度（m/s）
+      vx_max: 0.35             # 最大前向速度（m/s）
                               # 预测距离 = 预测时间 × vx_max = 3m
                               # 局部代价地图尺寸应 ≥ 6m
-      vx_min: -0.4            # 最大倒退速度（m/s）
-      vy_max: 0.4             # 最大侧向速度（m/s）
+      vx_min: -0.35            # 最大倒退速度（m/s）
+      vy_max: 0.35             # 最大侧向速度（m/s）
       wz_max: 0.35             # 最大角速度（rad/s）
 
       iteration_count: 1      # 迭代次数，推荐保持为 1，优先增大 batch_size
@@ -192,15 +192,11 @@ local_costmap:
       plugins: ["local_obstacle_layer", "local_inflation_layer"]
 
       local_obstacle_layer:
-        plugin: "costmap_intensity::ObstacleLayerIntensity"
-        # nav2_costmap_2d::ObstacleLayer
-        # costmap_intensity::ObstacleLayerIntensity
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         min_obstacle_height: -0.5
-        max_obstacle_intensity: 2.0
-        min_obstacle_intensity: 0.3
         combination_method: 1
         observation_sources: "pointcloud"
         pointcloud:
@@ -210,16 +206,16 @@ local_costmap:
           marking: true
           observation_persistence: 0.0
           expected_update_rate: 20.0
-          obstacle_max_range: 5.0
-          obstacle_min_range: 0.2
+          obstacle_max_range: 15.0
+          obstacle_min_range: 0.0
           raytrace_max_range: 8.0
-          raytrace_min_range: 0.2
+          raytrace_min_range: 0.25
           max_obstacle_height: 2.0
           min_obstacle_height: 0.0
 
       local_inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 10.0
+        cost_scaling_factor: 7.0
         inflation_radius: 0.5
 
 # =======================================================================================
