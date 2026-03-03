@@ -43,6 +43,16 @@ sequential_nodes:
     arguments: ["--ros-args"]
     wait_after: 2
 
+  - label: TF-Only-Odom
+    type: node
+    package: sentry_navigation
+    executable: tf_only_odom
+    name: tf_only_odom
+    parameters:
+      - lidar.yaml
+    arguments: ["--ros-args"]
+    wait_after: 2
+
   - label: Livox-to-Scan
     type: node
     package: livox_to_scan

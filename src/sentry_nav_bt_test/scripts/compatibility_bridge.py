@@ -59,7 +59,12 @@ class RefereeCompatibilityBridge(Node):
         super().__init__('referee_compatibility_bridge')
         
         # 定义 QoS (设置为 Best Effort 或 Reliable 视情况而定，这里用 Reliable 比较稳)
-        qos = QoSProfile(depth=10)
+        self.qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE
+        )
+
         
         self.get_logger().info("正在启动旧协议(rm2) -> 新协议(rm) 桥接器...")
 
@@ -95,7 +100,7 @@ class RefereeCompatibilityBridge(Node):
         new_topic = f"/rm_referee/{topic_suffix}"
 
         # 1. 创建发布者 (发给你的 BT)
-        pub = self.create_publisher(new_type, new_topic, 10)
+        pub = self.create_publisher(new_type, new_topic, self.qos)
         self.pubs.append(pub)
 
         # 2. 创建回调函数 (利用闭包捕获 pub 和 new_type)
@@ -117,7 +122,7 @@ class RefereeCompatibilityBridge(Node):
             # self.get_logger().debug(f"Bridged {name}")
 
         # 3. 创建订阅者 (监听模拟器)
-        sub = self.create_subscription(old_type, old_topic, callback, 10)
+        sub = self.create_subscription(old_type, old_topic, callback, self.qos)
         self.subs.append(sub)
         
         self.get_logger().info(f"已建立桥接: {old_topic} -> {new_topic}")

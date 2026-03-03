@@ -8,32 +8,32 @@
     },
     {
       "name": "supply_point",
-      "x": 0.0,
-      "y": 1.2,
+      "x": 2.0,
+      "y": 1.5,
       "yaw": 0.0
     },
     {
       "name": "tunnel_rune_point",
-      "x": 1.0,
-      "y": 0.6,
+      "x": 4.0,
+      "y": 1.5,
       "yaw": 1.57
     },
     {
       "name": "highway_defense",
-      "x": 0.0,
-      "y": -1.2,
+      "x": 6.0,
+      "y": 1.5,
       "yaw": -1.57
     },
     {
       "name": "fortress",
-      "x": -1.0,
-      "y": -0.6,
+      "x": 6.0,
+      "y": -1.0,
       "yaw": 3.14
     },
     {
       "name": "base_defense_point",
       "x": 1.0,
-      "y": -0.6,
+      "y": -1.0,
       "yaw": 0.0
     }
   ]
