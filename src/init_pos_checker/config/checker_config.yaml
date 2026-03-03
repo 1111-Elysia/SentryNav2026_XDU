@@ -1,0 +1,40 @@
+# 初始位姿 (map -> base_link)
+# 从 bringup/config/loc_start_pose.yaml 复制你使用的阵营值
+initial_pose:
+  x: 0.0
+  y: 0.0
+  z: 0.0
+  roll_deg: 0.0
+  pitch_deg: 0.0
+  yaw_deg: 0.0
+
+# base_link -> lidar 外参
+# 从 bringup/config/lidar.yaml 复制
+extrinsic:
+  x: 0.16
+  y: 0.0
+  z: 0.0
+
+# 地图 PCD 路径（可以是单个 .pcd 文件，也可以是包含多个 .pcd 的目录）
+map_pcd_path: /home/kyrie/SentryNav2026_XDU/data/new_map/
+
+
+# 地图 PCD 路径（单个文件或包含多个 .pcd 的目录）
+# 示例: /home/kyrie/SentryNav2026_XDU/data/map/
+map_pcd_path: ""
+
+# 定位系统输出的 map 坐标系下的点云话题
+cloud_topic: "/lio/cloud_world"
+
+# 累积帧数（越多越稳定，但等待时间越长）
+accumulate_frames: 5
+
+# 降采样体素大小（m）
+voxel_size: 0.3
+
+# ICP 最大迭代次数
+icp_max_iter: 50
+
+# 通过/失败判定阈值
+pos_threshold: 0.5   # 位置误差阈值（m）
+rot_threshold: 5.0   # 旋转误差阈值（°）
