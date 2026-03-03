@@ -1,6 +1,5 @@
 
 #include "referee_node/referee_node.hpp"
-
 #include "referee_node/log_utils.hpp"
 
 RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("referee_node", options) {
@@ -16,11 +15,36 @@ RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("ref
     RCLCPP_INFO(get_logger(), ("Normal data link: " + text::Green("Enabled") + " @ %s").c_str(),
                 param_normal_tty_device_.c_str());
     SerialInit(param_normal_tty_device_, normal_serial_);
+
+    // 启用原始数据记录，创建一个Recorder
+    if (param_record_raw_data_) {
+      const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+      std::stringstream ss;
+      ss << param_raw_data_path_ << "/normal_raw_data_" << std::put_time(std::localtime(&now), "%Y%m%d_%H%M%S")
+         << ".bin";
+      normal_recorder_ = std::make_unique<referee_node::ByteStreamRecorder>(ss.str());
+      if (normal_recorder_->IsOpen()) {
+        RCLCPP_INFO(get_logger(), "Recording normal raw data to: %s", ss.str().c_str());
+      } else {
+        RCLCPP_ERROR(get_logger(), "Failed to open file for recording normal raw data: %s", ss.str().c_str());
+        normal_recorder_.reset();
+      }
+    }
+
     normal_serial_rx_thread_ = std::thread([this] {
       while (!stop_threads_) {
         const auto data = normal_serial_->read();
+        // 记录原始数据
+        if (normal_recorder_) {
+          normal_recorder_->Write(data);
+        }
         for (auto byte : data) {
           normal_referee_ << byte;
+        }
+        if (normal_referee_.loss_rate() > 10.f) {
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                               text::Yellow("High loss rate on normal link! %.2f%%").c_str(),
+                               normal_referee_.loss_rate());
         }
       }
     });
@@ -36,14 +60,35 @@ RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("ref
       SerialInit(param_vt_tty_device_, vt_serial_);
     }
 
+    // 启用原始数据记录，创建一个Recorder
+    if (param_record_raw_data_) {
+      auto now = std::chrono::system_clock::now();
+      auto now_time_t = std::chrono::system_clock::to_time_t(now);
+      std::stringstream ss;
+      ss << param_raw_data_path_ << "/vt_raw_data_" << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S")
+         << ".bin";
+      vt_recorder_ = std::make_unique<referee_node::ByteStreamRecorder>(ss.str());
+      if (vt_recorder_->IsOpen()) {
+        RCLCPP_INFO(get_logger(), "Recording VT raw data to: %s", ss.str().c_str());
+      } else {
+        RCLCPP_ERROR(get_logger(), "Failed to open file for recording VT raw data: %s", ss.str().c_str());
+        vt_recorder_.reset();
+      }
+    }
+
     vt_serial_rx_thread_ = std::thread([this] {
       while (!stop_threads_) {
         const auto data = vt_serial_->read();
+        // 记录原始数据
+        if (vt_recorder_) {
+          vt_recorder_->Write(data);
+        }
         for (auto byte : data) {
           vt_referee_ << byte;
         }
         if (vt_referee_.loss_rate() > 10.f) {
-          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "High VT data link packet loss rate: %.2f%%",
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                               text::Yellow("High loss rate on VT link! %.2f%%").c_str(),  //
                                vt_referee_.loss_rate());
         }
       }
@@ -91,6 +136,14 @@ RefereeNode::~RefereeNode() {
   }
   if (vt_serial_rx_thread_.joinable()) {
     vt_serial_rx_thread_.join();
+  }
+
+  // 记录器会在析构时自动关闭文件
+  if (normal_recorder_) {
+    RCLCPP_INFO(get_logger(), "Normal raw data file closed");
+  }
+  if (vt_recorder_) {
+    RCLCPP_INFO(get_logger(), "VT raw data file closed");
   }
 }
 
@@ -155,6 +208,12 @@ void RefereeNode::SpawnPublishers() {
   custom_robot_data_pub_ = create_publisher<rm_referee_msgs::msg::CustomRobotData>(  //
       "/rm_referee/custom_robot_data",                                               //
       rclcpp::SensorDataQoS());
+  robot_custom_data_pub_ = create_publisher<rm_referee_msgs::msg::RobotCustomData>(  //
+      "/rm_referee/robot_custom_data",                                               //
+      rclcpp::SensorDataQoS());
+  robot_custom_data_2_pub_ = create_publisher<rm_referee_msgs::msg::RobotCustomData2>(  //
+      "/rm_referee/robot_custom_data_2",                                                //
+      rclcpp::SensorDataQoS());
   map_command_pub_ = create_publisher<rm_referee_msgs::msg::MapCommand>(  //
       "/rm_referee/map_command",                                          //
       rclcpp::SensorDataQoS());
@@ -170,6 +229,8 @@ void RefereeNode::GetParameters() {
   param_new_vt_ = declare_parameter("new_vt", false);
   param_normal_tty_device_ = declare_parameter("normal_tty_device", "/dev/ttyUSB0");
   param_vt_tty_device_ = declare_parameter("vt_tty_device", "/dev/ttyUSB0");
+  param_record_raw_data_ = declare_parameter("record_raw_data", false);
+  param_raw_data_path_ = declare_parameter("raw_data_path", "/tmp/rm_referee_data");
 }
 
 /**
@@ -214,22 +275,14 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
     }
     case CmdEnum::kGameRobotHp: {
       game_robot_hp_msg_.header.stamp = get_clock()->now();
-      game_robot_hp_msg_.red_1_robot_hp = referee_data.game_robot_HP.red_1_robot_HP;
-      game_robot_hp_msg_.red_2_robot_hp = referee_data.game_robot_HP.red_2_robot_HP;
-      game_robot_hp_msg_.red_3_robot_hp = referee_data.game_robot_HP.red_3_robot_HP;
-      game_robot_hp_msg_.red_4_robot_hp = referee_data.game_robot_HP.red_4_robot_HP;
+      game_robot_hp_msg_.ally_1_robot_hp = referee_data.game_robot_HP.ally_1_robot_HP;
+      game_robot_hp_msg_.ally_2_robot_hp = referee_data.game_robot_HP.ally_2_robot_HP;
+      game_robot_hp_msg_.ally_3_robot_hp = referee_data.game_robot_HP.ally_3_robot_HP;
+      game_robot_hp_msg_.ally_4_robot_hp = referee_data.game_robot_HP.ally_4_robot_HP;
       game_robot_hp_msg_.reserved = referee_data.game_robot_HP.reserved;
-      game_robot_hp_msg_.red_7_robot_hp = referee_data.game_robot_HP.red_7_robot_HP;
-      game_robot_hp_msg_.red_outpost_hp = referee_data.game_robot_HP.red_outpost_HP;
-      game_robot_hp_msg_.red_base_hp = referee_data.game_robot_HP.red_base_HP;
-      game_robot_hp_msg_.blue_1_robot_hp = referee_data.game_robot_HP.blue_1_robot_HP;
-      game_robot_hp_msg_.blue_2_robot_hp = referee_data.game_robot_HP.blue_2_robot_HP;
-      game_robot_hp_msg_.blue_3_robot_hp = referee_data.game_robot_HP.blue_3_robot_HP;
-      game_robot_hp_msg_.blue_4_robot_hp = referee_data.game_robot_HP.blue_4_robot_HP;
-      game_robot_hp_msg_.reserved_2 = referee_data.game_robot_HP.reserved_2;
-      game_robot_hp_msg_.blue_7_robot_hp = referee_data.game_robot_HP.blue_7_robot_HP;
-      game_robot_hp_msg_.blue_outpost_hp = referee_data.game_robot_HP.blue_outpost_HP;
-      game_robot_hp_msg_.blue_base_hp = referee_data.game_robot_HP.blue_base_HP;
+      game_robot_hp_msg_.ally_7_robot_hp = referee_data.game_robot_HP.ally_7_robot_HP;
+      game_robot_hp_msg_.ally_outpost_hp = referee_data.game_robot_HP.ally_outpost_HP;
+      game_robot_hp_msg_.ally_base_hp = referee_data.game_robot_HP.ally_base_HP;
       game_robot_hp_pub_->publish(game_robot_hp_msg_);
       break;
     }
@@ -276,7 +329,6 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       power_heat_data_msg_.reserved_3 = referee_data.power_heat_data.reserved_3;
       power_heat_data_msg_.buffer_energy = referee_data.power_heat_data.buffer_energy;
       power_heat_data_msg_.shooter_17mm_1_barrel_heat = referee_data.power_heat_data.shooter_17mm_1_barrel_heat;
-      power_heat_data_msg_.shooter_17mm_2_barrel_heat = referee_data.power_heat_data.shooter_17mm_2_barrel_heat;
       power_heat_data_msg_.shooter_42mm_barrel_heat = referee_data.power_heat_data.shooter_42mm_barrel_heat;
       power_heat_data_pub_->publish(power_heat_data_msg_);
       break;
@@ -320,12 +372,15 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       projectile_allowance_msg_.projectile_allowance_17mm = referee_data.projectile_allowance.projectile_allowance_17mm;
       projectile_allowance_msg_.projectile_allowance_42mm = referee_data.projectile_allowance.projectile_allowance_42mm;
       projectile_allowance_msg_.remaining_gold_coin = referee_data.projectile_allowance.remaining_gold_coin;
+      projectile_allowance_msg_.projectile_allowance_fortress =
+          referee_data.projectile_allowance.projectile_allowance_fortress;
       projectile_allowance_pub_->publish(projectile_allowance_msg_);
       break;
     }
     case CmdEnum::kRfidStatus: {
       rfid_status_msg_.header.stamp = get_clock()->now();
       rfid_status_msg_.rfid_status = referee_data.rfid_status.rfid_status;
+      rfid_status_msg_.rfid_status_2 = referee_data.rfid_status.rfid_status_2;
       rfid_status_pub_->publish(rfid_status_msg_);
       break;
     }
@@ -362,6 +417,7 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
     case CmdEnum::kSentryInfo: {
       sentry_info_msg_.header.stamp = get_clock()->now();
       sentry_info_msg_.sentry_info = referee_data.sentry_info.sentry_info;
+      sentry_info_msg_.sentry_info_2 = referee_data.sentry_info.sentry_info_2;
       sentry_info_pub_->publish(sentry_info_msg_);
       break;
     }
@@ -375,6 +431,18 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       custom_robot_data_msg_.header.stamp = get_clock()->now();
       memcpy(&custom_robot_data_msg_.data, referee_data.custom_robot_data.data, 30);
       custom_robot_data_pub_->publish(custom_robot_data_msg_);
+      break;
+    }
+    case CmdEnum::kRobotCustomData: {
+      robot_custom_data_msg_.header.stamp = get_clock()->now();
+      memcpy(&robot_custom_data_msg_.data, referee_data.robot_custom_data.data, 30);
+      robot_custom_data_pub_->publish(robot_custom_data_msg_);
+      break;
+    }
+    case CmdEnum::kRobotCustomData2: {
+      robot_custom_data_2_msg_.header.stamp = get_clock()->now();
+      memcpy(&robot_custom_data_2_msg_.data, referee_data.robot_custom_data_2.data, 150);
+      robot_custom_data_2_pub_->publish(robot_custom_data_2_msg_);
       break;
     }
     case CmdEnum::kMapCommand: {

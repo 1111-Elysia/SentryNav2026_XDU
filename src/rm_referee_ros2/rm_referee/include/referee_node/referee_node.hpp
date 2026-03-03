@@ -4,9 +4,10 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <librm.hpp>
-#include <atomic>
 
 #include <rm_referee_msgs/msg/custom_robot_data.hpp>
+#include <rm_referee_msgs/msg/robot_custom_data.hpp>
+#include <rm_referee_msgs/msg/robot_custom_data2.hpp>
 #include <rm_referee_msgs/msg/remote_control.hpp>
 #include <rm_referee_msgs/msg/buff.hpp>
 #include <rm_referee_msgs/msg/dart_client_cmd.hpp>
@@ -30,8 +31,8 @@
 #include <rm_referee_msgs/msg/map_command.hpp>
 #include <rm_referee_msgs/srv/tx.hpp>
 
-#include "asio_serial.hpp"
-#include "librm/device/referee/protocol.hpp"
+#include "referee_node/asio_serial.hpp"
+#include "referee_node/byte_stream_recorder.hpp"
 
 class RefereeNode : public rclcpp::Node {
  public:
@@ -60,6 +61,8 @@ class RefereeNode : public rclcpp::Node {
   bool param_new_vt_{};
   bool param_enable_normal_{};
   bool param_enable_vt_{};
+  bool param_record_raw_data_{};
+  std::string param_raw_data_path_{};
   /** </Parameters> **/
 
  private:
@@ -68,9 +71,13 @@ class RefereeNode : public rclcpp::Node {
   std::thread vt_serial_rx_thread_;
   std::atomic<bool> stop_threads_{false};
   /** </Threads> **/
+  /** <Raw Data Recording> **/
+  std::unique_ptr<referee_node::ByteStreamRecorder> normal_recorder_;
+  std::unique_ptr<referee_node::ByteStreamRecorder> vt_recorder_;
+  /** </Raw Data Recording> **/
   /** <Decoders> **/
-  rm::device::Referee<rm::device::RefereeRevision::kV170> normal_referee_;
-  rm::device::Referee<rm::device::RefereeRevision::kV170> vt_referee_;
+  rm::device::Referee<rm::device::RefereeRevision::kNewV110> normal_referee_;
+  rm::device::Referee<rm::device::RefereeRevision::kNewV110> vt_referee_;
   /** </Decoders> **/
 
  private:
@@ -95,6 +102,8 @@ class RefereeNode : public rclcpp::Node {
   rclcpp::Publisher<rm_referee_msgs::msg::SentryInfo>::SharedPtr sentry_info_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::RadarInfo>::SharedPtr radar_info_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::CustomRobotData>::SharedPtr custom_robot_data_pub_{nullptr};
+  rclcpp::Publisher<rm_referee_msgs::msg::RobotCustomData>::SharedPtr robot_custom_data_pub_{nullptr};
+  rclcpp::Publisher<rm_referee_msgs::msg::RobotCustomData2>::SharedPtr robot_custom_data_2_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::MapCommand>::SharedPtr map_command_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::RemoteControl>::SharedPtr remote_control_pub_{nullptr};
   /** </Publishers> **/
@@ -120,6 +129,8 @@ class RefereeNode : public rclcpp::Node {
   rm_referee_msgs::msg::SentryInfo sentry_info_msg_{};
   rm_referee_msgs::msg::RadarInfo radar_info_msg_{};
   rm_referee_msgs::msg::CustomRobotData custom_robot_data_msg_{};
+  rm_referee_msgs::msg::RobotCustomData robot_custom_data_msg_{};
+  rm_referee_msgs::msg::RobotCustomData2 robot_custom_data_2_msg_{};
   rm_referee_msgs::msg::MapCommand map_command_msg_{};
   rm_referee_msgs::msg::RemoteControl remote_control_msg_{};
   /** </msgs> **/

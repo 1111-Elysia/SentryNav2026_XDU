@@ -208,7 +208,25 @@ struct RefereeProtocol<RefereeRevision::kV164> {
     u8 target_robot_id;
     u16 cmd_source;
   } map_command;
-  struct {
+  struct RemoteControl {
+    enum : u16 {
+      kW = 1,
+      kS = 2,
+      kA = 4,
+      kD = 8,
+      kShift = 16,
+      kCtrl = 32,
+      kQ = 64,
+      kE = 128,
+      kR = 256,
+      kF = 512,
+      kG = 1024,
+      kZ = 2048,
+      kX = 4096,
+      kC = 8192,
+      kV = 16384,
+      kB = 32768,
+    };
     i16 mouse_x;
     i16 mouse_y;
     i16 mouse_z;

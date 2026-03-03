@@ -77,7 +77,15 @@ sequential_nodes:
 
   # - label: behavior-tree-nodes
   #   type: execute
-  #   cmd: ["ros2", "launch", "pub_point_bt", "pub_point_bt.launch.py"]
+  #   cmd: ["ros2", "launch", "sentry_eval_bt", "sentry_eval_bt.launch.py"]
   #   wait_after: 0
 
+  # - label: Sentry-BT
+  #   type: execute
+  #   cmd: [
+  #     "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py",
+  #     "use_old_protocol:=true",
+  #     "team_color:=red"
+  #   ]
+  #   wait_after: 2
 

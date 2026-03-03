@@ -3,23 +3,17 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
-# ==============================================================================
 # 1. 导入消息类型
-# 必须确保你的环境里同时编译/安装了 rm2_referee_msgs 和 rm_referee_msgs
-# ==============================================================================
 try:
-    # 旧协议 (模拟器发出的)
+
     import rm2_referee_msgs.msg as old_msgs
-    # 新协议 (BT节点需要的)
     import rm_referee_msgs.msg as new_msgs
 except ImportError as e:
     print(f"Error importing messages: {e}")
     print("请确保 rm2_referee_msgs 和 rm_referee_msgs 都在当前工作空间或环境中")
     exit(1)
 
-# ==============================================================================
-# 2. 通用字段复制函数 (核心魔法)
-# ==============================================================================
+# 2. 通用字段复制函数 
 def transfer_fields(src_msg, dst_msg, logger=None):
     """
     自动将 src_msg 的字段值复制到 dst_msg 中。
@@ -51,14 +45,16 @@ def transfer_fields(src_msg, dst_msg, logger=None):
             
     return dst_msg
 
-# ==============================================================================
 # 3. 桥接节点类
-# ==============================================================================
 class RefereeCompatibilityBridge(Node):
     def __init__(self):
         super().__init__('referee_compatibility_bridge')
-        
-        # 定义 QoS (设置为 Best Effort 或 Reliable 视情况而定，这里用 Reliable 比较稳)
+        # 阵营参数（red / blue）
+        self.declare_parameter('team_color', 'red')
+        self.team_color = self.get_parameter('team_color').value
+        self.get_logger().info(f"当前阵营颜色: {self.team_color}")
+
+        # 定义 QoS 
         self.qos = QoSProfile(
             depth=10,
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -68,11 +64,9 @@ class RefereeCompatibilityBridge(Node):
         
         self.get_logger().info("正在启动旧协议(rm2) -> 新协议(rm) 桥接器...")
 
-        # ================================================================
         # 定义需要转换的话题列表
         # 格式: (旧消息类型, 新消息类型, 话题名后缀)
         # 话题名会自动拼接到 /rm2_referee/ 和 /rm_referee/ 后面
-        # ================================================================
         self.bridges = [
             (old_msgs.RobotPos,            new_msgs.RobotPos,            'robot_pos'),
             (old_msgs.SentryInfo,          new_msgs.SentryInfo,          'sentry_info'),
@@ -82,8 +76,7 @@ class RefereeCompatibilityBridge(Node):
             (old_msgs.ProjectileAllowance, new_msgs.ProjectileAllowance, 'projectile_allowance'),
             (old_msgs.HurtData,            new_msgs.HurtData,            'hurt_data'),
             (old_msgs.EventData,           new_msgs.EventData,           'event_data'),
-            # RFID Status 你注释掉了，如果需要就取消下面这行的注释
-            # (old_msgs.RfidStatus,        new_msgs.RfidStatus,          'rfid_status'),
+            (old_msgs.RfidStatus,        new_msgs.RfidStatus,          'rfid_status'),
         ]
 
         # 存储 subscribers 和 publishers 以防被垃圾回收
@@ -106,27 +99,42 @@ class RefereeCompatibilityBridge(Node):
         # 2. 创建回调函数 (利用闭包捕获 pub 和 new_type)
         def callback(msg_old, p=pub, t=new_type, name=topic_suffix):
             msg_new = t()
-            
-            # 自动复制数据
-            transfer_fields(msg_old, msg_new, self.get_logger())
-            
-            # 处理 Header (如果有)
+
+            # 特殊处理 GameRobotHP
+            if name == "game_robot_hp":
+                self.map_game_robot_hp(msg_old, msg_new)
+            else:
+                transfer_fields(msg_old, msg_new, self.get_logger())
+
+            # header
             if hasattr(msg_new, 'header') and hasattr(msg_old, 'header'):
                 msg_new.header = msg_old.header
-                # 也可以选择重写时间戳为当前时间：
-                # msg_new.header.stamp = self.get_clock().now().to_msg()
-                # msg_new.header.frame_id = msg_old.header.frame_id
 
             p.publish(msg_new)
-            # Debug: 偶尔打印一下证明活着
-            # self.get_logger().debug(f"Bridged {name}")
-
         # 3. 创建订阅者 (监听模拟器)
         sub = self.create_subscription(old_type, old_topic, callback, self.qos)
         self.subs.append(sub)
         
         self.get_logger().info(f"已建立桥接: {old_topic} -> {new_topic}")
 
+    def map_game_robot_hp(self, old_msg, new_msg):
+
+        if self.team_color == "red":
+            prefix = "red"
+        else:
+            prefix = "blue"
+
+        new_msg.ally_1_robot_hp = getattr(old_msg, f"{prefix}_1_robot_hp")
+        new_msg.ally_2_robot_hp = getattr(old_msg, f"{prefix}_2_robot_hp")
+        new_msg.ally_3_robot_hp = getattr(old_msg, f"{prefix}_3_robot_hp")
+        new_msg.ally_4_robot_hp = getattr(old_msg, f"{prefix}_4_robot_hp")
+        new_msg.ally_7_robot_hp = getattr(old_msg, f"{prefix}_7_robot_hp")
+
+        new_msg.ally_outpost_hp = getattr(old_msg, f"{prefix}_outpost_hp")
+        new_msg.ally_base_hp = getattr(old_msg, f"{prefix}_base_hp")
+
+        new_msg.reserved = 0
+    
 
 def main(args=None):
     rclpy.init(args=args)

@@ -47,7 +47,7 @@ static BxCan *bxcan_instances[2] = {nullptr, nullptr};
  * @param  hcan  HAL库的CAN_HandleTypeDef
  * @return 数组索引（0或1），如果不是有效的CAN实例则返回-1
  */
-__attribute__((always_inline)) static int GetCanIndex(CAN_HandleTypeDef *hcan) {
+__attribute__((always_inline)) static inline int GetCanIndex(CAN_HandleTypeDef *hcan) {
   const auto instance = reinterpret_cast<uintptr_t>(hcan->Instance);
   if (instance == CAN1_BASE) return 0;
   if (instance == CAN2_BASE) return 1;

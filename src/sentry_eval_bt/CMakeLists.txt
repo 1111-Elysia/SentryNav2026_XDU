@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(pub_point_bt)
+project(sentry_eval_bt)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -29,12 +29,12 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(pub_point_bt_node
+add_executable(sentry_eval_bt_node
   src/bt_runner.cpp
   src/bt_nodes.cpp
 )
 
-ament_target_dependencies(pub_point_bt_node
+ament_target_dependencies(sentry_eval_bt_node
   rclcpp
   rclcpp_action
   nav2_msgs
@@ -47,7 +47,7 @@ ament_target_dependencies(pub_point_bt_node
 )
 
 install(TARGETS
-  pub_point_bt_node
+  sentry_eval_bt_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

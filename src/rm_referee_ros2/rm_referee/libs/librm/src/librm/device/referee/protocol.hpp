@@ -30,8 +30,6 @@
 
 #include "librm/core/typedefs.hpp"
 
-#include <etl/unordered_map.h>
-
 namespace rm::device {
 
 constexpr u8 kRefProtocolHeaderSof = 0xa5;
@@ -45,8 +43,9 @@ constexpr int kRefProtocolAllMetadataLen = kRefProtocolHeaderLen + kRefProtocolC
  * @brief 裁判系统协议版本
  */
 enum class RefereeRevision {
-  kV164,  ///< V1.6.4, 2024-7-15
-  kV170,  ///< V1.7.0, 2024-12-25
+  kV164,     ///< V1.6.4, 2024-7-15
+  kV170,     ///< V1.7.0, 2024-12-25
+  kNewV110,  ///< 新通信协议V1.1.0, 2025-12-17
 };
 
 /**

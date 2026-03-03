@@ -20,7 +20,7 @@
 
 // 裁判系统交互接口
 #include "rm_referee_msgs/msg/robot_pos.hpp"
-// #include "rm_referee_msgs/msg/rfid_status.hpp"
+#include "rm_referee_msgs/msg/rfid_status.hpp"
 #include "rm_referee_msgs/msg/sentry_info.hpp"
 #include "rm_referee_msgs/msg/game_status.hpp"
 #include "rm_referee_msgs/msg/robot_status.hpp"
@@ -172,13 +172,13 @@ namespace sentry_nav_bt_test
                 "/rm_referee/game_robot_hp",
                 [this](const rm_referee_msgs::msg::GameRobotHP::SharedPtr msg, BT::Blackboard::Ptr bb)
                 {
-                    // bb->set("ally_1_robot_hp", msg->ally_1_robot_hp);
-                    // bb->set("ally_2_robot_hp", msg->ally_2_robot_hp);
-                    // bb->set("ally_3_robot_hp", msg->ally_3_robot_hp);
-                    // bb->set("ally_4_robot_hp", msg->ally_4_robot_hp);
-                    // bb->set("ally_7_robot_hp", msg->ally_7_robot_hp);
-                    // bb->set("ally_outpost_hp", msg->ally_outpost_hp); // 前哨站
-                    // bb->set("ally_base_hp", msg->ally_base_hp);       // 基地
+                    bb->set("ally_1_robot_hp", msg->ally_1_robot_hp);
+                    bb->set("ally_2_robot_hp", msg->ally_2_robot_hp);
+                    bb->set("ally_3_robot_hp", msg->ally_3_robot_hp);
+                    bb->set("ally_4_robot_hp", msg->ally_4_robot_hp);
+                    bb->set("ally_7_robot_hp", msg->ally_7_robot_hp);
+                    bb->set("ally_outpost_hp", msg->ally_outpost_hp); // 前哨站
+                    bb->set("ally_base_hp", msg->ally_base_hp);       // 基地
                     // bb->set("enemy_1_robot_hp", msg->enemy_1_robot_hp);   可以改为敌方机器人，需要从雷达获取
                     // bb->set("enemy_2_robot_hp", msg->enemy_2_robot_hp);
                     // bb->set("enemy_3_robot_hp", msg->enemy_3_robot_hp);

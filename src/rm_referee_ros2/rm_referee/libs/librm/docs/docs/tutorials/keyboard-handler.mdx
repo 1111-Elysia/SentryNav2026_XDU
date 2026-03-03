@@ -1,0 +1,96 @@
+# 键盘输入处理
+
+本例程演示如何使用 `KeyboardHandler` 类处理键盘输入，支持单键和组合键（modifier键）的回调注册。
+
+`KeyboardHandler` 模仿桌面操作系统的键盘行为：
+- 组合键触发时单键回调不会触发
+- 必须先按下 modifier 键，再按普通键才能形成有效组合键（Ctrl+A 有效，A+Ctrl 无效）
+- 支持多个 modifier 键的组合（如 Ctrl+Shift+A）
+
+## 代码示例
+
+### 单键回调
+
+```cpp
+#include <librm.hpp>
+#include <iostream>
+
+// 用户自定义的 keycode 掩码
+namespace KeyMask {
+constexpr rm::u32 kW = 1U << 0;
+constexpr rm::u32 kS = 1U << 1;
+constexpr rm::u32 kA = 1U << 2;
+constexpr rm::u32 kD = 1U << 3;
+constexpr rm::u32 kCtrl = 1U << 16;
+constexpr rm::u32 kShift = 1U << 17;
+constexpr rm::u32 kAllModifiers = kCtrl | kShift;
+}  // namespace KeyMask
+
+int main() {
+  // 创建 handler，传入 modifier 掩码
+  rm::modules::KeyboardHandler<> handler(KeyMask::kAllModifiers);
+
+  // 注册单键回调
+  handler.OnKeyDown(KeyMask::kW, [](const rm::modules::KeyEvent& e) {
+    std::cout << "W pressed\n";
+  });
+
+  handler.OnKeyUp(KeyMask::kW, [](const rm::modules::KeyEvent& e) {
+    std::cout << "W released\n";
+  });
+
+  // 轮询更新
+  for (;;) {
+    rm::u32 keycode = GetCurrentKeycode();  // 从硬件获取当前按键状态
+    handler.Update(keycode);
+  }
+}
+```
+
+### 组合键回调
+
+```cpp
+#include <librm.hpp>
+#include <iostream>
+
+namespace KeyMask {
+constexpr rm::u32 kA = 1U << 2;
+constexpr rm::u32 kS = 1U << 1;
+constexpr rm::u32 kCtrl = 1U << 16;
+constexpr rm::u32 kShift = 1U << 17;
+constexpr rm::u32 kAllModifiers = kCtrl | kShift;
+}  // namespace KeyMask
+
+int main() {
+  rm::modules::KeyboardHandler<> handler(KeyMask::kAllModifiers);
+
+  // 注册单键 A 的回调
+  handler.OnKeyDown(KeyMask::kA, [](const rm::modules::KeyEvent& e) {
+    std::cout << "A pressed\n";
+  });
+
+  // 注册 Ctrl+A 组合键的回调
+  handler.OnKeyDown(KeyMask::kA, KeyMask::kCtrl, [](const rm::modules::KeyEvent& e) {
+    std::cout << "Ctrl+A pressed\n";
+  });
+
+  // 注册 Ctrl+Shift+S 组合键的回调
+  handler.OnKeyDown(KeyMask::kS, KeyMask::kCtrl | KeyMask::kShift,
+                    [](const rm::modules::KeyEvent& e) {
+    std::cout << "Ctrl+Shift+S pressed\n";
+  });
+
+  for (;;) {
+    rm::u32 keycode = GetCurrentKeycode();
+    handler.Update(keycode);
+  }
+}
+```
+
+:::tip
+当按下 Ctrl+A 时，只会触发 `Ctrl+A` 的回调，单独的 `A` 回调不会被触发。这与桌面操作系统的行为一致。
+:::
+
+:::note
+`KeyboardHandler` 是一个模板类，模板参数分别为最大绑定数量和最大同时按下的普通键数量，默认值为 32 和 8。
+:::

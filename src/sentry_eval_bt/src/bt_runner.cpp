@@ -1,4 +1,4 @@
-// pub_point_bt/src/bt_runner.cpp
+// sentry_eval_bt/src/bt_runner.cpp
 
 #include <memory>
 #include <chrono>
@@ -26,7 +26,7 @@ class PubPointBTNode : public rclcpp::Node
 {
 public:
   PubPointBTNode()
-      : Node("pub_point_bt_node")
+      : Node("sentry_eval_bt_node")
   {
     auto &ctx = BtRosContext::instance();
 
@@ -58,10 +58,10 @@ public:
     factory.registerNodeType<SendNav2Goal>("SendNav2Goal");
     factory.registerNodeType<CheckDistance>("CheckDistance");
     
-    // XML 路径（默认安装在 share/pub_point_bt/config/waypoints_bt.xml）
+    // XML 路径（默认安装在 share/sentry_eval_bt/config/waypoints_bt.xml）
     std::string xml_path = this->declare_parameter<std::string>(
         "bt_xml",
-        ament_index_cpp::get_package_share_directory("pub_point_bt") +
+        ament_index_cpp::get_package_share_directory("sentry_eval_bt") +
             std::string("/config/waypoints_bt.xml"));
 
     RCLCPP_INFO(get_logger(), "Loading BT XML: %s", xml_path.c_str());

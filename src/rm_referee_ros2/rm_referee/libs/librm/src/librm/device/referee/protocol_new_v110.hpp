@@ -21,12 +21,12 @@
 */
 
 /**
- * @file  librm/device/referee/protocol_v170.hpp
- * @brief 裁判系统串口协议V1.7.0(2024-12-25)
+ * @file  librm/device/referee/protocol_new_v110.hpp
+ * @brief 裁判系统通信协议V1.1.0（2025-12-17）
  */
 
-#ifndef LIBRM_DEVICE_REFEREE_PROTOCOL_V170_HPP
-#define LIBRM_DEVICE_REFEREE_PROTOCOL_V170_HPP
+#ifndef LIBRM_DEVICE_REFEREE_PROTOCOL_NEW_V110_HPP
+#define LIBRM_DEVICE_REFEREE_PROTOCOL_NEW_V110_HPP
 
 #include "protocol.hpp"
 
@@ -37,7 +37,7 @@
 namespace rm::device {
 
 template <>
-struct RefereeCmdId<RefereeRevision::kV170> {
+struct RefereeCmdId<RefereeRevision::kNewV110> {
   constexpr static u16 kGameStatus = 0x1;
   constexpr static u16 kGameResult = 0x2;
   constexpr static u16 kGameRobotHp = 0x3;
@@ -57,7 +57,9 @@ struct RefereeCmdId<RefereeRevision::kV170> {
   constexpr static u16 kRadarMarkData = 0x20c;
   constexpr static u16 kSentryInfo = 0x20d;
   constexpr static u16 kRadarInfo = 0x20e;
-  constexpr static u16 kCustomRobotData = 0x302;  // 图传链路
+  constexpr static u16 kCustomRobotData = 0x302;   // 图传链路
+  constexpr static u16 kRobotCustomData = 0x309;   // 图传链路
+  constexpr static u16 kRobotCustomData2 = 0x310;  // 图传链路
   constexpr static u16 kMapCommand = 0x303;
   constexpr static u16 kRemoteControl = 0x304;  // 图传链路
 };
@@ -65,7 +67,7 @@ struct RefereeCmdId<RefereeRevision::kV170> {
 #pragma pack(push, 1)
 
 template <>
-struct RefereeProtocol<RefereeRevision::kV170> {
+struct RefereeProtocol<RefereeRevision::kNewV110> {
   struct {
     u8 game_type : 4;
     u8 game_progress : 4;
@@ -76,22 +78,14 @@ struct RefereeProtocol<RefereeRevision::kV170> {
     u8 winner;
   } game_result;
   struct {
-    u16 red_1_robot_HP;
-    u16 red_2_robot_HP;
-    u16 red_3_robot_HP;
-    u16 red_4_robot_HP;
+    u16 ally_1_robot_HP;
+    u16 ally_2_robot_HP;
+    u16 ally_3_robot_HP;
+    u16 ally_4_robot_HP;
     u16 reserved;
-    u16 red_7_robot_HP;
-    u16 red_outpost_HP;
-    u16 red_base_HP;
-    u16 blue_1_robot_HP;
-    u16 blue_2_robot_HP;
-    u16 blue_3_robot_HP;
-    u16 blue_4_robot_HP;
-    u16 reserved_2;
-    u16 blue_7_robot_HP;
-    u16 blue_outpost_HP;
-    u16 blue_base_HP;
+    u16 ally_7_robot_HP;
+    u16 ally_outpost_HP;
+    u16 ally_base_HP;
   } game_robot_HP;
   struct {
     u32 event_data;
@@ -123,7 +117,6 @@ struct RefereeProtocol<RefereeRevision::kV170> {
     f32 reserved_3;
     u16 buffer_energy;
     u16 shooter_17mm_1_barrel_heat;
-    u16 shooter_17mm_2_barrel_heat;
     u16 shooter_42mm_barrel_heat;
   } power_heat_data;
   struct {
@@ -153,9 +146,11 @@ struct RefereeProtocol<RefereeRevision::kV170> {
     u16 projectile_allowance_17mm;
     u16 projectile_allowance_42mm;
     u16 remaining_gold_coin;
+    u16 projectile_allowance_fortress;
   } projectile_allowance;
   struct {
     u32 rfid_status;
+    u8 rfid_status_2;
   } rfid_status;
   struct {
     u8 dart_launch_opening_status;
@@ -176,7 +171,7 @@ struct RefereeProtocol<RefereeRevision::kV170> {
     f32 reserved_2;
   } ground_robot_position;
   struct {
-    u8 mark_progress;
+    u16 mark_progress;
   } radar_mark_data;
   struct {
     u32 sentry_info;
@@ -188,6 +183,12 @@ struct RefereeProtocol<RefereeRevision::kV170> {
   struct {
     u8 data[30];
   } custom_robot_data;
+  struct {
+    u8 data[30];
+  } robot_custom_data;
+  struct {
+    u8 data[150];
+  } robot_custom_data_2;
   struct {
     f32 target_position_x;
     f32 target_position_y;
@@ -227,35 +228,37 @@ struct RefereeProtocol<RefereeRevision::kV170> {
 #pragma pack(pop)
 
 template <>
-struct RefereeProtocolMemoryMap<RefereeRevision::kV170> {
+struct RefereeProtocolMemoryMap<RefereeRevision::kNewV110> {
   // clang-format off
   static MAPBOX_ETERNAL_CONSTEXPR const auto map = mapbox::eternal::map<u16, usize>({
-  {RefereeCmdId<RefereeRevision::kV170>::kGameStatus, offsetof(RefereeProtocol<RefereeRevision::kV170>, game_status)},
-      {RefereeCmdId<RefereeRevision::kV170>::kGameResult, offsetof(RefereeProtocol<RefereeRevision::kV170>, game_result)},
-      {RefereeCmdId<RefereeRevision::kV170>::kGameRobotHp, offsetof(RefereeProtocol<RefereeRevision::kV170>, game_robot_HP)},
-      {RefereeCmdId<RefereeRevision::kV170>::kEventData, offsetof(RefereeProtocol<RefereeRevision::kV170>, event_data)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRefereeWarning, offsetof(RefereeProtocol<RefereeRevision::kV170>, referee_warning)},
-      {RefereeCmdId<RefereeRevision::kV170>::kDartInformation, offsetof(RefereeProtocol<RefereeRevision::kV170>, dart_info)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRobotStatus, offsetof(RefereeProtocol<RefereeRevision::kV170>, robot_status)},
-      {RefereeCmdId<RefereeRevision::kV170>::kPowerHeatData, offsetof(RefereeProtocol<RefereeRevision::kV170>, power_heat_data)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRobotPos, offsetof(RefereeProtocol<RefereeRevision::kV170>, robot_pos)},
-      {RefereeCmdId<RefereeRevision::kV170>::kBuff, offsetof(RefereeProtocol<RefereeRevision::kV170>, buff)},
-      {RefereeCmdId<RefereeRevision::kV170>::kHurtData, offsetof(RefereeProtocol<RefereeRevision::kV170>, hurt_data)},
-      {RefereeCmdId<RefereeRevision::kV170>::kShootData, offsetof(RefereeProtocol<RefereeRevision::kV170>, shoot_data)},
-      {RefereeCmdId<RefereeRevision::kV170>::kProjectileAllowance, offsetof(RefereeProtocol<RefereeRevision::kV170>, projectile_allowance)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRfidStatus, offsetof(RefereeProtocol<RefereeRevision::kV170>, rfid_status)},
-      {RefereeCmdId<RefereeRevision::kV170>::kDartClientCmd, offsetof(RefereeProtocol<RefereeRevision::kV170>, dart_client_cmd)},
-      {RefereeCmdId<RefereeRevision::kV170>::kGroundRobotPosition, offsetof(RefereeProtocol<RefereeRevision::kV170>, ground_robot_position)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRadarMarkData, offsetof(RefereeProtocol<RefereeRevision::kV170>, radar_mark_data)},
-      {RefereeCmdId<RefereeRevision::kV170>::kSentryInfo, offsetof(RefereeProtocol<RefereeRevision::kV170>, sentry_info)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRadarInfo, offsetof(RefereeProtocol<RefereeRevision::kV170>, radar_info)},
-      {RefereeCmdId<RefereeRevision::kV170>::kCustomRobotData, offsetof(RefereeProtocol<RefereeRevision::kV170>, custom_robot_data)},
-      {RefereeCmdId<RefereeRevision::kV170>::kMapCommand, offsetof(RefereeProtocol<RefereeRevision::kV170>, map_command)},
-      {RefereeCmdId<RefereeRevision::kV170>::kRemoteControl, offsetof(RefereeProtocol<RefereeRevision::kV170>, remote_control)}
+  {RefereeCmdId<RefereeRevision::kNewV110>::kGameStatus, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, game_status)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kGameResult, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, game_result)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kGameRobotHp, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, game_robot_HP)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kEventData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, event_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRefereeWarning, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, referee_warning)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kDartInformation, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, dart_info)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRobotStatus, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, robot_status)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kPowerHeatData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, power_heat_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRobotPos, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, robot_pos)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kBuff, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, buff)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kHurtData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, hurt_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kShootData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, shoot_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kProjectileAllowance, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, projectile_allowance)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRfidStatus, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, rfid_status)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kDartClientCmd, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, dart_client_cmd)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kGroundRobotPosition, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, ground_robot_position)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRadarMarkData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, radar_mark_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kSentryInfo, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, sentry_info)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRadarInfo, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, radar_info)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kCustomRobotData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, custom_robot_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRobotCustomData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, robot_custom_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRobotCustomData2, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, robot_custom_data_2)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kMapCommand, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, map_command)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRemoteControl, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, remote_control)}
   });
   // clang-format on
 };
 
 }  // namespace rm::device
 
-#endif  // LIBRM_DEVICE_REFEREE_PROTOCOL_V170_HPP
+#endif  // LIBRM_DEVICE_REFEREE_PROTOCOL_NEW_V110_HPP

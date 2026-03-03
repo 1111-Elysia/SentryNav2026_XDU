@@ -34,6 +34,7 @@
 #include <cmath>
 
 #include "librm/device/can_device.hpp"
+#include "librm/modules/angle.hpp"
 #include "librm/modules/utils.hpp"
 
 namespace rm::device {
@@ -152,6 +153,24 @@ class LkMotor : public CanDevice {
     can_->Write(0x140 + id_, tx_buffer_, 8);
   }
 
+  /**
+   * @brief  速度控制函数
+   * @param  speed_rad_ps 期望速度，单位：rad/s
+   */
+  void SetSpeed(f32 speed_rad_ps) {
+    if (reversed_) {
+      speed_rad_ps = -speed_rad_ps;
+    }
+    const float dps_100x = speed_rad_ps / 180.f * M_PI * 100.f;  // rad/s -> dps, 0.01dps/LSB
+    i16 power_cmd = modules::Clamp(
+        dps_100x, -3600.f, 3600.f);  // 上位机里还有一个Max Speed值限制，这个值如果大于上位机里设置的值，会被电机限制掉
+    std::memset(&tx_buffer_[1], 0, sizeof(tx_buffer_) - 1);
+    tx_buffer_[0] = Instruction::kSpeedControl;
+    tx_buffer_[4] = *(u8 *)(&power_cmd);
+    tx_buffer_[5] = *((u8 *)(&power_cmd) + 1);
+    can_->Write(0x140 + id_, tx_buffer_, 8);
+  }
+
   // TODO: 还有一大堆控制模式懒得写了，有需要再说
 
   /**
@@ -189,7 +208,8 @@ class LkMotor : public CanDevice {
   void RxCallback(const hal::CanFrame *msg) override {
     ReportStatus(kOk);
     switch (msg->data[0]) {
-      case Instruction::kOpenLoopControl: {
+      case Instruction::kOpenLoopControl:
+      case Instruction::kSpeedControl: {
         feedback_.temperature = *(i8 *)(&msg->data[1]);
         feedback_.power = (msg->data[2] | (msg->data[3] << 8));
         feedback_.speed_rad_ps = (msg->data[4] | (msg->data[5] << 8));

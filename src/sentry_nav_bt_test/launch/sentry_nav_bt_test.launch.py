@@ -5,13 +5,26 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.conditions import IfCondition
 
 def generate_launch_description():
-    # 1. 获取包的安装路径 (install/share/sentry_nav_bt_test)
+    # 声明启动参数
+    use_old_protocol_arg = DeclareLaunchArgument(
+        'use_old_protocol',
+        default_value='false',
+        description='是否使用旧协议 (rm2)'
+    )
+
+    team_color_arg = DeclareLaunchArgument(
+        'team_color',
+        default_value='red',
+        description='阵营颜色: red / blue'
+    )
+
+    # 获取包的安装路径 
     pkg_dir = get_package_share_directory('sentry_nav_bt_test')
     
-    # 2. 定义文件路径
-    # 行为树 XML
+    # 行为树XML文件路径
     bt_xml_path = os.path.join(pkg_dir, 'config', 'demo.xml')
     
     # 红方路径点 JSON
@@ -19,12 +32,12 @@ def generate_launch_description():
     # 蓝方路径点 JSON
     waypoints_blue_path = os.path.join(pkg_dir, 'config', 'waypoints_blue.json')
 
-    # 3. 检查文件是否存在 (可选，为了报错更清晰)
+    # 检查配置文件是否存在 
     for path_check in [bt_xml_path, waypoints_red_path, waypoints_blue_path]:
         if not os.path.isfile(path_check):
             raise FileNotFoundError(f"配置文件未找到: {path_check}")
 
-    # 4. 声明启动参数 (允许命令行覆盖)
+    # 声明启动参数
     bt_xml_arg = DeclareLaunchArgument(
         'bt_xml_filename',
         default_value=bt_xml_path,
@@ -47,16 +60,19 @@ def generate_launch_description():
         package='sentry_nav_bt_test',
         executable='compatibility_bridge.py',
         name='referee_bridge',
-        output='screen'
+        output='screen',
+        parameters=[{
+            'team_color': LaunchConfiguration('team_color')
+        }],
+        condition=IfCondition(LaunchConfiguration('use_old_protocol'))
     )
 
-    # 5. 创建节点
+    # 创建节点
     sentry_nav_bt_test = Node(
         package='sentry_nav_bt_test',
-        executable='navigate_bt_node', # 你的可执行文件名
+        executable='navigate_bt_node',
         name='sentry_nav_bt_test',
         output='screen',
-        # 将路径作为参数传递给 C++ 节点
         parameters=[{
             'bt_xml_filename': LaunchConfiguration('bt_xml_filename'),
             'waypoints_red_file': LaunchConfiguration('waypoints_red_file'),
@@ -68,6 +84,8 @@ def generate_launch_description():
         bt_xml_arg,
         red_wp_arg,
         blue_wp_arg,
+        use_old_protocol_arg,
+        team_color_arg,
         sentry_nav_bt_test,
         bridge_node
     ])
