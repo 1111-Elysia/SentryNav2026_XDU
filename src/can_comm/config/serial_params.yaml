@@ -1,0 +1,7 @@
+can_comm_node:
+  ros__parameters:
+    port: "can0"
+    send_frequency: 500      # 发送频率 Hz
+    id_xyz: 0x133            # vx,vy,vyaw,vw 帧 CAN ID
+    id_scan: 0x134           # scan mode 帧 CAN ID
+
