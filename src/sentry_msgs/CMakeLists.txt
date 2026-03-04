@@ -8,6 +8,7 @@ find_package(std_msgs REQUIRED)
 set(msg_files
   msg/Vw.msg
   msg/ScanMode.msg
+  msg/ArmorPresence.msg
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

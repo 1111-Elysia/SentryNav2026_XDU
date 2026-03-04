@@ -2,6 +2,7 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <sentry_msgs/msg/vw.hpp>
 #include <sentry_msgs/msg/scan_mode.hpp>
+#include <sentry_msgs/msg/armor_presence.hpp>
 
 #include <librm.hpp>
 
@@ -22,27 +23,28 @@ public:
     : Node("can_comm_node")
     {
         // 参数声明
-        this->declare_parameter<std::string>("port", "can0");
+        this->declare_parameter<std::string>("port", "can2");
         this->declare_parameter<int>("send_frequency", 500);
         // 发送用的两个 ID 参数
-        this->declare_parameter<int>("id_xyz", 0x133);
-        this->declare_parameter<int>("id_scan", 0x134);
-
+        this->declare_parameter<int>("id_xyz", 0x180);
+        this->declare_parameter<int>("id_scan", 0x190);
         this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
         this->declare_parameter<std::string>("vw_topic", "/vw");
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
+        this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
 
         // 读取参数
         std::string port      = this->get_parameter("port").as_string();
-        int        send_freq  = this->get_parameter("send_frequency").as_int();
-        int        id_xyz_int = this->get_parameter("id_xyz").as_int();
-        int        id_scan_int = this->get_parameter("id_scan").as_int();
+        int send_freq  = this->get_parameter("send_frequency").as_int();
+        int id_xyz_int = this->get_parameter("id_xyz").as_int();
+        int id_scan_int = this->get_parameter("id_scan").as_int();
         id_xyz_  = static_cast<uint32_t>(id_xyz_int);
         id_scan_ = static_cast<uint32_t>(id_scan_int);
 
         std::string cmd_vel_topic       = this->get_parameter("cmd_vel_topic").as_string();
         std::string vw_topic            = this->get_parameter("vw_topic").as_string();
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
+        std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
 
         // 打开 CAN 设备
         try {
@@ -72,6 +74,15 @@ public:
             [this](const sentry_msgs::msg::ScanMode::SharedPtr m) {
                 std::lock_guard<std::mutex> lk(mutex_);
                 scan_mod_type_ = m->scan_mod_type;
+            });
+
+        armor_presence_sub_ = this->create_subscription<sentry_msgs::msg::ArmorPresence>(
+            all_detect_topic, 10,
+            [this](const sentry_msgs::msg::ArmorPresence::SharedPtr m) {
+                std::lock_guard<std::mutex> lk(mutex_);
+                armor_left_   = m->left;
+                armor_behind_ = m->behind;
+                armor_right_  = m->right;
             });
 
         // 定时发送 CAN 帧
@@ -105,13 +116,18 @@ private:
 
         float vx, vy, vyaw, vw;
         bool scan;
+        uint8_t left, behind, right;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             vx    = vx_;
+            vx    = 1.0f; // TODO: 临时固定 vx=1.0，后续可删除
             vy    = vy_;
             vyaw  = vyaw_;
             vw    = vw_;
             scan  = scan_mod_type_;
+            left   = armor_left_;
+            behind = armor_behind_;
+            right  = armor_right_;
         }
 
         // 限幅 lambda
@@ -132,20 +148,26 @@ private:
         uint16_t vw_u   = static_cast<uint16_t>(vw_q);
 
         uint8_t data_xyz[8];
-        data_xyz[0] = vx_u & 0xFF;
-        data_xyz[1] = (vx_u >> 8) & 0xFF;
-        data_xyz[2] = vy_u & 0xFF;
-        data_xyz[3] = (vy_u >> 8) & 0xFF;
-        data_xyz[4] = vyaw_u & 0xFF;
-        data_xyz[5] = (vyaw_u >> 8) & 0xFF;
-        data_xyz[6] = vw_u & 0xFF;
-        data_xyz[7] = (vw_u >> 8) & 0xFF;
+        data_xyz[0] = (vx_q >> 8) & 0xFF;
+        data_xyz[1] = vx_q & 0xFF;
+
+        data_xyz[2] = (vy_q >> 8) & 0xFF;
+        data_xyz[3] = vy_q & 0xFF;
+
+        data_xyz[4] = (vyaw_q >> 8) & 0xFF;
+        data_xyz[5] = vyaw_q & 0xFF;
+
+        data_xyz[6] = (vw_q >> 8) & 0xFF;
+        data_xyz[7] = vw_q & 0xFF;
 
         can_->Write(id_xyz_, data_xyz, sizeof(data_xyz));
 
-        // 发送 scan mode
+        // 发送 scan mode + ArmorPresence
         uint8_t data_scan[8] = {0};
         data_scan[0] = scan ? 1 : 0;
+        data_scan[1] = left;
+        data_scan[2] = behind;
+        data_scan[3] = right;
         can_->Write(id_scan_, data_scan, sizeof(data_scan));
 
         // 频率日志
@@ -155,8 +177,12 @@ private:
         if (dt >= 1.0) {
             double freq = send_count_ / dt;
             RCLCPP_INFO(this->get_logger(),
-                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u",
-                        freq, vx, vy, vyaw, vw, static_cast<unsigned>(scan));
+                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u left=%u behind=%u right=%u",
+                        freq, vx, vy, vyaw, vw,
+                        static_cast<unsigned>(scan),
+                        static_cast<unsigned>(left),
+                        static_cast<unsigned>(behind),
+                        static_cast<unsigned>(right));
             send_count_ = 0;
             last_log_ = now;
         }
@@ -165,19 +191,21 @@ private:
 private:
     std::unique_ptr<Can> can_;
 
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
-    rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr       vw_sub_;
-    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr scan_mod_sub_;
-    rclcpp::TimerBase::SharedPtr                                timer_;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr       cmd_vel_sub_;
+    rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr            vw_sub_;
+    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
+    rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
+    rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
-    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
+    float vx_ = 1.0f, vy_ = 0.0f, vyaw_ = 0.0f;
     float vw_ = 0.0f;
     bool  scan_mod_type_ = true;
+    uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
 
     // 新增：两个发送用 ID
-    uint32_t id_xyz_  = 0x133;
-    uint32_t id_scan_ = 0x134;
+    uint32_t id_xyz_  = 0x180;
+    uint32_t id_scan_ = 0x190;
 
     size_t send_count_ = 0;
     rclcpp::Time last_log_;

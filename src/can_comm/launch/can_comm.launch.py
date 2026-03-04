@@ -5,8 +5,8 @@ import os
 
 def generate_launch_description():
     pkg_share = get_package_share_directory('bringup')
-    config_file = os.path.join(pkg_share, 'config', 'serial_params.yaml')
-    topics_file = os.path.join(pkg_share, 'config', 'topic_names.yaml')  
+    config_file = os.path.join(pkg_share, 'config', 'can_params.yaml')
+    topics_file = os.path.join(pkg_share, 'config', 'can_topic_names.yaml')  
 
     return LaunchDescription([
         Node(
