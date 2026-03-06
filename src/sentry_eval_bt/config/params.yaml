@@ -1,4 +1,4 @@
-pub_point_bt_node:
+sentry_eval_bt_node:
   ros__parameters:
     points: [
       0.0, -6.5, 0.0,   

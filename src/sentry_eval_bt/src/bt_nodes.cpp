@@ -120,7 +120,11 @@ public:
 
   static BT::PortsList providedPorts()
   {
-    return {BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal")};
+    return {
+      BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal"),
+      BT::OutputPort<size_t>("idx"),
+      BT::OutputPort<bool>("is_last")
+    };
   }
 
   BT::NodeStatus tick() override
@@ -133,11 +137,13 @@ public:
       ctx.current_index = 0;
       return BT::NodeStatus::FAILURE;
     }
-
-    auto goal = ctx.points[ctx.current_index];
+    size_t idx = ctx.current_index;
+    auto goal = ctx.points[idx];
     goal.header.stamp = ctx.node->now();
 
     setOutput("goal", goal);
+    setOutput("idx", idx);
+    setOutput("is_last", (idx == ctx.points.size() - 1));
     ctx.current_index++;
     return BT::NodeStatus::SUCCESS;
   }
@@ -157,7 +163,11 @@ public:
   {
     return {
         BT::InputPort<geometry_msgs::msg::PoseStamped>("goal"),
-        BT::InputPort<double>("threshold", 0.5, "Distance threshold")};
+        BT::InputPort<double>("threshold", 0.5, "Distance threshold"),
+        BT::InputPort<double>("final_threshold", 0.3, "Final point threshold"),
+        BT::InputPort<bool>("is_last"),
+        BT::InputPort<size_t>("idx")
+      };
   }
 
   BT::NodeStatus onStart() override { return BT::NodeStatus::RUNNING; }
@@ -173,10 +183,13 @@ public:
     }
 
     geometry_msgs::msg::PoseStamped goal;
-    double xml_threshold = 0.5;
 
+    double xml_threshold = 0.5;
     if (!getInput("goal", goal)) return BT::NodeStatus::FAILURE;
     getInput("threshold", xml_threshold);
+
+    double final_xml_threshold = 0.3;
+    getInput("final_threshold", final_xml_threshold);
 
     try {
       geometry_msgs::msg::TransformStamped t;
@@ -187,41 +200,41 @@ public:
       double dist = std::sqrt(dx * dx + dy * dy);
 
       // --- 关键逻辑：区分普通点和终点 ---
-      bool is_last_point = (ctx.current_index >= ctx.points.size());
+      bool is_last_point = false;
+      getInput("is_last", is_last_point);
       double effective_threshold = xml_threshold;
       std::string mode_str = "巡逻模式";
 
+      size_t cur_idx = 0;
+      getInput("idx", cur_idx);
+
       if (is_last_point) {
-        effective_threshold = 0.3; 
+        effective_threshold = final_xml_threshold; 
         mode_str = "终点锁定";
       }
       
       if (dist < effective_threshold) {
-        size_t cur_idx = (ctx.current_index > 0) ? ctx.current_index - 1 : 0;
         
-        // 🚨【新增逻辑】如果是最后一个点，执行“混合急刹”
         if (is_last_point) {
             RCLCPP_WARN(ctx.node->get_logger(), "🛑 到达终点 (%.2fm) -> 触发强制急刹！", dist);
 
-            // A. Soft Stop: 告诉 Nav2 别算了，订单取消
+            // 取消导航任务
             if (ctx.client) {
                 ctx.client->async_cancel_all_goals();
             }
 
-            // B. Hard Stop: 向 /cmd_vel 连发 0 速度，按死车轮
+            // 向底盘发 0 速度
             if (ctx.vel_pub) {
                 geometry_msgs::msg::Twist stop_msg;
                 stop_msg.linear.x = 0.0;
                 stop_msg.linear.y = 0.0;
                 stop_msg.angular.z = 0.0;
-                // 连发3次，确保底层收到
                 ctx.vel_pub->publish(stop_msg);
                 ctx.vel_pub->publish(stop_msg);
-                ctx.vel_pub->publish(stop_msg);
+                ctx.vel_pub->publish(stop_msg);//连发三次
             }
         } 
         else {
-            // 普通点：只打印日志，平滑切过
             RCLCPP_INFO(ctx.node->get_logger(),
                     "\n>>> [到达 P%zu] %s | 距离 %.2fm (阈值 %.2f) <<<\n",
                     cur_idx, mode_str.c_str(), dist, effective_threshold);
