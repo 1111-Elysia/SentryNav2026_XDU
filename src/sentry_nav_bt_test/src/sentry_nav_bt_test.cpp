@@ -34,10 +34,12 @@
 #include "sentry_nav_bt_test/set_blackboard.hpp"
 #include "sentry_nav_bt_test/referee_actions.hpp"
 #include "sentry_nav_bt_test/auto_aim_and_fire_action.hpp"
+#include "sentry_nav_bt_test/chase_target_action.hpp"
 
 #include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
 
-void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory)
+void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
+                                 const rclcpp::Node::SharedPtr &node)
 {
     // 注册节点
     // NavigateToPose
@@ -68,7 +70,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory)
     factory.registerNodeType<sentry_nav_bt_test::RequestActivateRune>("RequestActivateRune");
     // 注册自瞄节点
     factory.registerNodeType<sentry_nav_bt_test::AutoAimAndFire>("AutoAimAndFire");
-    // factory.registerBuilder<sentry_nav_bt_test::PrintBlackboardValue>("PrintBlackboardValue", print_blackboard_builder);
+    factory.registerBuilder<sentry_nav_bt_test::PrintBlackboardValue>("PrintBlackboardValue", print_blackboard_builder);
     // 条件检查
     factory.registerNodeType<sentry_nav_bt_test::CheckCondition>("CheckCondition");
     // 关键值比较
@@ -82,6 +84,14 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory)
     factory.registerNodeType<sentry_nav_bt_test::PrintNode>("PrintNode");
     // 设置黑板值
     factory.registerNodeType<sentry_nav_bt_test::SetBlackboardValue>("SetBlackboardValue");
+
+    BT::NodeBuilder chase_builder =
+    [node](const std::string &name, const BT::NodeConfiguration &config)
+    {
+        return std::make_unique<sentry_nav_bt_test::ChaseTargetAction>(name, config, node);
+    };
+    factory.registerBuilder<sentry_nav_bt_test::ChaseTargetAction>("ChaseTarget", chase_builder);
+
 }
 
 int main(int argc, char **argv)
@@ -110,7 +120,7 @@ int main(int argc, char **argv)
 
     // 创建行为树工厂
     BT::BehaviorTreeFactory factory;
-    RegisterBehaviorTreePlugins(factory);
+    RegisterBehaviorTreePlugins(factory,node);
 
     // 打印可用行为树节点
     RCLCPP_INFO(node->get_logger(), "可用的行为树节点:");

@@ -69,6 +69,7 @@ target_compile_definitions(sentry_nav_bt_test_nodes PRIVATE BT_PLUGIN_EXPORT)
 # ============================================
 add_executable(navigate_bt_node 
   src/sentry_nav_bt_test.cpp 
+  src/chase_target_action.cpp
 )
 
 # 链接刚才创建的库

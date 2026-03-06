@@ -32,10 +32,8 @@ namespace sentry_nav_bt_test
         std::shared_ptr<SentryRefereeUtils> utils_;
     };
 
-    // ==========================================
     // 动作 1: SetSentryPosture (切换姿态 - 闭环控制)
     // XML: <Action ID="SetSentryPosture" mode="1" timeout_ms="1000"/>
-    // ==========================================
     class SetSentryPosture : public RefereeActionBase
     {
     public:
@@ -46,10 +44,8 @@ namespace sentry_nav_bt_test
         BT::NodeStatus tick() override;
     };
 
-    // ==========================================
-    // 动作 2: RequestActivateRune (请求开符 - 鲁棒发送)
+    // 动作 2: RequestActivateRune 
     // XML: <Action ID="RequestActivateRune" posture="0"/>
-    // ==========================================
     class RequestActivateRune : public RefereeActionBase
     {
     public:
