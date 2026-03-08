@@ -4,20 +4,19 @@
       <InitPoints points_param="points"/>
 
       <Repeat num_cycles="-1">
-        <Sequence>
+        <Sequence name="RunOnePoint">
           <NextPoint goal="{goal}" idx="{idx}" is_last="{is_last}"/>
 
-          <Parallel success_threshold="1" failure_threshold="1">
-            <SendNav2Goal goal="{goal}"/>
-
+          <Parallel success_threshold="1" failure_threshold="2">
             <CheckDistance
               goal="{goal}"
               idx="{idx}"
               is_last="{is_last}"
               threshold="0.2"
               final_threshold="0.2"/>
-          </Parallel>
 
+              <SendNav2Goal goal="{goal}"/>
+          </Parallel>
         </Sequence>
       </Repeat>
     </Sequence>

@@ -218,11 +218,6 @@ public:
         if (is_last_point) {
             RCLCPP_WARN(ctx.node->get_logger(), "🛑 到达终点 (%.2fm) -> 触发强制急刹！", dist);
 
-            // 取消导航任务
-            if (ctx.client) {
-                ctx.client->async_cancel_all_goals();
-            }
-
             // 向底盘发 0 速度
             if (ctx.vel_pub) {
                 geometry_msgs::msg::Twist stop_msg;
@@ -274,8 +269,11 @@ public:
     internal_state_ = InternalState::IDLE;
     retry_count_ = 0;
 
+    nav_result_ready_ = false;
+    nav_succeeded_ = false;
+    halted_by_bt_ = false;
+
     auto clock_type = BtRosContext::instance().node->get_clock()->get_clock_type();
-    // 初始化为一个很早的时间，确保第一次立刻触发
     last_attempt_time_ = rclcpp::Time(0, 0, clock_type);
     last_vis_time_ = rclcpp::Time(0, 0, clock_type);
 
@@ -295,9 +293,14 @@ public:
     auto &ctx = BtRosContext::instance();
     auto now = ctx.node->now();
 
-    // 0. 基础检查：Nav2 动作服务器是否在线
+      if (nav_result_ready_) {
+        if (nav_succeeded_) {
+          return BT::NodeStatus::SUCCESS;
+        } else {
+          return BT::NodeStatus::FAILURE;
+        }
+    }
     if (!ctx.client->action_server_is_ready()) {
-      // 降低日志频率：每 2 秒报一次错，避免刷屏，但保持 RUNNING 等待
       if ((now - last_attempt_time_).seconds() > 2.0) {
         RCLCPP_WARN(ctx.node->get_logger(), "⚠️ Nav2 Action Server 未连接，正在等待...");
         last_attempt_time_ = now;
@@ -332,7 +335,8 @@ public:
 
       // 回调函数：处理 Nav2 的反馈
       send_goal_options.goal_response_callback =
-          [this, logger = ctx.node->get_logger()](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
+          [this, logger = ctx.node->get_logger()]
+          (const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
       {
         if (!handle) {
           RCLCPP_ERROR(logger, "❌ [被拒] 目标被 Nav2 拒绝，准备重发...");
@@ -340,6 +344,38 @@ public:
         } else {
           RCLCPP_INFO(logger, "✅ [已接受] Nav2 接收成功！");
           internal_state_ = InternalState::ACCEPTED; // 锁定状态，不再重发
+        }
+      };
+
+      send_goal_options.result_callback =[this, logger = ctx.node->get_logger()](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
+      {
+        nav_result_ready_ = true;
+
+        switch (result.code)
+        {
+          case rclcpp_action::ResultCode::SUCCEEDED:
+            nav_succeeded_ = true;
+            RCLCPP_INFO(logger, "✅ [Nav2结果] 当前目标到达成功");
+            break;
+
+          case rclcpp_action::ResultCode::ABORTED:
+            nav_succeeded_ = true;
+            RCLCPP_WARN(logger, "⚠️ [Nav2结果] 当前目标被中止 -> 跳过当前点，继续下一个点");
+            break;
+
+          case rclcpp_action::ResultCode::CANCELED:
+            nav_succeeded_ = false;
+            if (halted_by_bt_) {
+              RCLCPP_INFO(logger, "ℹ️ [Nav2结果] 当前目标因 BT 切点而取消");
+            } else {
+              RCLCPP_WARN(logger, "⚠️ [Nav2结果] 当前目标被外部取消");
+            }
+            break;
+
+          default:
+            nav_succeeded_ = false;
+            RCLCPP_WARN(logger, "⚠️ [Nav2结果] 未知结果码");
+            break;
         }
       };
 
@@ -388,17 +424,15 @@ public:
   void onHalted() override 
   {
       auto &ctx = BtRosContext::instance();
+      halted_by_bt_ = true;
       
-      // 只有在已经发送或者接受状态下，才需要去取消
-      // 避免 IDLE 状态下乱发取消指令
       if (internal_state_ == InternalState::SENDING || internal_state_ == InternalState::ACCEPTED) {
           if (ctx.client) {
-              RCLCPP_WARN(ctx.node->get_logger(), "✂️ [切点] 距离达标，强制 Cancel 上一个 Nav2 目标！");
+              RCLCPP_WARN(ctx.node->get_logger(), "✂️ [切点] 当前导航节点被停止，取消上一个 Nav2 目标");
               ctx.client->async_cancel_all_goals();
           }
       }
       
-      // 重置状态，确保下一次使用该节点（发下一个点）时是清清白白的
       internal_state_ = InternalState::IDLE;
       retry_count_ = 0;
   }
@@ -409,4 +443,8 @@ private:
   rclcpp::Time last_attempt_time_;
   rclcpp::Time last_vis_time_;
   int retry_count_{0};
+
+  bool nav_result_ready_{false};
+  bool nav_succeeded_{false};
+  bool halted_by_bt_{false};
 };
