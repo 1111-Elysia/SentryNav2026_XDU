@@ -4,14 +4,14 @@ sequential_nodes:
     cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
     wait_after: 3
 
-  - label: Lightning-LM
-    type: execute
-    cmd: [
-      "ros2", "run", "lightning", "run_loc_online",
-      "--config", "/home/pgd/SentryNav2026_XDU/src/bringup/config/default_livox.yaml"
-    ]
-    use_config_dir_as_cwd: true
-    wait_after: 2
+  # - label: Lightning-LM
+  #   type: execute
+  #   cmd: [
+  #     "ros2", "run", "lightning", "run_loc_online",
+  #     "--config", "/home/pgd/SentryNav2026_XDU/src/bringup/config/default_livox.yaml"
+  #   ]
+  #   use_config_dir_as_cwd: true
+  #   wait_after: 2
 
   # - label: Fast-LIO
   #   type: execute
@@ -33,15 +33,15 @@ sequential_nodes:
     cmd: ["ros2", "launch", "super_lio", "Livox_mid360.py"]
     wait_after: 2
 
-  - label: TF-Odom-Publisher
-    type: node
-    package: sentry_navigation
-    executable: tf_odom_publisher
-    name: tf_odom_publisher
-    parameters:
-      - lidar.yaml
-    arguments: ["--ros-args"]
-    wait_after: 2
+  # - label: TF-Odom-Publisher
+  #   type: node
+  #   package: sentry_navigation
+  #   executable: tf_odom_publisher
+  #   name: tf_odom_publisher
+  #   parameters:
+  #     - lidar.yaml
+  #   arguments: ["--ros-args"]
+  #   wait_after: 2
 
   - label: TF-Only-Odom
     type: node
@@ -71,14 +71,14 @@ sequential_nodes:
     type: execute
     cmd: [
       "ros2", "launch", "sentry_navigation", "navigation_launch.py",
-      "map:=/home/pgd/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
+      "map:=/home/nuc/Desktop/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
     ]
     wait_after: 3
 
-  # - label: behavior-tree-nodes
-  #   type: execute
-  #   cmd: ["ros2", "launch", "sentry_eval_bt", "sentry_eval_bt.launch.py"]
-  #   wait_after: 0
+  - label: behavior-tree-nodes
+    type: execute
+    cmd: ["ros2", "launch", "sentry_eval_bt", "sentry_eval_bt.launch.py"]
+    wait_after: 0
 
   # - label: Sentry-BT
   #   type: execute

@@ -14,8 +14,8 @@
               goal="{goal}"
               idx="{idx}"
               is_last="{is_last}"
-              threshold="0.6"
-              final_threshold="0.3"/>
+              threshold="0.2"
+              final_threshold="0.2"/>
           </Parallel>
 
         </Sequence>
