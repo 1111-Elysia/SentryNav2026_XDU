@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3" main_tree_to_execute="MainTree">
+
+  <BehaviorTree ID="MainTree">
+    <Fallback name="Root">
+
+      <!-- =========================
+           1) 裁判系统连接检测
+           game_progress < 0 视为未连接
+           只要还没连上，就一直停在这里
+           ========================= -->
+      <KeepRunningUntilFailure>
+        <Sequence name="WaitRefereeConnection">
+          <PrintNode message="正在判定是否连接裁判系统"/>
+          <Inverter>
+            <CheckCondition key_name="game_progress"
+                            comparison="gte"
+                            threshold="0.0"/>
+          </Inverter>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <!-- 连接成功后打印一次 -->
+      <Inverter>
+        <PrintNode message="裁判系统连接成功"/>
+      </Inverter>
+
+      <!-- =========================
+           2) 比赛开始检测
+           game_progress <= 3 视为比赛未正式开始
+           在这里持续等待
+           ========================= -->
+      <KeepRunningUntilFailure>
+        <Sequence name="WaitGameStart">
+          <ForceSuccess>
+            <PrintBlackboardValue key="game_progress"
+                                  prefix="当前比赛进程:"/>
+          </ForceSuccess>
+          <CheckCondition key_name="game_progress"
+                          comparison="lte"
+                          threshold="3.0"/>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <!-- 比赛开始后，初始化一次状态 -->
+      <ForceFailure>
+        <Sequence name="InitBlackboardAfterStart">
+          <PrintNode message="比赛开始，初始化黑板变量"/>
+          <SetBlackboardValue key="aim_id"
+                              value="0"
+                              type="uint8"/>
+          <SetBlackboardValue key="hurt_armor"
+                              value="5"
+                              type="uint8"/>
+          <SetBlackboardValue key="vw"
+                              value="0.0"
+                              type="float"/>
+        </Sequence>
+      </ForceFailure>
+
+      <!-- =========================
+           3) 比赛主逻辑
+           优先级：
+           生存(低血/低弹) > 遇敌追击 > 阶段导航
+           用 ReactiveFallback 保证高优先级可抢占低优先级
+           ========================= -->
+      <ReactiveFallback name="GameMainLogic">
+
+        <!-- =========================================================
+             A. 低血 / 低弹 回家补给
+             逻辑：
+             - 若 HP < 100 或子弹 < 50，则进入补给
+             - 回家后原地转
+             - 等待血量恢复到 390 再退出
+             ========================================================= -->
+        <Sequence name="SupplyLogic">
+          <Fallback name="NeedSupplyCheck">
+            <!-- 正常状态：血量和弹药都足够，则该分支成功，Fallback停止在这里；
+                 外层 Sequence 不会继续执行“回家补给”动作。
+                 所以外面用 Inverter 包起来，把“正常”翻成失败，“缺补给”翻成成功更直观。
+                 但这里为了保持结构简单，直接用下面的写法： -->
+            <Sequence name="EnoughResource">
+              <CheckCondition key_name="current_hp"
+                              comparison="gte"
+                              threshold="100.0"/>
+              <CheckCondition key_name="projectile_allowance_17mm"
+                              comparison="gte"
+                              threshold="50.0"/>
+              <AlwaysFailure/>
+            </Sequence>
+
+            <!-- 资源不足 -->
+            <Sequence name="NeedSupply">
+              <PrintNode message="没血或者没弹，导航到补给点"/>
+            </Sequence>
+          </Fallback>
+
+          <GoalSelector goal_name="home"
+                        goal="{goal}"/>
+
+          <SetBlackboardValue key="vw"
+                              value="0.0"
+                              type="float"/>
+
+          <RetryUntilSuccessful num_attempts="100">
+            <NavigateToPose goal="{goal}"/>
+          </RetryUntilSuccessful>
+
+          <PrintNode message="已到补给点，开始原地防守等待恢复"/>
+
+          <SetBlackboardValue key="vw"
+                              value="5.0"
+                              type="float"/>
+
+          <Wait wait_duration="5.0"/>
+
+          <!-- 等待血量恢复 -->
+          <KeepRunningUntilFailure>
+            <Sequence name="WaitHpRecover">
+              <ForceSuccess>
+                <PrintBlackboardValue key="current_hp"
+                                      prefix="当前血量:"/>
+              </ForceSuccess>
+              <Inverter>
+                <CheckCondition key_name="current_hp"
+                                comparison="gte"
+                                threshold="390.0"/>
+              </Inverter>
+            </Sequence>
+          </KeepRunningUntilFailure>
+
+          <PrintNode message="血量恢复完成，退出补给逻辑"/>
+        </Sequence>
+
+        <!-- =========================================================
+             B. 发现敌人 / 被击打 时优先处理，并加入追击
+             触发条件：
+             - aim_id 有效（0 < aim_id < 255）
+             - 或 hurt_armor != 5
+             处理逻辑：
+             - 清一次 hurt_armor
+             - 进入 ChaseTarget 追击
+             - 追到近距离成功 or 目标丢失失败
+             ========================================================= -->
+        <Sequence name="EnemyOrHitReaction">
+          <Fallback name="DetectEnemyOrHit">
+            <Sequence name="AimTargetDetected">
+              <CheckCondition key_name="aim_id"
+                              comparison="gt"
+                              threshold="0"/>
+              <CheckCondition key_name="aim_id"
+                              comparison="lt"
+                              threshold="255"/>
+            </Sequence>
+
+            <CheckCondition key_name="hurt_armor"
+                            comparison="neq"
+                            threshold="5"/>
+          </Fallback>
+
+          <PrintNode message="发现敌人或受到击打，进入优先处理/追击逻辑"/>
+
+          <ForceSuccess>
+            <PrintBlackboardValue key="aim_id"
+                                  prefix="当前敌人ID:"/>
+          </ForceSuccess>
+
+          <ForceSuccess>
+            <PrintBlackboardValue key="hurt_armor"
+                                  prefix="当前受击装甲板:"/>
+          </ForceSuccess>
+
+          <!-- 受击标志作为触发信号，用完后清掉 -->
+          <SetBlackboardValue key="hurt_armor"
+                              value="5"
+                              type="uint8"/>
+
+          <!-- 追击时不额外自旋，交给追击节点和导航控制 -->
+          <SetBlackboardValue key="vw"
+                              value="0.0"
+                              type="float"/>
+
+          <ChaseTarget
+            aim_topic="/autoaim/target_bl"
+            world_frame="map"
+            base_frame="base_link"
+            nav_action="navigate_to_pose"
+
+            standoff="1.0"
+            stop_dist="1.0"
+            start_dist="1.6"
+
+            lost_timeout="0.6"
+            update_thresh="0.6"
+            max_rate="3.0"
+
+            ema_alpha="0.35"
+            max_jump="2.5"
+
+            chase_status="{chase_status}"
+            last_goal="{last_goal}"
+          />
+        </Sequence>
+
+        <!-- =========================================================
+             C. 平时按阶段去固定点导航
+             这里只保留一个简化版的两阶段：
+             - 第一阶段：中央高地
+             - 第二阶段：飞坡防守点
+             ========================================================= -->
+        <Fallback name="StageNavigation">
+
+          <!-- 第一阶段 -->
+          <ReactiveSequence name="StageOne">
+            <ForceSuccess>
+              <PrintNode message="第一阶段，导航到中央高地"/>
+            </ForceSuccess>
+
+            <ForceSuccess>
+              <PrintBlackboardValue key="stage_remain_time"
+                                    prefix="剩余比赛时间:"/>
+            </ForceSuccess>
+
+            <CompareValues first_key="stage_remain_time"
+                           second_key="stage_one_time"
+                           comparison="gte"/>
+
+            <GoalSelector goal_name="central_highland"
+                          goal="{goal}"/>
+
+            <SetBlackboardValue key="vw"
+                                value="0.0"
+                                type="float"/>
+
+            <RetryUntilSuccessful num_attempts="100">
+              <NavigateToPose goal="{goal}"/>
+            </RetryUntilSuccessful>
+
+            <SetBlackboardValue key="vw"
+                                value="5.0"
+                                type="float"/>
+
+            <Wait wait_duration="5.0"/>
+          </ReactiveSequence>
+
+          <!-- 第二阶段 -->
+          <ReactiveSequence name="StageTwo">
+            <ForceSuccess>
+              <PrintNode message="第二阶段，导航到飞坡防守点"/>
+            </ForceSuccess>
+
+            <ForceSuccess>
+              <PrintBlackboardValue key="stage_remain_time"
+                                    prefix="剩余比赛时间:"/>
+            </ForceSuccess>
+
+            <GoalSelector goal_name="ramp_point"
+                          goal="{goal}"/>
+
+            <SetBlackboardValue key="vw"
+                                value="0.0"
+                                type="float"/>
+
+            <RetryUntilSuccessful num_attempts="100">
+              <NavigateToPose goal="{goal}"/>
+            </RetryUntilSuccessful>
+
+            <SetBlackboardValue key="vw"
+                                value="5.0"
+                                type="float"/>
+
+            <Wait wait_duration="5.0"/>
+          </ReactiveSequence>
+
+        </Fallback>
+
+      </ReactiveFallback>
+
+    </Fallback>
+  </BehaviorTree>
+
+  <!-- =========================
+       TreeNodesModel
+       ========================= -->
+  <TreeNodesModel>
+
+    <Action ID="CheckCondition" editable="true">
+      <input_port name="key_name"/>
+      <input_port name="comparison"/>
+      <input_port name="threshold"/>
+    </Action>
+
+    <Action ID="CompareValues" editable="true">
+      <input_port name="first_key"/>
+      <input_port name="second_key"/>
+      <input_port name="comparison"/>
+    </Action>
+
+    <Action ID="GoalSelector" editable="true">
+      <input_port name="goal_name"/>
+      <output_port name="goal"/>
+    </Action>
+
+    <Action ID="NavigateToPose" editable="true">
+      <input_port name="goal"/>
+    </Action>
+
+    <Action ID="PrintBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="prefix"/>
+    </Action>
+
+    <Action ID="PrintNode" editable="true">
+      <input_port name="message"/>
+    </Action>
+
+    <Action ID="SetBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="value"/>
+      <input_port name="type"/>
+    </Action>
+
+    <Action ID="Wait" editable="true">
+      <input_port name="wait_duration"/>
+    </Action>
+
+    <Action ID="ChaseTarget" editable="true">
+      <input_port name="aim_topic"/>
+      <input_port name="world_frame"/>
+      <input_port name="base_frame"/>
+      <input_port name="nav_action"/>
+
+      <input_port name="standoff"/>
+      <input_port name="stop_dist"/>
+      <input_port name="start_dist"/>
+
+      <input_port name="lost_timeout"/>
+      <input_port name="update_thresh"/>
+      <input_port name="max_rate"/>
+
+      <input_port name="ema_alpha"/>
+      <input_port name="max_jump"/>
+
+      <output_port name="chase_status"/>
+      <output_port name="last_goal"/>
+    </Action>
+
+    <Condition ID="AlwaysFailure"/>
+
+    <Decorator ID="RetryUntilSuccessful">
+      <input_port name="num_attempts"/>
+    </Decorator>
+
+    <Decorator ID="KeepRunningUntilFailure"/>
+    <Decorator ID="ForceSuccess"/>
+    <Decorator ID="ForceFailure"/>
+    <Decorator ID="Inverter"/>
+
+  </TreeNodesModel>
+</root>
