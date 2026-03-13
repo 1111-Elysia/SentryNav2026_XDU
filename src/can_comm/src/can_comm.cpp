@@ -120,7 +120,6 @@ private:
         {
             std::lock_guard<std::mutex> lock(mutex_);
             vx    = vx_;
-            vx    = 1.0f; // TODO: 临时固定 vx=1.0，后续可删除
             vy    = vy_;
             vyaw  = vyaw_;
             vw    = vw_;
@@ -141,12 +140,6 @@ private:
         int16_t vyaw_q = static_cast<int16_t>(clamp(vyaw,-32.767f, 32.767f) * 1000.0f);
         int16_t vw_q   = static_cast<int16_t>(clamp(vw,   -32.767f, 32.767f) * 1000.0f);
 
-        // 发送 vx, vy, vyaw, vw
-        uint16_t vx_u   = static_cast<uint16_t>(vx_q);
-        uint16_t vy_u   = static_cast<uint16_t>(vy_q);
-        uint16_t vyaw_u = static_cast<uint16_t>(vyaw_q);
-        uint16_t vw_u   = static_cast<uint16_t>(vw_q);
-
         uint8_t data_xyz[8];
         data_xyz[0] = (vx_q >> 8) & 0xFF;
         data_xyz[1] = vx_q & 0xFF;
@@ -165,9 +158,7 @@ private:
         // 发送 scan mode + ArmorPresence
         uint8_t data_scan[8] = {0};
         data_scan[0] = scan ? 1 : 0;
-        data_scan[1] = left;
-        data_scan[2] = behind;
-        data_scan[3] = right;
+        data_scan[1] = left | (behind << 1) | (right << 2);
         can_->Write(id_scan_, data_scan, sizeof(data_scan));
 
         // 频率日志
@@ -198,7 +189,7 @@ private:
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
-    float vx_ = 1.0f, vy_ = 0.0f, vyaw_ = 0.0f;
+    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
     float vw_ = 0.0f;
     bool  scan_mod_type_ = true;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
