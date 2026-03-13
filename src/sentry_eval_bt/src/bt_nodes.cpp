@@ -364,11 +364,12 @@ public:
             break;
 
           case rclcpp_action::ResultCode::CANCELED:
-            nav_succeeded_ = false;
+            // 关键：取消也视为可继续，避免 BT 卡死在 FAILURE
+            nav_succeeded_ = true;
             if (halted_by_bt_) {
               RCLCPP_INFO(logger, "ℹ️ [Nav2结果] 当前目标因 BT 切点而取消");
             } else {
-              RCLCPP_WARN(logger, "⚠️ [Nav2结果] 当前目标被外部取消");
+              RCLCPP_WARN(logger, "⚠️ [Nav2结果] 当前目标被外部取消 -> 继续下一个点");
             }
             break;
 
@@ -448,3 +449,6 @@ private:
   bool nav_succeeded_{false};
   bool halted_by_bt_{false};
 };
+
+
+
