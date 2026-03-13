@@ -31,6 +31,7 @@ struct BtRosContext
   rclcpp::Node::SharedPtr node;
   rclcpp_action::Client<NavigateToPose>::SharedPtr client;
 
+
   // 可视化发布者
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr vis_pub;
 
@@ -271,7 +272,12 @@ public:
 
     nav_result_ready_ = false;
     nav_succeeded_ = false;
-    halted_by_bt_ = false;
+
+    active_goal_id_ = ++seq_;
+    goal_handle_.reset();
+
+    auto &ctx = BtRosContext::instance();
+    RCLCPP_INFO(ctx.node->get_logger(), "🚩 [Goal %lu] onStart", active_goal_id_);
 
     auto clock_type = BtRosContext::instance().node->get_clock()->get_clock_type();
     last_attempt_time_ = rclcpp::Time(0, 0, clock_type);
@@ -292,6 +298,7 @@ public:
   {
     auto &ctx = BtRosContext::instance();
     auto now = ctx.node->now();
+
 
       if (nav_result_ready_) {
         if (nav_succeeded_) {
@@ -316,6 +323,7 @@ public:
     case InternalState::IDLE:
     case InternalState::REJECTED:
     {
+      const uint64_t this_goal_id = active_goal_id_;
       if ((now - last_attempt_time_).seconds() < 0.2) {
           return BT::NodeStatus::RUNNING;
       }
@@ -335,49 +343,63 @@ public:
 
       // 回调函数：处理 Nav2 的反馈
       send_goal_options.goal_response_callback =
-          [this, logger = ctx.node->get_logger()]
+          [this, logger = ctx.node->get_logger(), goal_id = this_goal_id]
           (const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
       {
-        if (!handle) {
-          RCLCPP_ERROR(logger, "❌ [被拒] 目标被 Nav2 拒绝，准备重发...");
-          internal_state_ = InternalState::REJECTED; // 触发下一次循环的重发
-        } else {
-          RCLCPP_INFO(logger, "✅ [已接受] Nav2 接收成功！");
-          internal_state_ = InternalState::ACCEPTED; // 锁定状态，不再重发
-        }
+          if (goal_id != active_goal_id_) {
+            RCLCPP_WARN(logger, "⚠️ [Goal %lu] 过期的 goal_response，忽略", goal_id);
+            return;
+          }
+
+          if (!handle) {
+            RCLCPP_ERROR(logger, "❌ [Goal %lu] 被 Nav2 拒绝", goal_id);
+            internal_state_ = InternalState::REJECTED;
+          } else {
+            goal_handle_ = handle;
+            RCLCPP_INFO(logger, "✅ [Goal %lu] Nav2 接收成功", goal_id);
+            internal_state_ = InternalState::ACCEPTED;
+          }
       };
 
-      send_goal_options.result_callback =[this, logger = ctx.node->get_logger()](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
+      send_goal_options.result_callback =
+          [this, logger = ctx.node->get_logger(), goal_id = this_goal_id]
+          (const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
       {
-        nav_result_ready_ = true;
+          if (goal_id != active_goal_id_) {
+            RCLCPP_WARN(logger,
+                        "⚠️ [Goal %lu] 收到迟到结果, 当前活动 goal=%lu, 忽略",
+                        goal_id, active_goal_id_);
+            return;
+          }
 
-        switch (result.code)
-        {
-          case rclcpp_action::ResultCode::SUCCEEDED:
-            nav_succeeded_ = true;
-            RCLCPP_INFO(logger, "✅ [Nav2结果] 当前目标到达成功");
-            break;
+          nav_result_ready_ = true;
 
-          case rclcpp_action::ResultCode::ABORTED:
-            nav_succeeded_ = true;
-            RCLCPP_WARN(logger, "⚠️ [Nav2结果] 当前目标被中止 -> 跳过当前点，继续下一个点");
-            break;
+          switch (result.code)
+          {
+            case rclcpp_action::ResultCode::SUCCEEDED:
+              nav_succeeded_ = true;
+              RCLCPP_INFO(logger, "✅ [Goal %lu] 到达成功", goal_id);
+              break;
 
-          case rclcpp_action::ResultCode::CANCELED:
-            // 关键：取消也视为可继续，避免 BT 卡死在 FAILURE
-            nav_succeeded_ = true;
-            if (halted_by_bt_) {
-              RCLCPP_INFO(logger, "ℹ️ [Nav2结果] 当前目标因 BT 切点而取消");
-            } else {
-              RCLCPP_WARN(logger, "⚠️ [Nav2结果] 当前目标被外部取消 -> 继续下一个点");
-            }
-            break;
+            case rclcpp_action::ResultCode::ABORTED:
+              nav_succeeded_ = true;
+              RCLCPP_WARN(logger, "⚠️ [Goal %lu] 被中止 -> 跳过当前点", goal_id);
+              break;
 
-          default:
-            nav_succeeded_ = false;
-            RCLCPP_WARN(logger, "⚠️ [Nav2结果] 未知结果码");
-            break;
-        }
+            case rclcpp_action::ResultCode::CANCELED:
+              nav_succeeded_ = true;
+              if (goal_id == canceled_by_bt_goal_id_) {
+                RCLCPP_INFO(logger, "ℹ️ [Goal %lu] 因 BT 切点取消", goal_id);
+              } else {
+                RCLCPP_WARN(logger, "⚠️ [Goal %lu] 被外部取消 -> 继续下一个点", goal_id);
+              }
+              break;
+
+            default:
+              nav_succeeded_ = false;
+              RCLCPP_WARN(logger, "⚠️ [Goal %lu] 未知结果码", goal_id);
+              break;
+          }
       };
 
       // 发送请求
@@ -425,15 +447,13 @@ public:
   void onHalted() override 
   {
       auto &ctx = BtRosContext::instance();
-      halted_by_bt_ = true;
-      
-      if (internal_state_ == InternalState::SENDING || internal_state_ == InternalState::ACCEPTED) {
-          if (ctx.client) {
-              RCLCPP_WARN(ctx.node->get_logger(), "✂️ [切点] 当前导航节点被停止，取消上一个 Nav2 目标");
-              ctx.client->async_cancel_all_goals();
-          }
+
+      if (ctx.client && goal_handle_) {
+        canceled_by_bt_goal_id_ = active_goal_id_;
+        RCLCPP_WARN(ctx.node->get_logger(), "✂️ [Goal %lu] 取消当前 goal", active_goal_id_);
+        ctx.client->async_cancel_goal(goal_handle_);
+        goal_handle_.reset();
       }
-      
       internal_state_ = InternalState::IDLE;
       retry_count_ = 0;
   }
@@ -447,7 +467,10 @@ private:
 
   bool nav_result_ready_{false};
   bool nav_succeeded_{false};
-  bool halted_by_bt_{false};
+  rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle_;
+  uint64_t canceled_by_bt_goal_id_{0};
+  uint64_t active_goal_id_{0};
+  uint64_t seq_{0};
 };
 
 
