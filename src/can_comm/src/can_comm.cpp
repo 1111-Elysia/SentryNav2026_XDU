@@ -3,6 +3,7 @@
 #include <sentry_msgs/msg/vw.hpp>
 #include <sentry_msgs/msg/scan_mode.hpp>
 #include <sentry_msgs/msg/armor_presence.hpp>
+#include <rm2_referee_msgs/msg/hurt_data.hpp>
 
 #include <librm.hpp>
 
@@ -32,6 +33,7 @@ public:
         this->declare_parameter<std::string>("vw_topic", "/vw");
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
+        this->declare_parameter<std::string>("hurt_data_topic", "/rm2_referee/hurt_data");
 
         // 读取参数
         std::string port      = this->get_parameter("port").as_string();
@@ -45,6 +47,7 @@ public:
         std::string vw_topic            = this->get_parameter("vw_topic").as_string();
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
+        std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
 
         // 打开 CAN 设备
         try {
@@ -85,6 +88,10 @@ public:
                 armor_right_  = m->right;
             });
 
+        hurt_sub_ = this->create_subscription<rm2_referee_msgs::msg::HurtData>(
+            hurt_data_topic, 10,
+            std::bind(&CanCommNode::hurtCallback, this, std::placeholders::_1));
+
         // 定时发送 CAN 帧
         if (send_freq <= 0) send_freq = 1;
         int period_ms = 1000 / send_freq;
@@ -110,6 +117,19 @@ private:
         vyaw_ = static_cast<float>(msg->angular.z);
     }
 
+    void hurtCallback(const rm2_referee_msgs::msg::HurtData::SharedPtr msg)
+    {
+        if (!msg) return;
+
+        if (msg->armor_id != 0) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            hurt_active_ = true;
+            hurt_start_time_ = this->now();
+
+            vw_ = 1.0f;
+        }
+    }
+
     void sendFrame()
     {
         if (!can_) return;
@@ -127,6 +147,19 @@ private:
             left   = armor_left_;
             behind = armor_behind_;
             right  = armor_right_;
+
+            if (hurt_active_) {
+                auto now = this->now();
+                double dt = (now - hurt_start_time_).seconds();
+                if (dt < 5.0) {
+                    vw = 1.0f;
+                    vw_ = vw;
+                } else {
+                    hurt_active_ = false;
+                    vw = 0.0f;
+                    vw_ = vw;
+                }
+            }
         }
 
         // 限幅 lambda
@@ -186,6 +219,7 @@ private:
     rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr            vw_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
+    rclcpp::Subscription<rm2_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
@@ -193,8 +227,9 @@ private:
     float vw_ = 0.0f;
     bool  scan_mod_type_ = true;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
+    bool hurt_active_ = false;
+    rclcpp::Time hurt_start_time_;
 
-    // 新增：两个发送用 ID
     uint32_t id_xyz_  = 0x180;
     uint32_t id_scan_ = 0x190;
 

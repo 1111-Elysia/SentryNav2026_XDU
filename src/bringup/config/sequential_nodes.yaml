@@ -4,6 +4,11 @@ sequential_nodes:
     cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
     wait_after: 3
 
+  - label: RM-messages
+    type: execute
+    cmd: ["ros2", "launch", "referee_node", "referee_node.launch.py"]
+    wait_after: 3
+
   # - label: Lightning-LM
   #   type: execute
   #   cmd: [

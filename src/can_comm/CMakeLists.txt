@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sentry_msgs REQUIRED)
+find_package(rm2_referee_msgs REQUIRED)
 
 add_executable(can_comm_node
   src/can_comm.cpp
@@ -18,6 +19,7 @@ ament_target_dependencies(can_comm_node
   rclcpp
   geometry_msgs
   sentry_msgs
+  rm2_referee_msgs
 )
 
 add_subdirectory(librm)
