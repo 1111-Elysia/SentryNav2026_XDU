@@ -89,7 +89,8 @@ public:
             });
 
         hurt_sub_ = this->create_subscription<rm2_referee_msgs::msg::HurtData>(
-            hurt_data_topic, 10,
+            hurt_data_topic,
+            rclcpp::SensorDataQoS(),   // BestEffort + small queue
             std::bind(&CanCommNode::hurtCallback, this, std::placeholders::_1));
 
         // 定时发送 CAN 帧
@@ -125,7 +126,7 @@ private:
             std::lock_guard<std::mutex> lock(mutex_);
             hurt_active_ = true;
             hurt_start_time_ = this->now();
-
+            printf("hurtCallback hurtCallback hurtCallback");
             vw_ = 1.0f;
         }
     }
@@ -180,11 +181,11 @@ private:
         data_xyz[2] = (vy_q >> 8) & 0xFF;
         data_xyz[3] = vy_q & 0xFF;
 
-        data_xyz[4] = (vyaw_q >> 8) & 0xFF;
-        data_xyz[5] = vyaw_q & 0xFF;
+        data_xyz[4] = (vw_q >> 8) & 0xFF;
+        data_xyz[5] = vw_q & 0xFF;
 
-        data_xyz[6] = (vw_q >> 8) & 0xFF;
-        data_xyz[7] = vw_q & 0xFF;
+        data_xyz[6] = (vyaw_q >> 8) & 0xFF;
+        data_xyz[7] = vyaw_q & 0xFF;
 
         can_->Write(id_xyz_, data_xyz, sizeof(data_xyz));
 
