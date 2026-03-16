@@ -7,3 +7,4 @@ src/bringup/map/
 *.pcd
 *.pgm
 *.ply.vscode/
+can_comm_start.sh
