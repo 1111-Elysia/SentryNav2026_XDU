@@ -5,3 +5,8 @@ can_comm_node:
     id_xyz: 0x180            # vx,vy,vyaw,vw 帧 CAN ID
     id_scan: 0x190           # scan mode 帧 CAN ID
 
+    # super_deluo: 受击后策略（仅随机 vw）
+    super_deluo.duration_s: 5.0   # 受击策略持续时间（秒）
+    super_deluo.vw_min: 0.9       # 每秒随机角速度下限（rad/s）
+    super_deluo.vw_max: 1.0       # 每秒随机角速度上限（rad/s）
+
