@@ -142,8 +142,8 @@ namespace sentry_nav_bt_test
             blackboard_->set<std::chrono::milliseconds>("server_timeout", std::chrono::milliseconds(1000));
             blackboard_->set<bool>("initial_pose_received", false);
 
-            // 初始化 game_progress 为 0
-            blackboard_->set<uint8_t>("game_progress", 0);
+            // 显式记录是否已经收到过裁判系统状态，避免用 game_progress 的默认值误判已连接
+            blackboard_->set<bool>("game_status_received", false);
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
@@ -275,6 +275,7 @@ namespace sentry_nav_bt_test
                     bb->set("game_progress", msg->game_progress);
                     bb->set("stage_remain_time", msg->stage_remain_time);
                     bb->set("sync_timestamp", msg->sync_timestamp);
+                    bb->set("game_status_received", true);
                     RCLCPP_DEBUG(
                         node_->get_logger(),
                         "黑板更新: '%s' 从话题 '%s'",
@@ -364,7 +365,6 @@ namespace sentry_nav_bt_test
             // 创建控制指令发布者 （将navigation的速度指令转换为控制指令发布出去）
 
             // 1. 初始化发布者 (发给底盘驱动)
-            // 注意："/cmd_vel" 是底盘接收的话题名，如果你的底盘叫别的(如 /robot/cmd_vel)，请修改这里
             cmd_vel_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
             // 2. 订阅 Nav2 输出，混合黑板 vw，转发给底盘

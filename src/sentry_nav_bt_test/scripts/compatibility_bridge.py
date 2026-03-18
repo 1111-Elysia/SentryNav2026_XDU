@@ -76,7 +76,7 @@ class RefereeCompatibilityBridge(Node):
             (old_msgs.ProjectileAllowance, new_msgs.ProjectileAllowance, 'projectile_allowance'),
             (old_msgs.HurtData,            new_msgs.HurtData,            'hurt_data'),
             (old_msgs.EventData,           new_msgs.EventData,           'event_data'),
-            (old_msgs.RfidStatus,        new_msgs.RfidStatus,          'rfid_status'),
+            # (old_msgs.RfidStatus,        new_msgs.RfidStatus,          'rfid_status'),
         ]
 
         # 存储 subscribers 和 publishers 以防被垃圾回收

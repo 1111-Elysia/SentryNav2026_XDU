@@ -1,52 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="3" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <Fallback name="Root">
-      <KeepRunningUntilFailure>
-        <Sequence name="裁判系统连接判定">
-          <Inverter>
-            <CheckCondition key_name="game_status_received"
-                            comparison="eq"
-                            threshold="1.0"/>
-          </Inverter>
-        </Sequence>
-      </KeepRunningUntilFailure>
-      <ForceFailure>
-        <PrintNode message="裁判系统连接成功"/>
-      </ForceFailure>
-      <KeepRunningUntilFailure>
-        <Sequence name="开始比赛检测">
-          <CheckCondition key_name="game_progress"
-                          comparison="lte"
-                          threshold="3.0"/>
-        </Sequence>
-      </KeepRunningUntilFailure>
+    <ReactiveSequence name="Root">
+      <CheckCondition name="裁判系统连接判定"
+                      key_name="game_status_received"
+                      comparison="eq"
+                      threshold="1.0"/>
+      <Inverter name="开始比赛检测">
+        <CheckCondition key_name="game_progress"
+                        comparison="lte"
+                        threshold="3.0"/>
+      </Inverter>
 
-      <ForceFailure>
-        <Fallback name="初始化">
-          <CheckCondition key_name="ul_initialized"
-                          comparison="eq"
-                          threshold="1.0"/>
-          <Sequence name="初始化状态">
-            <PrintNode message="比赛开始，初始化黑板变量"/>
-            <SetBlackboardValue key="aim_id"
-                                value="0"
-                                type="uint8"/>
-            <SetBlackboardValue key="hurt_armor"
-                                value="5"
-                                type="uint8"/>
-            <SetBlackboardValue key="ul_center_ready"
-                                value="0"
-                                type="int"/>
-            <SetBlackboardValue key="ul_retreat_active"
-                                value="0"
-                                type="int"/>
-            <SetBlackboardValue key="ul_initialized"
-                                value="1"
-                                type="int"/>
-          </Sequence>
-        </Fallback>
-      </ForceFailure>
+      <Fallback name="初始化">
+        <CheckCondition key_name="ul_initialized"
+                        comparison="eq"
+                        threshold="1.0"/>
+        <Sequence name="初始化状态">
+          <PrintNode message="比赛开始，初始化黑板变量"/>
+          <SetBlackboardValue key="aim_id"
+                              value="0"
+                              type="uint8"/>
+          <SetBlackboardValue key="hurt_armor"
+                              value="5"
+                              type="uint8"/>
+          <SetBlackboardValue key="ul_center_ready"
+                              value="0"
+                              type="int"/>
+          <SetBlackboardValue key="ul_retreat_active"
+                              value="0"
+                              type="int"/>
+          <SetBlackboardValue key="ul_initialized"
+                              value="1"
+                              type="int"/>
+        </Sequence>
+      </Fallback>
 
       <ReactiveFallback name="比赛开始">
         <Sequence name="低血量回补">
@@ -124,37 +112,39 @@
           <PrintNode message="[UL] 已到达中心区域，进入驻守态"/>
         </Sequence>
 
-        <Sequence name="中心驻守">
-          <CheckCondition key_name="ul_retreat_active"
-                          comparison="eq"
-                          threshold="0.0"/>
-          <CheckCondition key_name="ul_center_ready"
-                          comparison="eq"
-                          threshold="1.0"/>
-          <CheckCondition key_name="current_hp"
-                          comparison="gte"
-                          threshold="150.0"/>
-          <SetBlackboardValue key="vw"
-                              value="0.0"
-                              type="float"/>
-          <GoalSelector goal_name="center_point"
-                        goal="{goal}"/>
-          <Fallback name="中心位置维持">
-            <Sequence name="已在中心附近">
-              <CheckGoalReached goal="{goal}"
-                                threshold="0.50"/>
-              <Wait wait_duration="0.5"/>
-            </Sequence>
-            <ReliableNavigateToPose goal="{goal}"
-                                    goal_name="center_point_hold"
-                                    reach_threshold="0.50"
-                                    resend_interval="0.50"
-                                    response_timeout="1.00"
-                                    result_retry_delay="0.50"/>
-          </Fallback>
-        </Sequence>
+        <KeepRunningUntilFailure>
+          <Sequence name="中心驻守">
+            <CheckCondition key_name="ul_retreat_active"
+                            comparison="eq"
+                            threshold="0.0"/>
+            <CheckCondition key_name="ul_center_ready"
+                            comparison="eq"
+                            threshold="1.0"/>
+            <CheckCondition key_name="current_hp"
+                            comparison="gte"
+                            threshold="150.0"/>
+            <SetBlackboardValue key="vw"
+                                value="0.0"
+                                type="float"/>
+            <GoalSelector goal_name="center_point"
+                          goal="{goal}"/>
+            <Fallback name="中心位置维持">
+              <Sequence name="已在中心附近">
+                <CheckGoalReached goal="{goal}"
+                                  threshold="0.50"/>
+                <Wait wait_duration="0.5"/>
+              </Sequence>
+              <ReliableNavigateToPose goal="{goal}"
+                                      goal_name="center_point_hold"
+                                      reach_threshold="0.50"
+                                      resend_interval="0.50"
+                                      response_timeout="1.00"
+                                      result_retry_delay="0.50"/>
+            </Fallback>
+          </Sequence>
+        </KeepRunningUntilFailure>
       </ReactiveFallback>
-    </Fallback>
+    </ReactiveSequence>
   </BehaviorTree>
 
   <!-- =========================

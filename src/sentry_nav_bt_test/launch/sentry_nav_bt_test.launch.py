@@ -25,7 +25,7 @@ def generate_launch_description():
     pkg_dir = get_package_share_directory('sentry_nav_bt_test')
     
     # 行为树XML文件路径
-    bt_xml_path = os.path.join(pkg_dir, 'config', 'chase_bt.xml')
+    bt_xml_path = os.path.join(pkg_dir, 'config', 'ul.xml')
     
     # 红方路径点 JSON
     waypoints_red_path = os.path.join(pkg_dir, 'config', 'waypoints_red.json')

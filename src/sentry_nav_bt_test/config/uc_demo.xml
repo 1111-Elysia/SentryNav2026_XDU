@@ -3,6 +3,7 @@
   <BehaviorTree ID="MainTree">
     <Sequence name="Global_Loop">
       
+      <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
       <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
 
       <ReactiveFallback name="Root_Logic">

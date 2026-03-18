@@ -35,6 +35,8 @@
 #include "sentry_nav_bt_test/referee_actions.hpp"
 #include "sentry_nav_bt_test/auto_aim_and_fire_action.hpp"
 #include "sentry_nav_bt_test/chase_target_action.hpp"
+#include "sentry_nav_bt_test/patrol_nodes.hpp"
+#include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
 
 #include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
 
@@ -50,6 +52,13 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
             name, "navigate_to_pose", config);
     };
     factory.registerBuilder<nav2_behavior_tree::NavigateToPoseAction>("NavigateToPose", navigate_builder);
+    BT::NodeBuilder reliable_navigate_builder =
+    [node](const std::string &name, const BT::NodeConfiguration &config)
+    {
+        return std::make_unique<sentry_nav_bt_test::ReliableNavigateToPose>(name, config, node);
+    };
+    factory.registerBuilder<sentry_nav_bt_test::ReliableNavigateToPose>(
+        "ReliableNavigateToPose", reliable_navigate_builder);
     // 等待
     BT::NodeBuilder wait_builder =
         [](const std::string &name, const BT::NodeConfiguration &config)
@@ -80,6 +89,8 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     factory.registerNodeType<sentry_nav_bt_test::RandomSelector>("RandomSelector");
     // 目标选择器
     factory.registerNodeType<sentry_nav_bt_test::GoalSelector>("GoalSelector");
+    factory.registerNodeType<sentry_nav_bt_test::PatrolGoalSelector>("PatrolGoalSelector");
+    factory.registerNodeType<sentry_nav_bt_test::CheckGoalReached>("CheckGoalReached");
     // 打印节点
     factory.registerNodeType<sentry_nav_bt_test::PrintNode>("PrintNode");
     // 设置黑板值
@@ -337,8 +348,8 @@ int main(int argc, char **argv)
         RCLCPP_INFO(node->get_logger(), "运行导航行为树");
         while (rclcpp::ok())
         {
-            tree.rootNode()->executeTick();
             rclcpp::spin_some(node);
+            tree.rootNode()->executeTick();
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
