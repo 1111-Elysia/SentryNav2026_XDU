@@ -10,9 +10,15 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sentry_msgs REQUIRED)
 find_package(rm2_referee_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(can_comm_node
   src/can_comm.cpp
+)
+
+target_include_directories(can_comm_node PRIVATE
+  include
 )
 
 ament_target_dependencies(can_comm_node
@@ -20,6 +26,8 @@ ament_target_dependencies(can_comm_node
   geometry_msgs
   sentry_msgs
   rm2_referee_msgs
+  tf2
+  tf2_ros
 )
 
 add_subdirectory(librm)

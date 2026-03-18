@@ -4,6 +4,7 @@
 #include <sentry_msgs/msg/scan_mode.hpp>
 #include <sentry_msgs/msg/armor_presence.hpp>
 #include <rm2_referee_msgs/msg/hurt_data.hpp>
+#include "super_deluo.hpp"
 
 #include <librm.hpp>
 
@@ -48,6 +49,8 @@ public:
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
+
+        super_deluo_ = std::make_unique<SuperDeluo>(*this);
 
         // 打开 CAN 设备
         try {
@@ -124,10 +127,21 @@ private:
 
         if (msg->armor_id != 0) {
             std::lock_guard<std::mutex> lock(mutex_);
+
+            // 测试*******
+            // New logic switch: trigger super_deluo behavior (random vw + low-priority circle vx/vy).
+            if (super_deluo_) {
+                super_deluo_->onHurt(this->now());
+            }
+            // 测试*******
+
+            // Old logic (vw only) is intentionally kept for quick switching.
+            // hurt_active_ = true;
+            // hurt_start_time_ = this->now();
+            // vw_ = 1.0f;
+
             hurt_active_ = true;
             hurt_start_time_ = this->now();
-            printf("hurtCallback hurtCallback hurtCallback");
-            vw_ = 1.0f;
         }
     }
 
@@ -149,16 +163,43 @@ private:
             behind = armor_behind_;
             right  = armor_right_;
 
+            // 测试*******
+            if (super_deluo_) {
+                auto plan = super_deluo_->compute(this->now());
+                if (plan.active) {
+                    vw = plan.vw;
+                    vw_ = vw;
+
+                    // Lower priority than cmd_vel: only inject when cmd_vel vx/vy are near zero.
+                    if (super_deluo_->shouldInjectVxy(vx, vy)) {
+                        vx = plan.vx;
+                        vy = plan.vy;
+                        vx_ = vx;
+                        vy_ = vy;
+                    }
+                }
+            }
+            // 测试*******
+
+            // Old logic (vw only for 5s after hurt), retained for quick fallback:
+            // if (hurt_active_) {
+            //     auto now = this->now();
+            //     double dt = (now - hurt_start_time_).seconds();
+            //     if (dt < 5.0) {
+            //         vw = 1.0f;
+            //         vw_ = vw;
+            //     } else {
+            //         hurt_active_ = false;
+            //         vw = 0.0f;
+            //         vw_ = vw;
+            //     }
+            // }
+
             if (hurt_active_) {
                 auto now = this->now();
                 double dt = (now - hurt_start_time_).seconds();
-                if (dt < 5.0) {
-                    vw = 1.0f;
-                    vw_ = vw;
-                } else {
+                if (dt >= 5.0) {
                     hurt_active_ = false;
-                    vw = 0.0f;
-                    vw_ = vw;
                 }
             }
         }
@@ -222,6 +263,7 @@ private:
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
     rclcpp::Subscription<rm2_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
     rclcpp::TimerBase::SharedPtr                                     timer_;
+    std::unique_ptr<SuperDeluo>                                      super_deluo_;
 
     std::mutex mutex_;
     float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
