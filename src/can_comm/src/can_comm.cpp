@@ -128,17 +128,10 @@ private:
         if (msg->armor_id != 0) {
             std::lock_guard<std::mutex> lock(mutex_);
 
-            // 测试*******
-            // New logic switch: trigger super_deluo behavior (random vw + low-priority circle vx/vy).
+            // 受击后触发 super_deluo：仅随机 vw。
             if (super_deluo_) {
                 super_deluo_->onHurt(this->now());
             }
-            // 测试*******
-
-            // Old logic (vw only) is intentionally kept for quick switching.
-            // hurt_active_ = true;
-            // hurt_start_time_ = this->now();
-            // vw_ = 1.0f;
         }
     }
 
@@ -160,34 +153,12 @@ private:
             behind = armor_behind_;
             right  = armor_right_;
 
-            // 测试*******
             if (super_deluo_) {
                 auto plan = super_deluo_->compute(this->now());
                 if (plan.active) {
                     vw = plan.vw;
-
-                    // Lower priority than cmd_vel: only inject when cmd_vel vx/vy are near zero.
-                    if (super_deluo_->shouldInjectVxy(vx, vy)) {
-                        vx = plan.vx;
-                        vy = plan.vy;
-                    }
                 }
             }
-            // 测试*******
-
-            // Old logic (vw only for 5s after hurt), retained for quick fallback:
-            // if (hurt_active_) {
-            //     auto now = this->now();
-            //     double dt = (now - hurt_start_time_).seconds();
-            //     if (dt < 5.0) {
-            //         vw = 1.0f;
-            //         vw_ = vw;
-            //     } else {
-            //         hurt_active_ = false;
-            //         vw = 0.0f;
-            //         vw_ = vw;
-            //     }
-            // }
         }
 
         // 限幅 lambda

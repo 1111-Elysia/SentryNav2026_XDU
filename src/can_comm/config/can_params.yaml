@@ -5,15 +5,8 @@ can_comm_node:
     id_xyz: 0x180            # vx,vy,vyaw,vw 帧 CAN ID
     id_scan: 0x190           # scan mode 帧 CAN ID
 
-    # super_deluo: 受击后策略（随机 vw + 小范围闭环绕圈 vx/vy）
-    super_deluo.duration_s: 5.0                 # 受击策略持续时间（秒）
-    super_deluo.vw_min: 0.9                     # 每秒随机角速度下限（rad/s）
-    super_deluo.vw_max: 1.0                     # 每秒随机角速度上限（rad/s）
-    super_deluo.circle_radius_m: 0.35           # 目标绕圈半径（米）
-    super_deluo.circle_tangent_speed: 0.25      # 切向速度（m/s），越大绕圈越快
-    super_deluo.radial_kp: 1.1                  # 径向误差 P 系数，用于回到目标半径
-    super_deluo.max_vxy: 0.40                   # 注入 vx/vy 的最大限幅（m/s）
-    super_deluo.vxy_cmd_vel_low_prio_eps: 0.03  # cmd_vel 优先阈值：|vx|/|vy| 小于该值才注入
-    super_deluo.map_frame: "map"               # 闭环控制使用的全局坐标系
-    super_deluo.base_frame: "base_link"        # 车体坐标系（TF 目标帧）
+    # super_deluo: 受击后策略（仅随机 vw）
+    super_deluo.duration_s: 5.0   # 受击策略持续时间（秒）
+    super_deluo.vw_min: 0.9       # 每秒随机角速度下限（rad/s）
+    super_deluo.vw_max: 1.0       # 每秒随机角速度上限（rad/s）
 
