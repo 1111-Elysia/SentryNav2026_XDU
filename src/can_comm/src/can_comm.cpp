@@ -139,9 +139,6 @@ private:
             // hurt_active_ = true;
             // hurt_start_time_ = this->now();
             // vw_ = 1.0f;
-
-            hurt_active_ = true;
-            hurt_start_time_ = this->now();
         }
     }
 
@@ -168,14 +165,11 @@ private:
                 auto plan = super_deluo_->compute(this->now());
                 if (plan.active) {
                     vw = plan.vw;
-                    vw_ = vw;
 
                     // Lower priority than cmd_vel: only inject when cmd_vel vx/vy are near zero.
                     if (super_deluo_->shouldInjectVxy(vx, vy)) {
                         vx = plan.vx;
                         vy = plan.vy;
-                        vx_ = vx;
-                        vy_ = vy;
                     }
                 }
             }
@@ -194,14 +188,6 @@ private:
             //         vw_ = vw;
             //     }
             // }
-
-            if (hurt_active_) {
-                auto now = this->now();
-                double dt = (now - hurt_start_time_).seconds();
-                if (dt >= 5.0) {
-                    hurt_active_ = false;
-                }
-            }
         }
 
         // 限幅 lambda
@@ -270,8 +256,6 @@ private:
     float vw_ = 0.0f;
     bool  scan_mod_type_ = true;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
-    bool hurt_active_ = false;
-    rclcpp::Time hurt_start_time_;
 
     uint32_t id_xyz_  = 0x180;
     uint32_t id_scan_ = 0x190;
