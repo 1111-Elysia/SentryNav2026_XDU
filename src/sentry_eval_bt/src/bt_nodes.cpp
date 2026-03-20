@@ -44,6 +44,9 @@ struct BtRosContext
 
   std::vector<geometry_msgs::msg::PoseStamped> points;
   size_t current_index{0};
+  size_t loop_count{0};
+  bool loop_points{true};
+  bool stop_on_last{false};
 
   std::mutex nav_mutex;
 
@@ -90,6 +93,13 @@ public:
       return BT::NodeStatus::FAILURE;
     }
 
+    if (!ctx.node->has_parameter("loop_points")) {
+      ctx.node->declare_parameter("loop_points", true);
+    }
+    if (!ctx.node->has_parameter("stop_on_last")) {
+      ctx.node->declare_parameter("stop_on_last", false);
+    }
+
     ctx.points.clear();
     for (size_t i = 0; i < flat.size(); i += 3) {
       geometry_msgs::msg::PoseStamped p;
@@ -103,7 +113,16 @@ public:
     }
 
     ctx.current_index = 0;
-    RCLCPP_INFO(ctx.node->get_logger(), "InitPoints: loaded %zu points", ctx.points.size());
+    ctx.loop_count = 0;
+    ctx.loop_points = ctx.node->get_parameter("loop_points").as_bool();
+    ctx.stop_on_last = ctx.node->get_parameter("stop_on_last").as_bool();
+
+    RCLCPP_INFO(
+        ctx.node->get_logger(),
+        "InitPoints: loaded %zu points, loop_points=%s, stop_on_last=%s",
+        ctx.points.size(),
+        ctx.loop_points ? "true" : "false",
+        ctx.stop_on_last ? "true" : "false");
     initialized = true;
     return BT::NodeStatus::SUCCESS;
   }
@@ -134,18 +153,39 @@ public:
     if (ctx.points.empty()) return BT::NodeStatus::FAILURE;
 
     if (ctx.current_index >= ctx.points.size()) {
-      RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 所有点已跑完，任务结束！");
+      if (!ctx.loop_points) {
+        RCLCPP_INFO(ctx.node->get_logger(), "NextPoint: 所有点已跑完，任务结束！");
+        ctx.current_index = 0;
+        return BT::NodeStatus::FAILURE;
+      }
+
       ctx.current_index = 0;
-      return BT::NodeStatus::FAILURE;
+      ++ctx.loop_count;
+      RCLCPP_INFO(
+          ctx.node->get_logger(),
+          "NextPoint: 完成第 %zu 轮，回到起点继续循环",
+          ctx.loop_count);
     }
+
     size_t idx = ctx.current_index;
     auto goal = ctx.points[idx];
     goal.header.stamp = ctx.node->now();
+    const bool stop_on_this_point = ctx.stop_on_last && (idx == ctx.points.size() - 1);
 
     setOutput("goal", goal);
     setOutput("idx", idx);
-    setOutput("is_last", (idx == ctx.points.size() - 1));
+    setOutput("is_last", stop_on_this_point);
     ctx.current_index++;
+
+    RCLCPP_INFO(
+        ctx.node->get_logger(),
+        "NextPoint: 当前目标 P%zu/%zu -> (%.2f, %.2f)%s",
+        idx,
+        ctx.points.size(),
+        goal.pose.position.x,
+        goal.pose.position.y,
+        stop_on_this_point ? " [末点停车]" : "");
+
     return BT::NodeStatus::SUCCESS;
   }
 };
@@ -200,7 +240,7 @@ public:
       double dy = goal.pose.position.y - t.transform.translation.y;
       double dist = std::sqrt(dx * dx + dy * dy);
 
-      // --- 关键逻辑：区分普通点和终点 ---
+      // --- 关键逻辑：区分普通巡逻点和需要停车的末点 ---
       bool is_last_point = false;
       getInput("is_last", is_last_point);
       double effective_threshold = xml_threshold;
@@ -211,7 +251,7 @@ public:
 
       if (is_last_point) {
         effective_threshold = final_xml_threshold; 
-        mode_str = "终点锁定";
+        mode_str = "末点停车";
       }
       
       if (dist < effective_threshold) {
@@ -294,19 +334,20 @@ public:
     return BT::NodeStatus::RUNNING;
   }
 
-  BT::NodeStatus onRunning() override
+  BT::NodeStatus onRunning()
   {
     auto &ctx = BtRosContext::instance();
     auto now = ctx.node->now();
 
-
-      if (nav_result_ready_) {
+    // 检查结果是否已经就绪
+    if (nav_result_ready_) {
         if (nav_succeeded_) {
-          return BT::NodeStatus::SUCCESS;
+            return BT::NodeStatus::SUCCESS;
         } else {
-          return BT::NodeStatus::FAILURE;
+            return BT::NodeStatus::FAILURE;
         }
     }
+
     if (!ctx.client->action_server_is_ready()) {
       if ((now - last_attempt_time_).seconds() > 2.0) {
         RCLCPP_WARN(ctx.node->get_logger(), "⚠️ Nav2 Action Server 未连接，正在等待...");
@@ -416,9 +457,6 @@ public:
     // ----------------------------------------------------------------
     case InternalState::SENDING:
     {
-      // 超时看门狗 (Watchdog)
-      // 如果发送后 1.0 秒内没有收到 callback (既没变 ACCEPTED 也没变 REJECTED)
-      // 说明消息丢了或者卡住了。直接强制重置回 IDLE，触发下一次 tick 重新发。
       double wait_time = (now - last_attempt_time_).seconds();
       if (wait_time > 1.0) {
           RCLCPP_WARN(ctx.node->get_logger(), "⏰ [超时] 等待 Nav2 响应 %.1fs 无果，强制重发！", wait_time);
@@ -472,6 +510,5 @@ private:
   uint64_t active_goal_id_{0};
   uint64_t seq_{0};
 };
-
 
 

@@ -1,5 +1,7 @@
 sentry_eval_bt_node:
   ros__parameters:
+    loop_points: true
+    stop_on_last: false
     points: [
       -0.2, -6.5, 0.0,   
       1.2, -6.5, 0.0,

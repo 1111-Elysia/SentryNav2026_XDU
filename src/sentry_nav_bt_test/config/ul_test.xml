@@ -56,9 +56,6 @@
                                   type="int"/>
             </Sequence>
           </Fallback>
-          <SetBlackboardValue key="vw"
-                              value="0.0"
-                              type="float"/>
           <GoalSelector goal_name="supply_point"
                         goal="{goal}"/>
           <ReliableNavigateToPose goal="{goal}"
@@ -67,9 +64,6 @@
                                   resend_interval="0.30"
                                   response_timeout="0.80"
                                   result_retry_delay="0.30"/>
-          <SetBlackboardValue key="vw"
-                              value="5.0"
-                              type="float"/>
           <Wait wait_duration="5.0"/>
           <KeepRunningUntilFailure>
             <Sequence name="等待回血完成">
@@ -95,9 +89,6 @@
           <CheckCondition key_name="ul_center_ready"
                           comparison="eq"
                           threshold="0.0"/>
-          <SetBlackboardValue key="vw"
-                              value="0.0"
-                              type="float"/>
           <GoalSelector goal_name="center_point"
                         goal="{goal}"/>
           <ReliableNavigateToPose goal="{goal}"
@@ -123,9 +114,6 @@
             <CheckCondition key_name="current_hp"
                             comparison="gte"
                             threshold="150.0"/>
-            <SetBlackboardValue key="vw"
-                                value="0.0"
-                                type="float"/>
             <GoalSelector goal_name="center_point"
                           goal="{goal}"/>
             <Fallback name="中心位置维持">

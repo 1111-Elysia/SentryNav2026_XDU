@@ -19,7 +19,6 @@
              <NavigateToPose goal="{goal}"/>
              
              <PrintNode message="到达补给区，等待回血..."/>
-             <SetBlackboardValue key="vw" value="0.0" type="float"/>
              <Wait wait_duration="5.0"/>
              <SetBlackboardValue key="is_under_attack" value="0" type="int"/>
           </Sequence>
@@ -29,7 +28,6 @@
              
              <PrintNode message="!!! 遭遇敌人: 原地反击 !!!"/>
              <ForceSuccess><Action ID="SetSentryPosture" mode="1"/></ForceSuccess>
-             <SetBlackboardValue key="vw" value="15.0" type="float"/>
              <Wait wait_duration="1.0"/>
              <SetBlackboardValue key="is_under_attack" value="0" type="int"/>
           </Sequence>

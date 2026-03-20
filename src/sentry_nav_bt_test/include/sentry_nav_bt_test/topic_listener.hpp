@@ -367,10 +367,10 @@ namespace sentry_nav_bt_test
             // 1. 初始化发布者 (发给底盘驱动)
             cmd_vel_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-            // 2. 订阅 Nav2 输出，混合黑板 vw，转发给底盘
+            // 2. 订阅 Nav2 输出并转发给底盘
             this->subscribeWithProcessorBestEffort<geometry_msgs::msg::TwistStamped>(
                 "/follower/cmd_vel",
-                [this](const geometry_msgs::msg::TwistStamped::SharedPtr msg, BT::Blackboard::Ptr bb)
+                [this](const geometry_msgs::msg::TwistStamped::SharedPtr msg, BT::Blackboard::Ptr /*bb*/)
                 {
                     geometry_msgs::msg::Twist output_msg;
 
@@ -378,19 +378,8 @@ namespace sentry_nav_bt_test
                     output_msg.linear.x = msg->twist.linear.x;
                     output_msg.linear.y = msg->twist.linear.y;
 
-                    // B. 处理角速度 (小陀螺逻辑)
-                    float target_vw = 0.0f;
-                    // 尝试从黑板读取 "vw"
-                    if (bb->get("vw", target_vw))
-                    {
-                        // 如果黑板里设定了 vw (例如遭遇战设为 10.0)，直接覆盖，实现小陀螺
-                        output_msg.angular.z = target_vw;
-                    }
-                    else
-                    {
-                        // 如果没设 vw，就用 Nav2 算出来的角速度正常转弯
-                        output_msg.angular.z = msg->twist.angular.z;
-                    }
+                    // B. 直接使用 Nav2 计算出的角速度
+                    output_msg.angular.z = msg->twist.angular.z;
 
                     // C. 发送给底盘
                     cmd_vel_pub_->publish(output_msg);
