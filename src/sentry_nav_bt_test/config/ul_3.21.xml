@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="Root">
+      <KeepRunningUntilFailure>
+        <Sequence name="裁判系统连接判定">
+          <Inverter>
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1.0"/>
+          </Inverter>
+          <Wait wait_duration="0.2"/>
+        </Sequence>
+      </KeepRunningUntilFailure>
+      <ForceFailure>
+        <PrintNode message="裁判系统连接成功"/>
+      </ForceFailure>
+      <KeepRunningUntilFailure>
+        <Sequence name="开始比赛检测">
+          <CheckCondition key_name="game_progress"
+                          comparison="lte"
+                          threshold="3.0"/>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <Sequence name="ConnectedPatrol">
+        <Fallback name="InitOnce">
+          <CheckCondition key_name="ul_initialized"
+                          comparison="eq"
+                          threshold="1.0"/>
+          <Sequence name="InitPatrol">
+            <PrintNode message="裁判系统连接成功，开始循环跑点"/>
+            <SetBlackboardValue key="patrol_index"
+                                value="0"
+                                type="int"/>
+            <SetBlackboardValue key="ul_initialized"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
+
+        <PatrolGoalSelector goal_names="supply_point,center_point"
+                            index_key="patrol_index"
+                            goal="{goal}"
+                            goal_name="{goal_name}"/>
+
+        <ReliableNavigateToPose goal="{goal}"
+                                goal_name="{goal_name}"
+                                reach_threshold="0.25"
+                                resend_interval="0.30"
+                                response_timeout="0.80"
+                                result_retry_delay="0.30"/>
+
+        <Wait wait_duration="0.2"/>
+      </Sequence>
+    </Fallback>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <Condition ID="CheckCondition" editable="true">
+      <input_port name="key_name"/>
+      <input_port name="comparison"/>
+      <input_port name="threshold"/>
+    </Condition>
+
+    <Action ID="GoalSelector" editable="true">
+      <input_port name="goal_name"/>
+      <output_port name="goal"/>
+    </Action>
+
+    <Action ID="PatrolGoalSelector" editable="true">
+      <input_port name="goal_names"/>
+      <input_port name="index_key"/>
+      <output_port name="goal"/>
+      <output_port name="goal_name"/>
+    </Action>
+
+    <Action ID="NavigateToPose" editable="true">
+      <input_port name="goal"/>
+    </Action>
+
+    <Action ID="ReliableNavigateToPose" editable="true">
+      <input_port name="goal"/>
+      <input_port name="goal_name"/>
+      <input_port name="reach_threshold"/>
+      <input_port name="resend_interval"/>
+      <input_port name="response_timeout"/>
+      <input_port name="result_retry_delay"/>
+    </Action>
+
+    <Condition ID="CheckGoalReached" editable="true">
+      <input_port name="goal"/>
+      <input_port name="threshold"/>
+    </Condition>
+
+    <Action ID="PrintBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="prefix"/>
+    </Action>
+
+    <Action ID="PrintNode" editable="true">
+      <input_port name="message"/>
+    </Action>
+
+    <Action ID="SetBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="value"/>
+      <input_port name="type"/>
+    </Action>
+
+    <Action ID="Wait" editable="true">
+      <input_port name="wait_duration"/>
+    </Action>
+
+    <Decorator ID="RetryUntilSuccessful">
+      <input_port name="num_attempts"/>
+    </Decorator>
+    <Decorator ID="KeepRunningUntilFailure"/>
+    <Decorator ID="ForceSuccess"/>
+    <Decorator ID="ForceFailure"/>
+    <Decorator ID="Inverter"/>
+    <Control ID="Parallel"/>
+  </TreeNodesModel>
+</root>
