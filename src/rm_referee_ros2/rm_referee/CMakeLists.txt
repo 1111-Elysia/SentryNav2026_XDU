@@ -25,7 +25,7 @@ target_include_directories(referee_node_component PUBLIC
   ${Boost_INCLUDE_DIRS}
 )
 rclcpp_components_register_node(referee_node_component
-  PLUGIN "rm_referee::RefereeNode"
+  PLUGIN "RefereeNode"
   EXECUTABLE referee_node
 )
 
@@ -36,7 +36,7 @@ target_include_directories(tf_publisher_component PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 rclcpp_components_register_node(tf_publisher_component
-  PLUGIN "rm_referee::TfPublisher"
+  PLUGIN "TfPublisher"
   EXECUTABLE tf_publisher
 )
 

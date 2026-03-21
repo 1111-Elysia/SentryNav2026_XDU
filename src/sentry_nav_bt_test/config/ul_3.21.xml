@@ -20,7 +20,7 @@
 
       <KeepRunningUntilFailure>
         <Sequence name="开始比赛检测">
-          <CheckCondition key_name="game_type"
+          <CheckCondition key_name="game_progress"
                           comparison="lte"
                           threshold="3.0"/>
         </Sequence>
