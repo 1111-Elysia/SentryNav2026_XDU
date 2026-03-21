@@ -138,8 +138,14 @@ class Referee : public Device {
             // 整包接收完+CRC校验通过
             // 裁判系统仍然在线
             ReportStatus(kOk);
+            // 新协议可能会出现当前版本尚未建模的 cmd_id，直接忽略即可，不能让解析线程被打断。
+            const auto member_it = referee_protocol_memory_map_.map.find(cmdid_this_time_);
+            if (member_it == referee_protocol_memory_map_.map.end()) {
+              break;
+            }
+
             // 把数据拷贝到反序列化缓冲区对应的结构体中
-            const usize member_offset = referee_protocol_memory_map_.map.at(cmdid_this_time_);
+            const usize member_offset = member_it->second;
             u8 *dest_ptr = reinterpret_cast<u8 *>(&deserialize_buffer_) + member_offset;
             u8 *src_ptr = valid_data_so_far_.data() + kRefProtocolHeaderLen + kRefProtocolCmdIdLen;
             std::memcpy(dest_ptr, src_ptr, data_len_this_time_);

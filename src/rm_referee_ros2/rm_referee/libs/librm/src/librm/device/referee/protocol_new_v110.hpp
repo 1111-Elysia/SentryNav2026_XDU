@@ -62,6 +62,11 @@ struct RefereeCmdId<RefereeRevision::kNewV110> {
   constexpr static u16 kRobotCustomData2 = 0x310;  // 图传链路
   constexpr static u16 kMapCommand = 0x303;
   constexpr static u16 kRemoteControl = 0x304;  // 图传链路
+  constexpr static u16 kRadarInfoToClient = 0x305;
+  constexpr static u16 kMapData = 0x307;
+  constexpr static u16 kCustomInfo = 0x308;
+  constexpr static u16 kSetVtChannel = 0x0f01;
+  constexpr static u16 kQueryVtChannel = 0x0f02;
 };
 
 #pragma pack(push, 1)
@@ -126,7 +131,7 @@ struct RefereeProtocol<RefereeRevision::kNewV110> {
   } robot_pos;
   struct {
     u8 recovery_buff;
-    u8 cooling_buff;
+    u16 cooling_buff;
     u8 defence_buff;
     u8 vulnerability_buff;
     u16 attack_buff;
@@ -196,6 +201,39 @@ struct RefereeProtocol<RefereeRevision::kNewV110> {
     u8 target_robot_id;
     u16 cmd_source;
   } map_command;
+  struct {
+    u16 hero_position_x;
+    u16 hero_position_y;
+    u16 engineer_position_x;
+    u16 engineer_position_y;
+    u16 infantry_3_position_x;
+    u16 infantry_3_position_y;
+    u16 infantry_4_position_x;
+    u16 infantry_4_position_y;
+    u16 infantry_5_position_x;
+    u16 infantry_5_position_y;
+    u16 sentry_position_x;
+    u16 sentry_position_y;
+  } radar_info_to_client;
+  struct {
+    u8 intention;
+    u16 start_position_x;
+    u16 start_position_y;
+    i8 delta_x[49];
+    i8 delta_y[49];
+    u16 sender_id;
+  } map_data;
+  struct {
+    u16 sender_id;
+    u16 receiver_id;
+    u8 user_data[30];
+  } custom_info;
+  struct {
+    u8 channel;
+  } set_vt_channel;
+  struct {
+    u8 channel;
+  } query_vt_channel;
   struct RemoteControl {
     enum : u16 {
       kW = 1,
@@ -254,7 +292,12 @@ struct RefereeProtocolMemoryMap<RefereeRevision::kNewV110> {
       {RefereeCmdId<RefereeRevision::kNewV110>::kRobotCustomData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, robot_custom_data)},
       {RefereeCmdId<RefereeRevision::kNewV110>::kRobotCustomData2, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, robot_custom_data_2)},
       {RefereeCmdId<RefereeRevision::kNewV110>::kMapCommand, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, map_command)},
-      {RefereeCmdId<RefereeRevision::kNewV110>::kRemoteControl, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, remote_control)}
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRemoteControl, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, remote_control)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kRadarInfoToClient, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, radar_info_to_client)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kMapData, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, map_data)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kCustomInfo, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, custom_info)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kSetVtChannel, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, set_vt_channel)},
+      {RefereeCmdId<RefereeRevision::kNewV110>::kQueryVtChannel, offsetof(RefereeProtocol<RefereeRevision::kNewV110>, query_vt_channel)}
   });
   // clang-format on
 };
