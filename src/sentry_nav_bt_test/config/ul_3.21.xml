@@ -15,9 +15,12 @@
       <ForceFailure>
         <PrintNode message="裁判系统连接成功"/>
       </ForceFailure>
+
+
+
       <KeepRunningUntilFailure>
         <Sequence name="开始比赛检测">
-          <CheckCondition key_name="game_progress"
+          <CheckCondition key_name="game_type"
                           comparison="lte"
                           threshold="3.0"/>
         </Sequence>
@@ -39,7 +42,7 @@
           </Sequence>
         </Fallback>
 
-        <PatrolGoalSelector goal_names="supply_point,center_point"
+        <PatrolGoalSelector goal_names="point1,point2,point3,point4"
                             index_key="patrol_index"
                             goal="{goal}"
                             goal_name="{goal_name}"/>
@@ -51,7 +54,7 @@
                                 response_timeout="0.80"
                                 result_retry_delay="0.30"/>
 
-        <Wait wait_duration="0.2"/>
+        <Wait wait_duration="0.0"/>
       </Sequence>
     </Fallback>
   </BehaviorTree>
