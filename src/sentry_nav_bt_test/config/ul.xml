@@ -19,6 +19,31 @@
           <CheckCondition key_name="game_progress"
                           comparison="lte"
                           threshold="3.0"/>
+          <Fallback name="赛前状态复位">
+            <Sequence name="赛前状态已复位">
+              <CheckCondition key_name="ul_initialized"
+                              comparison="eq"
+                              threshold="0.0"/>
+              <CheckCondition key_name="ul_retreat_active"
+                              comparison="eq"
+                              threshold="0.0"/>
+              <CheckCondition key_name="ul_center_ready"
+                              comparison="eq"
+                              threshold="0.0"/>
+            </Sequence>
+            <Sequence name="执行赛前复位">
+              <PrintNode message="[UL] 比赛未开始，重置局内状态"/>
+              <SetBlackboardValue key="ul_initialized"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="ul_retreat_active"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="ul_center_ready"
+                                  value="0"
+                                  type="int"/>
+            </Sequence>
+          </Fallback>
         </Sequence>
       </KeepRunningUntilFailure>
 
@@ -76,18 +101,19 @@
                                   resend_interval="0.30"
                                   response_timeout="0.80"
                                   result_retry_delay="0.30"/>
-          <Wait wait_duration="5.0"/>
-          <KeepRunningUntilFailure>
-            <Sequence name="等待回血完成">
-              <Inverter>
-                <CheckCondition name="回补结束判定"
-                                key_name="current_hp"
-                                comparison="gte"
-                                threshold="390.0"/>
-              </Inverter>
-              <Wait wait_duration="0.2"/>
-            </Sequence>
-          </KeepRunningUntilFailure>
+          <Inverter>
+            <KeepRunningUntilFailure>
+              <Sequence name="等待回血完成">
+                <Inverter>
+                  <CheckCondition name="回补结束判定"
+                                  key_name="current_hp"
+                                  comparison="gte"
+                                  threshold="390.0"/>
+                </Inverter>
+                <Wait wait_duration="0.2"/>
+              </Sequence>
+            </KeepRunningUntilFailure>
+          </Inverter>
           <PrintNode message="[UL] 回补完成，准备重新前往中心"/>
           <SetBlackboardValue key="ul_retreat_active"
                               value="0"
