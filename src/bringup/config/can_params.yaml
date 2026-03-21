@@ -4,4 +4,3 @@ can_comm_node:
     send_frequency: 500      # 发送频率 Hz
     id_xyz: 0x180            # vx,vy,vyaw,vw 帧 CAN ID
     id_scan: 0x190           # scan mode 帧 CAN ID
-    hurt_data_topic: /rm2_referee/hurt_data
