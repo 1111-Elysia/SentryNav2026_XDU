@@ -58,8 +58,10 @@ private:
   bool result_ready_{false};
   bool result_success_{false};
   uint64_t active_goal_id_{0};
+  uint64_t active_send_id_{0};
   uint64_t canceled_goal_id_{0};
   uint64_t seq_{0};
+  uint64_t send_seq_{0};
   int send_attempts_{0};
   int retry_count_{0};
   rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle_;

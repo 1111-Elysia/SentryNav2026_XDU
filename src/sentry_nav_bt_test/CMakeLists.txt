@@ -25,6 +25,7 @@ find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(sentry_msgs REQUIRED)
 
 # 自定义消息包
 find_package(rm_referee_msgs REQUIRED)
@@ -60,6 +61,7 @@ ament_target_dependencies(sentry_nav_bt_test_nodes
   tf2
   tf2_ros
   tf2_geometry_msgs
+  sentry_msgs
   rm_referee_msgs
   nlohmann_json
 )

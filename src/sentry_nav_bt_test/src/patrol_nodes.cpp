@@ -159,13 +159,30 @@ BT::NodeStatus CheckGoalReached::tick()
   const double dy = goal_pose.pose.position.y - current_pose.pose.position.y;
   const double distance = std::hypot(dx, dy);
 
+  const bool goal_changed =
+    !has_goal_context_ ||
+    std::abs(goal_pose.pose.position.x - last_goal_pose_.pose.position.x) > 1e-3 ||
+    std::abs(goal_pose.pose.position.y - last_goal_pose_.pose.position.y) > 1e-3 ||
+    std::abs(threshold - last_threshold_) > 1e-6;
+
+  if (goal_changed) {
+    last_goal_pose_ = goal_pose;
+    last_threshold_ = threshold;
+    has_goal_context_ = true;
+    last_reported_reached_ = false;
+  }
+
   if (distance <= threshold) {
-    RCLCPP_INFO(
-      logger_, "已到达目标点附近，当前距离 %.3f m，阈值 %.3f m",
-      distance, threshold);
+    if (!last_reported_reached_) {
+      RCLCPP_INFO(
+        logger_, "已到达目标点附近，当前距离 %.3f m，阈值 %.3f m",
+        distance, threshold);
+      last_reported_reached_ = true;
+    }
     return BT::NodeStatus::SUCCESS;
   }
 
+  last_reported_reached_ = false;
   return BT::NodeStatus::FAILURE;
 }
 

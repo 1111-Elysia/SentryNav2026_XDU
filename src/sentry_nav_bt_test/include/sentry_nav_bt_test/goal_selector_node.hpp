@@ -31,6 +31,9 @@ public:
 
 private:
     rclcpp::Logger logger_;
+    std::string last_logged_goal_name_;
+    geometry_msgs::msg::PoseStamped last_logged_goal_pose_;
+    bool has_last_logged_goal_{false};
 };
 
 } // namespace sentry_nav_bt_test

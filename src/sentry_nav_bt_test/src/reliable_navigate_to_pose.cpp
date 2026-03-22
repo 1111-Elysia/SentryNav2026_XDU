@@ -40,6 +40,7 @@ void ReliableNavigateToPose::resetRuntimeState_()
   retry_count_ = 0;
   canceled_goal_id_ = 0;
   active_goal_id_ = ++seq_;
+  active_send_id_ = 0;
   const auto clock_type = node_->get_clock()->get_clock_type();
   last_send_time_ = rclcpp::Time(0, 0, clock_type);
   last_log_time_ = rclcpp::Time(0, 0, clock_type);
@@ -128,6 +129,8 @@ void ReliableNavigateToPose::sendGoal_()
   const auto now = node_->now();
   current_goal_.header.stamp = now;
   const uint64_t goal_id = active_goal_id_;
+  const uint64_t send_id = ++send_seq_;
+  active_send_id_ = send_id;
   ++send_attempts_;
 
   NavigateToPose::Goal goal_msg;
@@ -135,9 +138,12 @@ void ReliableNavigateToPose::sendGoal_()
 
   auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
   options.goal_response_callback =
-    [this, goal_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
+    [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
     {
       if (goal_id != active_goal_id_) {
+        if (handle) {
+          client_->async_cancel_goal(handle);
+        }
         RCLCPP_WARN(
           node_->get_logger(),
           "[ReliableNavigate] 忽略过期 goal_response, goal_id=%lu current=%lu",
@@ -146,16 +152,31 @@ void ReliableNavigateToPose::sendGoal_()
         return;
       }
 
+      if (send_id != active_send_id_) {
+        if (handle) {
+          client_->async_cancel_goal(handle);
+          RCLCPP_WARN(
+            node_->get_logger(),
+            "[ReliableNavigate] 取消过期已接收目标%s%s%s, send_id=%lu current=%lu",
+            goal_name_.empty() ? "" : "[",
+            goal_name_.empty() ? "" : goal_name_.c_str(),
+            goal_name_.empty() ? "" : "]",
+            send_id,
+            active_send_id_);
+        }
+        return;
+      }
+
       if (!handle) {
         state_ = InternalState::IDLE;
         ++retry_count_;
-      RCLCPP_WARN(
-        node_->get_logger(),
-        "[ReliableNavigate] Nav2 未接收目标%s%s%s, retry_count=%d",
-        goal_name_.empty() ? "" : "[",
-        goal_name_.empty() ? "" : goal_name_.c_str(),
-        goal_name_.empty() ? "" : "]",
-        retry_count_);
+        RCLCPP_WARN(
+          node_->get_logger(),
+          "[ReliableNavigate] Nav2 未接收目标%s%s%s, retry_count=%d",
+          goal_name_.empty() ? "" : "[",
+          goal_name_.empty() ? "" : goal_name_.c_str(),
+          goal_name_.empty() ? "" : "]",
+          retry_count_);
         return;
       }
 
@@ -171,7 +192,7 @@ void ReliableNavigateToPose::sendGoal_()
     };
 
   options.result_callback =
-    [this, goal_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
+    [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
     {
       if (goal_id != active_goal_id_) {
         RCLCPP_WARN(
@@ -179,6 +200,18 @@ void ReliableNavigateToPose::sendGoal_()
           "[ReliableNavigate] 忽略过期 result, goal_id=%lu current=%lu",
           goal_id,
           active_goal_id_);
+        return;
+      }
+
+      if (send_id != active_send_id_) {
+        RCLCPP_WARN(
+          node_->get_logger(),
+          "[ReliableNavigate] 忽略过期 result callback%s%s%s, send_id=%lu current=%lu",
+          goal_name_.empty() ? "" : "[",
+          goal_name_.empty() ? "" : goal_name_.c_str(),
+          goal_name_.empty() ? "" : "]",
+          send_id,
+          active_send_id_);
         return;
       }
 

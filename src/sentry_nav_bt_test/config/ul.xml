@@ -12,7 +12,20 @@
         </Sequence>
       </KeepRunningUntilFailure>
       <ForceFailure>
-        <PrintNode message="裁判系统连接成功"/>
+        <Fallback name="裁判系统连接成功日志">
+          <CheckCondition key_name="game_status_connected_logged"
+                          comparison="eq"
+                          threshold="1.0"/>
+          <Sequence name="首次裁判系统连接成功">
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1.0"/>
+            <PrintNode message="裁判系统已连接，等待比赛开始"/>
+            <SetBlackboardValue key="game_status_connected_logged"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
       </ForceFailure>
       <KeepRunningUntilFailure>
         <Sequence name="开始比赛检测">
@@ -129,12 +142,16 @@
                           threshold="0.0"/>
           <GoalSelector goal_name="center_point"
                         goal="{goal}"/>
-          <ReliableNavigateToPose goal="{goal}"
-                                  goal_name="center_point"
-                                  reach_threshold="0.25"
-                                  resend_interval="0.30"
-                                  response_timeout="0.80"
-                                  result_retry_delay="0.30"/>
+          <Fallback name="已到中心或前往中心">
+            <CheckGoalReached goal="{goal}"
+                              threshold="0.50"/>
+            <ReliableNavigateToPose goal="{goal}"
+                                    goal_name="center_point"
+                                    reach_threshold="0.25"
+                                    resend_interval="0.30"
+                                    response_timeout="0.80"
+                                    result_retry_delay="0.30"/>
+          </Fallback>
           <SetBlackboardValue key="ul_center_ready"
                               value="1"
                               type="int"/>

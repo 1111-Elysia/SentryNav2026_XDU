@@ -2,6 +2,7 @@
 #define SENTRY_NAV_BT_TEST_TOPIC_LISTENER_HPP_
 
 #include <string>
+#include <cmath>
 #include <memory>
 #include <vector>
 #include <mutex>
@@ -30,6 +31,7 @@
 #include "rm_referee_msgs/msg/event_data.hpp"
 
 #include <geometry_msgs/msg/twist.hpp>
+#include "sentry_msgs/msg/vw.hpp"
 
 namespace sentry_nav_bt_test
 {
@@ -144,6 +146,12 @@ namespace sentry_nav_bt_test
 
             // 显式记录是否已经收到过裁判系统状态，避免用 game_progress 的默认值误判已连接
             blackboard_->set<bool>("game_status_received", false);
+            blackboard_->set<int>("game_status_connected_logged", 0);
+
+            // 初始化 UL 状态，避免赛前条件检查因缺键刷 warning
+            blackboard_->set<int>("ul_initialized", 0);
+            blackboard_->set<int>("ul_retreat_active", 0);
+            blackboard_->set<int>("ul_center_ready", 0);
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
@@ -364,26 +372,12 @@ namespace sentry_nav_bt_test
 
             // 创建控制指令发布者 （将navigation的速度指令转换为控制指令发布出去）
 
-            // 1. 初始化发布者 (发给底盘驱动)
-            cmd_vel_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
-
-            // 2. 订阅 Nav2 输出并转发给底盘
-            this->subscribeWithProcessorBestEffort<geometry_msgs::msg::TwistStamped>(
-                "/follower/cmd_vel",
-                [this](const geometry_msgs::msg::TwistStamped::SharedPtr msg, BT::Blackboard::Ptr /*bb*/)
-                {
-                    geometry_msgs::msg::Twist output_msg;
-
-                    // A. 继承 Nav2 的线速度 (导航走位)
-                    output_msg.linear.x = msg->twist.linear.x;
-                    output_msg.linear.y = msg->twist.linear.y;
-
-                    // B. 直接使用 Nav2 计算出的角速度
-                    output_msg.angular.z = msg->twist.angular.z;
-
-                    // C. 发送给底盘
-                    cmd_vel_pub_->publish(output_msg);
-                });
+            // 初始化发布者 (发给底盘驱动)
+            vw_pub_ = node_->create_publisher<sentry_msgs::msg::Vw>("/vw", 10);
+            vw_timer_ = node_->create_wall_timer(
+                std::chrono::milliseconds(100),
+                [this]()
+                { updateCenterHoldVwCommand(); });
 
             // 订阅伤害状态数据 0x0206
             this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::HurtData>(
@@ -572,11 +566,94 @@ namespace sentry_nav_bt_test
         rclcpp::TimerBase::SharedPtr hurt_reset_timer_;
         std::mutex hurt_mutex_;
 
-        rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+        rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
+        rclcpp::TimerBase::SharedPtr vw_timer_;
+        bool last_center_hold_vw_active_ = false;
+        bool vw_command_initialized_ = false;
         // TF
         std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
         std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
         rclcpp::TimerBase::SharedPtr tf_timer_;
+
+        bool isNearCenterPoint(double threshold = 0.50) const
+        {
+            geometry_msgs::msg::PoseStamped current_pose;
+            geometry_msgs::msg::PoseStamped center_pose;
+
+            if (!blackboard_->get("waypoint_now", current_pose)) {
+                return false;
+            }
+            if (!blackboard_->get("waypoint_center_point", center_pose)) {
+                return false;
+            }
+
+            const double dx = center_pose.pose.position.x - current_pose.pose.position.x;
+            const double dy = center_pose.pose.position.y - current_pose.pose.position.y;
+            return std::hypot(dx, dy) <= threshold;
+        }
+
+        bool isCenterHoldActive() const
+        {
+            int center_ready = 0;
+            int retreat_active = 0;
+            int ul_initialized = 0;
+            uint16_t current_hp = 0;
+            uint8_t game_progress = 0;
+
+            const bool center_ready_ok =
+                blackboard_->get("ul_center_ready", center_ready) && center_ready == 1;
+            const bool retreat_inactive =
+                blackboard_->get("ul_retreat_active", retreat_active) && retreat_active == 0;
+            const bool initialized =
+                blackboard_->get("ul_initialized", ul_initialized) && ul_initialized == 1;
+            const bool hp_ok =
+                blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
+            const bool match_started =
+                blackboard_->get("game_progress", game_progress) && game_progress > 3U;
+            const bool center_nearby = isNearCenterPoint();
+
+            return match_started && initialized && retreat_inactive && hp_ok &&
+                   (center_ready_ok || center_nearby);
+        }
+
+        void publishVwCommand(float value)
+        {
+            if (!vw_pub_) {
+                return;
+            }
+
+            sentry_msgs::msg::Vw msg;
+            msg.vw = value;
+            vw_pub_->publish(msg);
+        }
+
+        void updateCenterHoldVwCommand()
+        {
+            const bool center_hold_active = isCenterHoldActive();
+
+            if (!vw_command_initialized_)
+            {
+                publishVwCommand(center_hold_active ? 1.0f : 0.0f);
+                vw_command_initialized_ = true;
+                last_center_hold_vw_active_ = center_hold_active;
+                return;
+            }
+
+            if (center_hold_active)
+            {
+                if (!last_center_hold_vw_active_)
+                {
+                    RCLCPP_INFO(node_->get_logger(), "[UL] 中心驻守激活，开始持续发布 /vw = 1");
+                }
+                publishVwCommand(1.0f);
+            }
+            else if (last_center_hold_vw_active_)
+            {
+                RCLCPP_INFO(node_->get_logger(), "[UL] 退出中心驻守，停止持续发布 /vw");
+            }
+
+            last_center_hold_vw_active_ = center_hold_active;
+        }
 
         // 更新当前位置的方法
         void updateCurrentPosition()

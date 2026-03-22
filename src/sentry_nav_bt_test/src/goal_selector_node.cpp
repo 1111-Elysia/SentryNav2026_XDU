@@ -39,8 +39,19 @@ BT::NodeStatus GoalSelector::tick()
     // 设置输出
     setOutput("goal", goal_pose);
     
-    RCLCPP_INFO(logger_, "已选择目标点 '%s'，位置(%.2f, %.2f)",
-               goal_name.c_str(), goal_pose.pose.position.x, goal_pose.pose.position.y);
+    const bool goal_changed =
+        !has_last_logged_goal_ ||
+        goal_name != last_logged_goal_name_ ||
+        std::abs(goal_pose.pose.position.x - last_logged_goal_pose_.pose.position.x) > 1e-3 ||
+        std::abs(goal_pose.pose.position.y - last_logged_goal_pose_.pose.position.y) > 1e-3;
+
+    if (goal_changed) {
+        RCLCPP_INFO(logger_, "已选择目标点 '%s'，位置(%.2f, %.2f)",
+                   goal_name.c_str(), goal_pose.pose.position.x, goal_pose.pose.position.y);
+        last_logged_goal_name_ = goal_name;
+        last_logged_goal_pose_ = goal_pose;
+        has_last_logged_goal_ = true;
+    }
     
     return BT::NodeStatus::SUCCESS;
 }
