@@ -93,7 +93,7 @@ public:
                 armor_left_   = m->left;
                 armor_behind_ = m->behind;
                 armor_right_  = m->right;
-                armor_color_  = m->color;
+                armor_color_  = m->enemy_color;
             });
 
         robot_status_sub_ = this->create_subscription<rm_referee_msgs::msg::RobotStatus>(
