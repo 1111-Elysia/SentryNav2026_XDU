@@ -150,6 +150,17 @@ BT::NodeStatus ConfirmResurrection::tick()
         return BT::NodeStatus::FAILURE;
     }
 
+    uint16_t current_hp = 0;
+    if (config().blackboard->get("current_hp", current_hp) && current_hp > 0U) {
+        return BT::NodeStatus::SUCCESS;
+    }
+
+    bool can_confirm_resurrection = false;
+    if (!config().blackboard->get("can_confirm_resurrection", can_confirm_resurrection) ||
+        !can_confirm_resurrection) {
+        return BT::NodeStatus::SUCCESS;
+    }
+
     int req_posture_int = 0;
     int burst_count = 3;
     int burst_interval_ms = 20;

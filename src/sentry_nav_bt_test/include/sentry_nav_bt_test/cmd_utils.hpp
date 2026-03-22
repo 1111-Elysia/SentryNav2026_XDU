@@ -6,12 +6,9 @@
 #include <cstring>
 #include <iostream>
 
-// ==========================================
-// 1. CRC 校验算法 (基于官方提供的 C 代码移植)
-// ==========================================
 namespace rm_crc {
 
-    // CRC8 Lookup Table
+    // 裁判系统数据包使用的 CRC 查表
     const unsigned char CRC8_INIT = 0xff;
     const unsigned char CRC8_TAB[256] = {
         0x00, 0x5e, 0xbc, 0xe2, 0x61, 0x3f, 0xdd, 0x83, 0xc2, 0x9c, 0x7e, 0x20, 0xa3, 0xfd, 0x1f, 0x41,
@@ -32,7 +29,6 @@ namespace rm_crc {
         0x74, 0x2a, 0xc8, 0x96, 0x15, 0x4b, 0xa9, 0xf7, 0xb6, 0xe8, 0x0a, 0x54, 0xd7, 0x89, 0x6b, 0x35
     };
 
-    // CRC16 Lookup Table
     const uint16_t CRC16_INIT = 0xffff;
     const uint16_t CRC16_TAB[256] = {
         0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
@@ -81,7 +77,6 @@ namespace rm_crc {
     inline void Append_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLength) {
         unsigned char ucCRC = 0;
         if ((pchMessage == 0) || (dwLength <= 2)) return;
-        // CRC8 calculates over dwLength - 1 bytes (Header content), places result at end
         ucCRC = Get_CRC8_Check_Sum((unsigned char *)pchMessage, dwLength - 1, CRC8_INIT);
         pchMessage[dwLength - 1] = ucCRC;
     }
@@ -99,19 +94,15 @@ namespace rm_crc {
     inline void Append_CRC16_Check_Sum(uint8_t *pchMessage, uint32_t dwLength) {
         uint16_t wCRC = 0;
         if ((pchMessage == NULL) || (dwLength <= 2)) return;
-        // CRC16 calculates over dwLength - 2 (Header+Cmd+Data), places result at end
         wCRC = Get_CRC16_Check_Sum(pchMessage, dwLength - 2, CRC16_INIT);
         pchMessage[dwLength - 2] = (uint8_t)(wCRC & 0x00ff);
         pchMessage[dwLength - 1] = (uint8_t)((wCRC >> 8) & 0x00ff);
     }
 }
 
-// ==========================================
-// 2. 协议结构体定义
-// ==========================================
 namespace rm_protocol {
 
-    // 帧头 (5 bytes)
+    // 裁判系统交互帧头，固定 5 字节
     typedef struct __attribute__((packed)) {
         uint8_t sof;
         uint16_t data_length;
@@ -119,109 +110,81 @@ namespace rm_protocol {
         uint8_t crc8;
     } frame_header_t;
 
-    // 交互数据头 (0x0301 的内容结构)
+    // 0x0301 交互数据头
     typedef struct __attribute__((packed)) {
-        uint16_t data_cmd_id; // 子内容ID，这里填 0x0120
-        uint16_t sender_id;   // 哨兵ID (107 or 7)
-        uint16_t receiver_id; // 裁判系统ID (0x8080)
+        uint16_t data_cmd_id;
+        uint16_t sender_id;
+        uint16_t receiver_id;
     } interaction_header_t;
 
-    // 哨兵自主决策数据 (0x0120 的内容结构) - 4 bytes
-    // 暂时只需关注 Bit 21-22 (姿态), Bit 23 (能量机关)
-    // 其他买活/买弹位暂时置0
+    // 0x0120 哨兵决策数据
     typedef struct __attribute__((packed)) {
-        uint32_t value; 
+        uint32_t value;
     } sentry_decision_t;
 
-    // 常量定义
     const uint8_t SOF = 0xA5;
     const uint16_t CMD_ID_INTERACTION = 0x0301;
     const uint16_t SUB_CMD_ID_SENTRY = 0x0120;
     const uint16_t ID_REFEREE = 0x8080;
-    
-    // 哨兵ID
+
     const uint16_t ID_RED_SENTRY = 7;
     const uint16_t ID_BLUE_SENTRY = 107;
 
-    // 姿态枚举 (Bit 21-22)
+    // value 的 bit21-22 表示哨兵姿态
     enum class SentryPosture : uint32_t {
-        ATTACK = 1,   // 进攻姿态 (01)
-        DEFEND = 2,   // 防御姿态 (10)
-        MOVE = 3      // 移动姿态 (11) - 默认
+        ATTACK = 1,
+        DEFEND = 2,
+        MOVE = 3
     };
 
-    // 复活相关位定义
-    constexpr uint32_t BIT_CONFIRM_RESURRECTION = 19; // 确认免费复活
+    // 0x0120 value 的 bit0，表示发送给裁判系统的“确认免费复活”指令位
+    constexpr uint32_t BIT_CONFIRM_RESURRECTION = 0;
 }
 
-// ==========================================
-// 3. 工具类：构建数据包
-// ==========================================
 class SentryRefereeUtils {
 public:
     SentryRefereeUtils(uint16_t sender_id) : sender_id_(sender_id), seq_(0) {}
 
-    /**
-     * @brief 构建发送给裁判系统的 0x0301 (含 0x0120) 数据包
-     * * @param posture 姿态 (1:进攻, 2:防御, 3:移动)
-     * @param activate_energy 是否请求激活能量机关
-     * @return std::vector<uint8_t> 可直接赋给 tx.srv 的 data
-     */
+    // 构造一帧 0x0301 / 0x0120 哨兵指令包
     std::vector<uint8_t> buildSentryCmdPacket(
         rm_protocol::SentryPosture posture,
         bool activate_energy,
         bool confirm_resurrection = false) {
-        // 1. 构建 0x0120 数据 (4字节)
         uint32_t decision_val = 0;
-        
-        // Bit 21-22: 姿态
+
+        // 决策位：确认免费复活 bit0，姿态 bit21-22，激活能量机关 bit23
         decision_val |= (static_cast<uint32_t>(posture) & 0x3) << 21;
 
-        // Bit 23: 能量机关
         if (activate_energy) {
             decision_val |= (1 << 23);
         }
 
-        // Bit 19: 确认免费复活
         if (confirm_resurrection) {
             decision_val |= (1u << rm_protocol::BIT_CONFIRM_RESURRECTION);
         }
 
-        // 2. 准备缓冲区
-        // 长度计算: 
-        // Header(5) + CmdID(2) + [SubHeader(6) + UserData(4)] + CRC16(2) = 19 Bytes
+        // Header(5) + CmdID(2) + InteractionHeader(6) + Decision(4) + CRC16(2)
         std::vector<uint8_t> buffer(19);
 
-        // 3. 填充 Header
         rm_protocol::frame_header_t* header = (rm_protocol::frame_header_t*)buffer.data();
         header->sof = rm_protocol::SOF;
-        // DataLength 指的是 CmdID 之后的数据长度 (即 InteractionHeader + SentryDecision)
-        // 2(sub_cmd) + 2(sender) + 2(receiver) + 4(data) = 10
         header->data_length = sizeof(rm_protocol::interaction_header_t) + sizeof(rm_protocol::sentry_decision_t);
-        header->seq = seq_++; // 序号累加
-        
-        // 计算 Header 的 CRC8
+        header->seq = seq_++;
         rm_crc::Append_CRC8_Check_Sum(buffer.data(), sizeof(rm_protocol::frame_header_t));
 
-        // 4. 填充 CmdID (0x0301)
         uint16_t* cmd_id_ptr = (uint16_t*)(buffer.data() + sizeof(rm_protocol::frame_header_t));
         *cmd_id_ptr = rm_protocol::CMD_ID_INTERACTION;
 
-        // 5. 填充 Data 段 (0x0301 内容)
         uint8_t* data_ptr = buffer.data() + sizeof(rm_protocol::frame_header_t) + sizeof(uint16_t);
         rm_protocol::interaction_header_t* interact_head = (rm_protocol::interaction_header_t*)data_ptr;
-        
-        interact_head->data_cmd_id = rm_protocol::SUB_CMD_ID_SENTRY; // 0x0120
+        interact_head->data_cmd_id = rm_protocol::SUB_CMD_ID_SENTRY;
         interact_head->sender_id = sender_id_;
         interact_head->receiver_id = rm_protocol::ID_REFEREE;
 
-        // 6. 填充 Data 段 (0x0120 用户数据)
         rm_protocol::sentry_decision_t* decision_data = (rm_protocol::sentry_decision_t*)(data_ptr + sizeof(rm_protocol::interaction_header_t));
         decision_data->value = decision_val;
 
-        // 7. 计算整包 CRC16
         rm_crc::Append_CRC16_Check_Sum(buffer.data(), buffer.size());
-
         return buffer;
     }
 

@@ -13,7 +13,20 @@
         </Sequence>
       </KeepRunningUntilFailure>
       <ForceFailure>
-        <PrintNode message="裁判系统连接成功"/>
+        <Fallback name="裁判系统连接成功日志">
+          <CheckCondition key_name="game_status_connected_logged"
+                          comparison="eq"
+                          threshold="1.0"/>
+          <Sequence name="首次裁判系统连接成功">
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1.0"/>
+            <PrintNode message="裁判系统已连接，等待比赛开始"/>
+            <SetBlackboardValue key="game_status_connected_logged"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
       </ForceFailure>
 
 
@@ -30,7 +43,7 @@
         <CheckCondition key_name="current_hp"
                         comparison="eq"
                         threshold="0.0"/>
-        <PrintNode message="[UL-3.21] 检测到当前血量为0，开始持续确认复活"/>
+        <PrintNode message="[UL-3.21] 检测到当前血量为0，进入复活等待态"/>
         <Inverter>
           <KeepRunningUntilFailure>
             <Sequence name="持续确认复活">
@@ -44,7 +57,7 @@
             </Sequence>
           </KeepRunningUntilFailure>
         </Inverter>
-        <PrintNode message="[UL-3.21] 当前血量恢复，结束复活确认"/>
+        <PrintNode message="[UL-3.21] 当前血量恢复，结束复活等待"/>
       </Sequence>
 
       <Sequence name="ConnectedPatrol">

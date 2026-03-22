@@ -91,7 +91,7 @@
           <CheckCondition key_name="current_hp"
                           comparison="eq"
                           threshold="0.0"/>
-          <PrintNode message="[UL] 检测到当前血量为0，开始持续确认复活"/>
+          <PrintNode message="[UL] 检测到当前血量为0，进入复活等待态"/>
           <Inverter>
             <KeepRunningUntilFailure>
               <Sequence name="持续确认复活">
@@ -105,7 +105,7 @@
               </Sequence>
             </KeepRunningUntilFailure>
           </Inverter>
-          <PrintNode message="[UL] 当前血量恢复，结束复活确认"/>
+          <PrintNode message="[UL] 当前血量恢复，结束复活等待"/>
         </Sequence>
 
         <Sequence name="低血量回补">
@@ -142,7 +142,7 @@
                   <CheckCondition name="回补结束判定"
                                   key_name="current_hp"
                                   comparison="gte"
-                                  threshold="390.0"/>
+                                  threshold="400.0"/>
                 </Inverter>
                 <Wait wait_duration="0.2"/>
               </Sequence>

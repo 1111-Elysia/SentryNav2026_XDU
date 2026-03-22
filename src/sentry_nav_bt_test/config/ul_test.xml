@@ -71,7 +71,7 @@
                 <CheckCondition name="回补结束判定"
                                 key_name="current_hp"
                                 comparison="gte"
-                                threshold="390.0"/>
+                                threshold="400.0"/>
               </Inverter>
               <Wait wait_duration="0.2"/>
             </Sequence>
