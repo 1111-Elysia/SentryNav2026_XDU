@@ -73,6 +73,9 @@ public:
             vw_topic, 10,
             [this](const sentry_msgs::msg::Vw::SharedPtr m) {
                 std::lock_guard<std::mutex> lk(mutex_);
+                if (!vw_received_once_) {
+                    vw_received_once_ = true;
+                }
                 vw_ = m->vw;
             });
 
@@ -171,7 +174,7 @@ private:
                     vw_ = vw;
                 } else {
                     hurt_active_ = false;
-                    vw = 0.0f;
+                    vw = vw_received_once_ ? vw_default_after_first_msg_ : vw_default_before_first_msg_;
                     vw_ = vw;
                 }
             }
@@ -248,8 +251,10 @@ private:
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
-    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
-    float vw_ = 0.0f;
+    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;float vw_ = 0.0f;
+    float vw_default_before_first_msg_ = 0.0f;
+    float vw_default_after_first_msg_ = 0.3f;
+    bool vw_received_once_ = false;
     bool  scan_mod_type_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
     uint8_t armor_color_ = 0;
