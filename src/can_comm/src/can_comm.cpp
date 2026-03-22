@@ -3,7 +3,7 @@
 #include <sentry_msgs/msg/vw.hpp>
 #include <sentry_msgs/msg/scan_mode.hpp>
 #include <sentry_msgs/msg/armor_presence.hpp>
-#include <rm2_referee_msgs/msg/hurt_data.hpp>
+#include "rm_referee_msgs/msg/hurt_data.hpp"
 #include <rclcpp/qos.hpp>
 
 #include <librm.hpp>
@@ -34,7 +34,7 @@ public:
         this->declare_parameter<std::string>("vw_topic", "/vw");
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
-        this->declare_parameter<std::string>("hurt_data_topic", "/rm2_referee/hurt_data");
+        this->declare_parameter<std::string>("hurt_data_topic", "/rm_referee/hurt_data");
 
         // 读取参数
         std::string port      = this->get_parameter("port").as_string();
@@ -89,12 +89,11 @@ public:
                 armor_right_  = m->right;
             });
 
-        hurt_sub_ = this->create_subscription<rm2_referee_msgs::msg::HurtData>(
+        hurt_sub_ = this->create_subscription<rm_referee_msgs::msg::HurtData>(
             hurt_data_topic,
             rclcpp::SensorDataQoS(),   // BestEffort + small queue
             std::bind(&CanCommNode::hurtCallback, this, std::placeholders::_1));
     
-
         // 定时发送 CAN 帧
         if (send_freq <= 0) send_freq = 1;
         int period_ms = 1000 / send_freq;
@@ -120,10 +119,9 @@ private:
         vyaw_ = static_cast<float>(msg->angular.z);
     }
 
-    void hurtCallback(const rm2_referee_msgs::msg::HurtData::SharedPtr msg)
+    void hurtCallback(const rm_referee_msgs::msg::HurtData::SharedPtr msg)
     {
         if (!msg) return;
-
         if (msg->hp_deduction_reason == 0) {
             std::lock_guard<std::mutex> lock(mutex_);
             hurt_active_ = true;
@@ -222,13 +220,13 @@ private:
     rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr            vw_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
-    rclcpp::Subscription<rm2_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
+    rclcpp::Subscription<rm_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
     float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
     float vw_ = 0.0f;
-    bool  scan_mod_type_ = true;
+    bool  scan_mod_type_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
     bool hurt_active_ = false;
     rclcpp::Time hurt_start_time_;

@@ -11,7 +11,7 @@
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
   <depend>sentry_msgs</depend>
-  <depend>rm2_referee_msgs</depend>
+  <depend>rm_referee_msgs</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
 
