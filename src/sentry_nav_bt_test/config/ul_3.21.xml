@@ -9,7 +9,6 @@
                             comparison="eq"
                             threshold="1.0"/>
           </Inverter>
-          <Wait wait_duration="0.2"/>
         </Sequence>
       </KeepRunningUntilFailure>
       <ForceFailure>
@@ -33,15 +32,32 @@
           <CheckCondition key_name="game_progress"
                           comparison="lte"
                           threshold="3.0"/>
+          <Fallback name="赛前巡逻状态复位">
+            <Sequence name="赛前状态已复位">
+              <CheckCondition key_name="ul_initialized"
+                              comparison="eq"
+                              threshold="0.0"/>
+            </Sequence>
+            <Sequence name="执行巡逻状态复位">
+              <PrintNode message="[UL_3.21] 比赛未开始，重置巡逻状态"/>
+              <SetBlackboardValue key="ul_initialized"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="patrol_index"
+                                  value="0"
+                                  type="int"/>
+            </Sequence>
+          </Fallback>
         </Sequence>
       </KeepRunningUntilFailure>
-      <Sequence name="ConnectedPatrol">
-        <Fallback name="InitOnce">
+
+      <ForceFailure>
+        <Fallback name="初始化">
           <CheckCondition key_name="ul_initialized"
                           comparison="eq"
                           threshold="1.0"/>
-          <Sequence name="InitPatrol">
-            <PrintNode message="裁判系统连接成功，开始循环跑点"/>
+          <Sequence name="初始化巡逻状态">
+            <PrintNode message="比赛开始，开始循环跑点"/>
             <SetBlackboardValue key="patrol_index"
                                 value="0"
                                 type="int"/>
@@ -50,22 +66,24 @@
                                 type="int"/>
           </Sequence>
         </Fallback>
+      </ForceFailure>
 
+      <Sequence name="ConnectedPatrol">
         <PatrolGoalSelector goal_names="point1,point2"
                             index_key="patrol_index"
                             goal="{goal}"
                             goal_name="{goal_name}"/>
-        <Fallback>
+        <Fallback name="已到巡逻点或前往巡逻点">
+          <CheckGoalReached goal="{goal}"
+                            threshold="0.50"/>
           <ReliableNavigateToPose goal="{goal}"
-                                goal_name="{goal_name}"
-                                reach_threshold="0.25"
-                                resend_interval="0.30"
-                                response_timeout="0.80"
-                                result_retry_delay="0.30"/>
-
-          <Wait wait_duration="0.0"/>
+                                  goal_name="{goal_name}"
+                                  reach_threshold="0.25"
+                                  resend_interval="0.30"
+                                  response_timeout="0.80"
+                                  result_retry_delay="0.30"/>
         </Fallback>
-        
+        <Wait wait_duration="0.0"/>
       </Sequence>
     </Fallback>
   </BehaviorTree>
