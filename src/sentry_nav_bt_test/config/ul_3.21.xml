@@ -51,19 +51,21 @@
           </Sequence>
         </Fallback>
 
-        <PatrolGoalSelector goal_names="point1,point2,point3,point4"
+        <PatrolGoalSelector goal_names="point1,point2"
                             index_key="patrol_index"
                             goal="{goal}"
                             goal_name="{goal_name}"/>
-
-        <ReliableNavigateToPose goal="{goal}"
+        <Fallback>
+          <ReliableNavigateToPose goal="{goal}"
                                 goal_name="{goal_name}"
                                 reach_threshold="0.25"
                                 resend_interval="0.30"
                                 response_timeout="0.80"
                                 result_retry_delay="0.30"/>
 
-        <Wait wait_duration="0.0"/>
+          <Wait wait_duration="0.0"/>
+        </Fallback>
+        
       </Sequence>
     </Fallback>
   </BehaviorTree>
