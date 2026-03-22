@@ -4,7 +4,6 @@
 #include <sentry_msgs/msg/scan_mode.hpp>
 #include <sentry_msgs/msg/armor_presence.hpp>
 #include "rm_referee_msgs/msg/hurt_data.hpp"
-#include "rm_referee_msgs/msg/robot_status.hpp"
 #include <rclcpp/qos.hpp>
 
 #include <librm.hpp>
@@ -36,7 +35,6 @@ public:
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
         this->declare_parameter<std::string>("hurt_data_topic", "/rm_referee/hurt_data");
-        this->declare_parameter<std::string>("robot_status_topic", "/rm_referee/robot_status");
 
         // 读取参数
         std::string port      = this->get_parameter("port").as_string();
@@ -51,7 +49,6 @@ public:
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
-        std::string robot_status_topic  = this->get_parameter("robot_status_topic").as_string();
 
         // 打开 CAN 设备
         try {
@@ -93,15 +90,6 @@ public:
                 armor_left_   = m->left;
                 armor_behind_ = m->behind;
                 armor_right_  = m->right;
-                armor_color_  = m->enemy_color;
-            });
-
-        robot_status_sub_ = this->create_subscription<rm_referee_msgs::msg::RobotStatus>(
-            robot_status_topic,
-            rclcpp::SensorDataQoS(),
-            [this](const rm_referee_msgs::msg::RobotStatus::SharedPtr m) {
-                std::lock_guard<std::mutex> lk(mutex_);
-                robot_id_ = m->robot_id;
             });
 
         hurt_sub_ = this->create_subscription<rm_referee_msgs::msg::HurtData>(
@@ -152,7 +140,7 @@ private:
 
         float vx, vy, vyaw, vw;
         bool scan;
-        uint8_t left, behind, right, color, robot_id;
+        uint8_t left, behind, right;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             vx    = vx_;
@@ -163,8 +151,6 @@ private:
             left   = armor_left_;
             behind = armor_behind_;
             right  = armor_right_;
-            color  = armor_color_;
-            robot_id = robot_id_;
 
             if (hurt_active_) {
                 auto now = this->now();
@@ -207,15 +193,6 @@ private:
         can_->Write(id_xyz_, data_xyz, sizeof(data_xyz));
 
         // 发送 scan mode + ArmorPresence
-        const bool allow_armor_presence =
-            ((robot_id == 7U) && (color == 1U)) ||
-            ((robot_id == 107U) && (color == 0U));
-        if (!allow_armor_presence) {
-            left = 0;
-            behind = 0;
-            right = 0;
-        }
-
         uint8_t data_scan[8] = {0};
         data_scan[0] = scan ? 1 : 0;
         data_scan[1] = left | (behind << 1) | (right << 2);
@@ -247,7 +224,6 @@ private:
     rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
-    rclcpp::Subscription<rm_referee_msgs::msg::RobotStatus>::SharedPtr robot_status_sub_;
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
@@ -257,8 +233,6 @@ private:
     bool vw_received_once_ = false;
     bool  scan_mod_type_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
-    uint8_t armor_color_ = 0;
-    uint8_t robot_id_ = 0;
     bool hurt_active_ = false;
     rclcpp::Time hurt_start_time_;
 
