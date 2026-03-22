@@ -149,6 +149,9 @@ namespace rm_protocol {
         DEFEND = 2,   // 防御姿态 (10)
         MOVE = 3      // 移动姿态 (11) - 默认
     };
+
+    // 复活相关位定义
+    constexpr uint32_t BIT_CONFIRM_RESURRECTION = 19; // 确认免费复活
 }
 
 // ==========================================
@@ -164,7 +167,10 @@ public:
      * @param activate_energy 是否请求激活能量机关
      * @return std::vector<uint8_t> 可直接赋给 tx.srv 的 data
      */
-    std::vector<uint8_t> buildSentryCmdPacket(rm_protocol::SentryPosture posture, bool activate_energy) {
+    std::vector<uint8_t> buildSentryCmdPacket(
+        rm_protocol::SentryPosture posture,
+        bool activate_energy,
+        bool confirm_resurrection = false) {
         // 1. 构建 0x0120 数据 (4字节)
         uint32_t decision_val = 0;
         
@@ -174,6 +180,11 @@ public:
         // Bit 23: 能量机关
         if (activate_energy) {
             decision_val |= (1 << 23);
+        }
+
+        // Bit 19: 确认免费复活
+        if (confirm_resurrection) {
+            decision_val |= (1u << rm_protocol::BIT_CONFIRM_RESURRECTION);
         }
 
         // 2. 准备缓冲区

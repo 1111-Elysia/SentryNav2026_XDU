@@ -56,6 +56,18 @@ namespace sentry_nav_bt_test
         BT::NodeStatus tick() override;
     };
 
+    // 动作 3: ConfirmResurrection
+    // XML: <Action ID="ConfirmResurrection" posture="0" burst_count="3" burst_interval_ms="20"/>
+    class ConfirmResurrection : public RefereeActionBase
+    {
+    public:
+        ConfirmResurrection(const std::string &name, const BT::NodeConfiguration &config);
+
+        static BT::PortsList providedPorts();
+
+        BT::NodeStatus tick() override;
+    };
+
 } // namespace sentry_nav_bt_test
 
 #endif // SENTRY_NAV_BT_TEST_REFEREE_ACTIONS_HPP_

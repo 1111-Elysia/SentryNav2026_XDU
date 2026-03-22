@@ -26,6 +26,27 @@
         </Sequence>
       </KeepRunningUntilFailure>
 
+      <Sequence name="复活机制">
+        <CheckCondition key_name="current_hp"
+                        comparison="eq"
+                        threshold="0.0"/>
+        <PrintNode message="[UL-3.21] 检测到当前血量为0，开始持续确认复活"/>
+        <Inverter>
+          <KeepRunningUntilFailure>
+            <Sequence name="持续确认复活">
+              <CheckCondition key_name="current_hp"
+                              comparison="eq"
+                              threshold="0.0"/>
+              <ConfirmResurrection posture="0"
+                                  burst_count="3"
+                                  burst_interval_ms="20"/>
+              <Wait wait_duration="0.10"/>
+            </Sequence>
+          </KeepRunningUntilFailure>
+        </Inverter>
+        <PrintNode message="[UL-3.21] 当前血量恢复，结束复活确认"/>
+      </Sequence>
+
       <Sequence name="ConnectedPatrol">
         <Fallback name="InitOnce">
           <CheckCondition key_name="ul_initialized"
@@ -109,6 +130,12 @@
       <input_port name="key"/>
       <input_port name="value"/>
       <input_port name="type"/>
+    </Action>
+
+    <Action ID="ConfirmResurrection" editable="true">
+      <input_port name="posture"/>
+      <input_port name="burst_count"/>
+      <input_port name="burst_interval_ms"/>
     </Action>
 
     <Action ID="Wait" editable="true">
