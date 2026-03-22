@@ -87,7 +87,7 @@
       </ForceFailure>
 
       <ReactiveFallback name="比赛开始">
-        <Sequence name="复活机制">
+        <!-- <Sequence name="复活机制">
           <CheckCondition key_name="current_hp"
                           comparison="eq"
                           threshold="0.0"/>
@@ -106,7 +106,7 @@
             </KeepRunningUntilFailure>
           </Inverter>
           <PrintNode message="[UL] 当前血量恢复，结束复活等待"/>
-        </Sequence>
+        </Sequence> -->
 
         <Sequence name="低血量回补">
           <Fallback name="回补触发或保持">
