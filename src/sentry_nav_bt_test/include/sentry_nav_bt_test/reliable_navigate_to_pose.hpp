@@ -38,6 +38,7 @@ private:
   };
 
   void resetRuntimeState_();
+  bool refreshGoalInput_(bool *goal_changed = nullptr);
   bool isGoalReached_() const;
   void sendGoal_();
   void cancelGoal_(const char *reason);

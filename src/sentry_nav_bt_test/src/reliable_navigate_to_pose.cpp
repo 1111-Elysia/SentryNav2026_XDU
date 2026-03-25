@@ -30,6 +30,45 @@ BT::PortsList ReliableNavigateToPose::providedPorts()
   };
 }
 
+bool ReliableNavigateToPose::refreshGoalInput_(bool *goal_changed)
+{
+  geometry_msgs::msg::PoseStamped next_goal;
+  if (!getInput("goal", next_goal)) {
+    RCLCPP_ERROR(node_->get_logger(), "[ReliableNavigate] 缺少输入端口 'goal'");
+    return false;
+  }
+
+  std::string next_goal_name;
+  getInput("goal_name", next_goal_name);
+
+  if (next_goal.header.frame_id.empty()) {
+    next_goal.header.frame_id = "map";
+  }
+
+  const bool pose_changed =
+    std::abs(next_goal.pose.position.x - current_goal_.pose.position.x) > 1e-3 ||
+    std::abs(next_goal.pose.position.y - current_goal_.pose.position.y) > 1e-3 ||
+    std::abs(next_goal.pose.position.z - current_goal_.pose.position.z) > 1e-3 ||
+    std::abs(next_goal.pose.orientation.x - current_goal_.pose.orientation.x) > 1e-3 ||
+    std::abs(next_goal.pose.orientation.y - current_goal_.pose.orientation.y) > 1e-3 ||
+    std::abs(next_goal.pose.orientation.z - current_goal_.pose.orientation.z) > 1e-3 ||
+    std::abs(next_goal.pose.orientation.w - current_goal_.pose.orientation.w) > 1e-3;
+
+  const bool changed =
+    next_goal_name != goal_name_ ||
+    next_goal.header.frame_id != current_goal_.header.frame_id ||
+    pose_changed;
+
+  current_goal_ = next_goal;
+  goal_name_ = next_goal_name;
+
+  if (goal_changed) {
+    *goal_changed = changed;
+  }
+
+  return true;
+}
+
 void ReliableNavigateToPose::resetRuntimeState_()
 {
   state_ = InternalState::IDLE;
@@ -48,20 +87,14 @@ void ReliableNavigateToPose::resetRuntimeState_()
 
 BT::NodeStatus ReliableNavigateToPose::onStart()
 {
-  if (!getInput("goal", current_goal_)) {
-    RCLCPP_ERROR(node_->get_logger(), "[ReliableNavigate] 缺少输入端口 'goal'");
+  if (!refreshGoalInput_()) {
     return BT::NodeStatus::FAILURE;
   }
 
-  getInput("goal_name", goal_name_);
   getInput("reach_threshold", reach_threshold_);
   getInput("resend_interval", resend_interval_);
   getInput("response_timeout", response_timeout_);
   getInput("result_retry_delay", result_retry_delay_);
-
-  if (current_goal_.header.frame_id.empty()) {
-    current_goal_.header.frame_id = "map";
-  }
 
   resetRuntimeState_();
 
@@ -144,7 +177,7 @@ void ReliableNavigateToPose::sendGoal_()
         if (handle) {
           client_->async_cancel_goal(handle);
         }
-        RCLCPP_WARN(
+        RCLCPP_DEBUG(
           node_->get_logger(),
           "[ReliableNavigate] 忽略过期 goal_response, goal_id=%lu current=%lu",
           goal_id,
@@ -155,7 +188,7 @@ void ReliableNavigateToPose::sendGoal_()
       if (send_id != active_send_id_) {
         if (handle) {
           client_->async_cancel_goal(handle);
-          RCLCPP_WARN(
+          RCLCPP_DEBUG(
             node_->get_logger(),
             "[ReliableNavigate] 取消过期已接收目标%s%s%s, send_id=%lu current=%lu",
             goal_name_.empty() ? "" : "[",
@@ -195,7 +228,7 @@ void ReliableNavigateToPose::sendGoal_()
     [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
     {
       if (goal_id != active_goal_id_) {
-        RCLCPP_WARN(
+        RCLCPP_DEBUG(
           node_->get_logger(),
           "[ReliableNavigate] 忽略过期 result, goal_id=%lu current=%lu",
           goal_id,
@@ -204,7 +237,7 @@ void ReliableNavigateToPose::sendGoal_()
       }
 
       if (send_id != active_send_id_) {
-        RCLCPP_WARN(
+        RCLCPP_DEBUG(
           node_->get_logger(),
           "[ReliableNavigate] 忽略过期 result callback%s%s%s, send_id=%lu current=%lu",
           goal_name_.empty() ? "" : "[",
@@ -320,6 +353,28 @@ void ReliableNavigateToPose::cancelGoal_(const char *reason)
 
 BT::NodeStatus ReliableNavigateToPose::onRunning()
 {
+  geometry_msgs::msg::PoseStamped previous_goal = current_goal_;
+  const std::string previous_goal_name = goal_name_;
+  bool goal_changed = false;
+
+  if (!refreshGoalInput_(&goal_changed)) {
+    return BT::NodeStatus::FAILURE;
+  }
+
+  if (goal_changed) {
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "[ReliableNavigate] 检测到目标切换: %s(%.2f, %.2f) -> %s(%.2f, %.2f)",
+      previous_goal_name.empty() ? "<unnamed>" : previous_goal_name.c_str(),
+      previous_goal.pose.position.x,
+      previous_goal.pose.position.y,
+      goal_name_.empty() ? "<unnamed>" : goal_name_.c_str(),
+      current_goal_.pose.position.x,
+      current_goal_.pose.position.y);
+    cancelGoal_("goal_updated");
+    resetRuntimeState_();
+  }
+
   if (isGoalReached_()) {
     return BT::NodeStatus::SUCCESS;
   }

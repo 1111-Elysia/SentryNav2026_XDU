@@ -32,11 +32,44 @@ bool RefereeActionBase::initUtils()
 void RefereeActionBase::send_packet(const std::vector<uint8_t> &data)
 {
     if (!client_->service_is_ready()) {
+        if (config().blackboard) {
+            config().blackboard->set("last_referee_tx_ok", false);
+        }
+        RCLCPP_WARN_THROTTLE(
+            node_->get_logger(),
+            *node_->get_clock(),
+            1000,
+            "Tx.srv 未就绪，无法发送裁判系统数据");
         return;
     }
+
     auto request = std::make_shared<rm_referee_msgs::srv::Tx::Request>();
+    request->header.stamp = node_->now();
     request->data = data;
-    client_->async_send_request(request);
+
+    client_->async_send_request(
+        request,
+        [this, data_size = data.size()](rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedFuture future)
+        {
+            bool ok = false;
+
+            try {
+                auto response = future.get();
+                ok = response && response->ok;
+            } catch (const std::exception &e) {
+                RCLCPP_WARN(node_->get_logger(), "Tx.srv 调用异常: %s", e.what());
+            }
+
+            if (config().blackboard) {
+                config().blackboard->set("last_referee_tx_ok", ok);
+            }
+
+            if (!ok) {
+                RCLCPP_WARN(node_->get_logger(), "Tx.srv 返回失败，data_size=%zu", data_size);
+            } else {
+                RCLCPP_DEBUG(node_->get_logger(), "Tx.srv 返回成功，data_size=%zu", data_size);
+            }
+        });
 }
 
 SetSentryPosture::SetSentryPosture(const std::string &name, const BT::NodeConfiguration &config)

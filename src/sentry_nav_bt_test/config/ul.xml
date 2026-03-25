@@ -55,6 +55,9 @@
               <SetBlackboardValue key="ul_center_ready"
                                   value="0"
                                   type="int"/>
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="center_point"
+                                  type="string"/>
             </Sequence>
           </Fallback>
         </Sequence>
@@ -79,6 +82,9 @@
             <SetBlackboardValue key="ul_retreat_active"
                                 value="0"
                                 type="int"/>
+            <SetBlackboardValue key="ul_center_goal_name"
+                                value="center_point"
+                                type="string"/>
             <SetBlackboardValue key="ul_initialized"
                                 value="1"
                                 type="int"/>
@@ -154,20 +160,37 @@
                               type="int"/>
         </Sequence>
 
-        <Sequence name="前往中心">
+        <ReactiveSequence name="前往中心相关点位">
           <CheckCondition key_name="ul_retreat_active"
                           comparison="eq"
                           threshold="0.0"/>
           <CheckCondition key_name="ul_center_ready"
                           comparison="eq"
                           threshold="0.0"/>
-          <GoalSelector goal_name="center_point"
-                        goal="{goal}"/>
+          <Fallback name="选择前往目标点">
+            <Sequence name="前往FallbackPoint">
+              <CheckCondition key_name="center_gain_point_occupancy_status"
+                              comparison="eq"
+                              threshold="2.0"/>
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="fallback_point"
+                                  type="string"/>
+              <GoalSelector goal_name="fallback_point"
+                            goal="{goal}"/>
+            </Sequence>
+            <Sequence name="前往CenterPoint">
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="center_point"
+                                  type="string"/>
+              <GoalSelector goal_name="center_point"
+                            goal="{goal}"/>
+            </Sequence>
+          </Fallback>
           <Fallback name="已到中心或前往中心">
             <CheckGoalReached goal="{goal}"
                               threshold="0.50"/>
             <ReliableNavigateToPose goal="{goal}"
-                                    goal_name="center_point"
+                                    goal_name="{ul_center_goal_name}"
                                     reach_threshold="0.25"
                                     resend_interval="0.30"
                                     response_timeout="0.80"
@@ -176,10 +199,10 @@
           <SetBlackboardValue key="ul_center_ready"
                               value="1"
                               type="int"/>
-          <PrintNode message="[UL] 已到达中心区域，进入驻守态"/>
-        </Sequence>
+          <PrintNode message="[UL] 已到达中心相关点位，进入驻守态"/>
+        </ReactiveSequence>
 
-        <Sequence name="中心驻守">
+        <ReactiveSequence name="中心驻守">
           <CheckCondition key_name="ul_retreat_active"
                           comparison="eq"
                           threshold="0.0"/>
@@ -189,22 +212,39 @@
           <CheckCondition key_name="current_hp"
                           comparison="gte"
                           threshold="150.0"/>
-          <GoalSelector goal_name="center_point"
-                        goal="{goal}"/>
-          <Fallback name="中心位置维持">
-            <Sequence name="已在中心附近">
+          <Fallback name="选择驻守目标点">
+            <Sequence name="驻守FallbackPoint">
+              <CheckCondition key_name="center_gain_point_occupancy_status"
+                              comparison="eq"
+                              threshold="2.0"/>
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="fallback_point"
+                                  type="string"/>
+              <GoalSelector goal_name="fallback_point"
+                            goal="{goal}"/>
+            </Sequence>
+            <Sequence name="驻守CenterPoint">
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="center_point"
+                                  type="string"/>
+              <GoalSelector goal_name="center_point"
+                            goal="{goal}"/>
+            </Sequence>
+          </Fallback>
+          <Fallback name="中心相关位置维持">
+            <Sequence name="已在目标附近">
               <CheckGoalReached goal="{goal}"
                                 threshold="0.50"/>
               <Wait wait_duration="0.5"/>
             </Sequence>
             <ReliableNavigateToPose goal="{goal}"
-                                    goal_name="center_point_hold"
+                                    goal_name="{ul_center_goal_name}"
                                     reach_threshold="0.50"
                                     resend_interval="0.50"
                                     response_timeout="1.00"
                                     result_retry_delay="0.50"/>
           </Fallback>
-        </Sequence>
+        </ReactiveSequence>
       </ReactiveFallback>
     </Fallback>
   </BehaviorTree>

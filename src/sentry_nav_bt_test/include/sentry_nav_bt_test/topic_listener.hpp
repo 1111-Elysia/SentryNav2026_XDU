@@ -14,6 +14,9 @@
 #include <nlohmann/json.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/u_int8.hpp>
+#include <std_msgs/msg/u_int16.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -149,9 +152,12 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("game_status_connected_logged", 0);
 
             // 初始化 UL 状态，避免赛前条件检查因缺键刷 warning
+            blackboard_->set<bool>("last_referee_tx_ok", false);
             blackboard_->set<int>("ul_initialized", 0);
             blackboard_->set<int>("ul_retreat_active", 0);
             blackboard_->set<int>("ul_center_ready", 0);
+            blackboard_->set<int>("center_gain_point_occupancy_status", 0);
+            blackboard_->set<std::string>("ul_center_goal_name", "center_point");
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
@@ -212,13 +218,20 @@ namespace sentry_nav_bt_test
                     uint8_t large_rune_status = (event_data >> 5) & 0x03;
                     // 解析小能量机关状态 (Bit 3-4)
                     uint8_t small_rune_status = (event_data >> 3) & 0x03;
+                    // 解析中心增益点占领状态 (Bit 23-24, 仅 RMUL 适用)
+                    uint8_t center_gain_point_occupancy_status = (event_data >> 23) & 0x03;
 
                     bb->set("large_rune_status", large_rune_status);
                     bb->set("small_rune_status", small_rune_status);
+                    bb->set(
+                        "center_gain_point_occupancy_status",
+                        static_cast<int>(center_gain_point_occupancy_status));
                     RCLCPP_DEBUG(
                         node_->get_logger(),
-                        "黑板更新: 大符状态=%d, 小符状态=%d",
-                        large_rune_status, small_rune_status);
+                        "黑板更新: 大符状态=%d, 小符状态=%d, 中心增益点占领状态=%d",
+                        large_rune_status,
+                        small_rune_status,
+                        center_gain_point_occupancy_status);
                 });
 
             // 订阅机器人位置数据
@@ -268,6 +281,14 @@ namespace sentry_nav_bt_test
 
                     bb->set("current_posture", current_posture);
                     bb->set("can_activate_rune", can_activate_rune);
+
+                    publishDecodedSentryInfo(
+                        exchanged_ammo,
+                        can_confirm_resurrection,
+                        can_buy_resurrection,
+                        buy_resurrection_cost,
+                        current_posture,
+                        can_activate_rune);
 
                     RCLCPP_DEBUG(node_->get_logger(),
                                  "哨兵信息: 姿态=%d, 可激活符=%d, 复活金币=%d",
@@ -370,7 +391,13 @@ namespace sentry_nav_bt_test
             //             "/target");
             //     });
 
-            // 创建控制指令发布者 （将navigation的速度指令转换为控制指令发布出去）
+            // 初始化调试发布者，便于直接 ros2 topic echo 查看解包结果
+            exchanged_ammo_pub_ = node_->create_publisher<std_msgs::msg::UInt16>("/sentry_nav_bt_test/decoded_sentry_info/exchanged_ammo", 10);
+            can_confirm_resurrection_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_confirm_resurrection", 10);
+            can_buy_resurrection_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_buy_resurrection", 10);
+            buy_resurrection_cost_pub_ = node_->create_publisher<std_msgs::msg::UInt16>("/sentry_nav_bt_test/decoded_sentry_info/buy_resurrection_cost", 10);
+            current_posture_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/sentry_nav_bt_test/decoded_sentry_info/current_posture", 10);
+            can_activate_rune_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_activate_rune", 10);
 
             // 初始化发布者 (发给底盘驱动)
             vw_pub_ = node_->create_publisher<sentry_msgs::msg::Vw>("/vw", 10);
@@ -567,6 +594,12 @@ namespace sentry_nav_bt_test
         std::mutex hurt_mutex_;
 
         rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
+        rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr exchanged_ammo_pub_;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_confirm_resurrection_pub_;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_buy_resurrection_pub_;
+        rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr buy_resurrection_cost_pub_;
+        rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr current_posture_pub_;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_activate_rune_pub_;
         rclcpp::TimerBase::SharedPtr vw_timer_;
         bool last_center_hold_vw_active_ = false;
         bool vw_command_initialized_ = false;
@@ -575,21 +608,75 @@ namespace sentry_nav_bt_test
         std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
         rclcpp::TimerBase::SharedPtr tf_timer_;
 
-        bool isNearCenterPoint(double threshold = 0.50) const
+        bool isNearWaypoint(const std::string &waypoint_name, double threshold = 0.50) const
         {
             geometry_msgs::msg::PoseStamped current_pose;
-            geometry_msgs::msg::PoseStamped center_pose;
+            geometry_msgs::msg::PoseStamped target_pose;
 
             if (!blackboard_->get("waypoint_now", current_pose)) {
                 return false;
             }
-            if (!blackboard_->get("waypoint_center_point", center_pose)) {
+
+            const std::string waypoint_key = "waypoint_" + waypoint_name;
+            if (!blackboard_->get(waypoint_key, target_pose)) {
                 return false;
             }
 
-            const double dx = center_pose.pose.position.x - current_pose.pose.position.x;
-            const double dy = center_pose.pose.position.y - current_pose.pose.position.y;
+            const double dx = target_pose.pose.position.x - current_pose.pose.position.x;
+            const double dy = target_pose.pose.position.y - current_pose.pose.position.y;
             return std::hypot(dx, dy) <= threshold;
+        }
+
+        bool isNearCurrentCenterGoal(double threshold = 0.50) const
+        {
+            std::string goal_name = "center_point";
+            blackboard_->get("ul_center_goal_name", goal_name);
+            return isNearWaypoint(goal_name, threshold);
+        }
+
+        void publishDecodedSentryInfo(
+            uint16_t exchanged_ammo,
+            bool can_confirm_resurrection,
+            bool can_buy_resurrection,
+            uint16_t buy_resurrection_cost,
+            uint8_t current_posture,
+            bool can_activate_rune)
+        {
+            if (exchanged_ammo_pub_) {
+                std_msgs::msg::UInt16 msg;
+                msg.data = exchanged_ammo;
+                exchanged_ammo_pub_->publish(msg);
+            }
+
+            if (can_confirm_resurrection_pub_) {
+                std_msgs::msg::Bool msg;
+                msg.data = can_confirm_resurrection;
+                can_confirm_resurrection_pub_->publish(msg);
+            }
+
+            if (can_buy_resurrection_pub_) {
+                std_msgs::msg::Bool msg;
+                msg.data = can_buy_resurrection;
+                can_buy_resurrection_pub_->publish(msg);
+            }
+
+            if (buy_resurrection_cost_pub_) {
+                std_msgs::msg::UInt16 msg;
+                msg.data = buy_resurrection_cost;
+                buy_resurrection_cost_pub_->publish(msg);
+            }
+
+            if (current_posture_pub_) {
+                std_msgs::msg::UInt8 msg;
+                msg.data = current_posture;
+                current_posture_pub_->publish(msg);
+            }
+
+            if (can_activate_rune_pub_) {
+                std_msgs::msg::Bool msg;
+                msg.data = can_activate_rune;
+                can_activate_rune_pub_->publish(msg);
+            }
         }
 
         bool isCenterHoldActive() const
@@ -610,10 +697,10 @@ namespace sentry_nav_bt_test
                 blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
             const bool match_started =
                 blackboard_->get("game_progress", game_progress) && game_progress > 3U;
-            const bool center_nearby = isNearCenterPoint();
+            const bool current_center_goal_nearby = isNearCurrentCenterGoal();
 
             return match_started && initialized && retreat_inactive && hp_ok &&
-                   (center_ready_ok || center_nearby);
+                   center_ready_ok && current_center_goal_nearby;
         }
 
         void publishVwCommand(float value)
