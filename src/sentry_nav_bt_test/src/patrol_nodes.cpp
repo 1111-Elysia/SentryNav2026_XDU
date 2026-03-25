@@ -147,10 +147,23 @@ BT::NodeStatus CheckGoalReached::tick()
   }
 
   geometry_msgs::msg::PoseStamped current_pose;
-  if (!blackboard->get("waypoint_now", current_pose)) {
-    RCLCPP_WARN(logger_, "黑板中还没有 'waypoint_now'，暂时无法判断是否到点");
+  bool current_pose_valid = false;
+  if (!blackboard->get("waypoint_now_valid", current_pose_valid) || !current_pose_valid) {
+    if (!last_pose_invalid_reported_) {
+      RCLCPP_WARN(logger_, "当前位置没有新鲜位姿，暂时无法判定是否仍在目标点附近");
+      last_pose_invalid_reported_ = true;
+    }
+    last_reported_reached_ = false;
     return BT::NodeStatus::FAILURE;
   }
+
+  if (!blackboard->get("waypoint_now", current_pose)) {
+    RCLCPP_WARN(logger_, "黑板中还没有 'waypoint_now'，暂时无法判断是否到点");
+    last_pose_invalid_reported_ = true;
+    return BT::NodeStatus::FAILURE;
+  }
+
+  last_pose_invalid_reported_ = false;
 
   double threshold = 0.3;
   getInput("threshold", threshold);

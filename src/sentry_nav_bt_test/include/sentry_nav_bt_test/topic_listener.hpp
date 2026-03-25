@@ -158,6 +158,9 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("ul_center_ready", 0);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
+            blackboard_->set<double>("ul_center_hold_distance_threshold", 0.50);
+            blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
+            blackboard_->set<bool>("waypoint_now_valid", false);
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
@@ -607,9 +610,49 @@ namespace sentry_nav_bt_test
         std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
         std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
         rclcpp::TimerBase::SharedPtr tf_timer_;
+        rclcpp::Time last_waypoint_update_time_{0, 0, RCL_ROS_TIME};
+        bool waypoint_now_received_ = false;
+        bool last_waypoint_now_valid_ = false;
+
+        double getBlackboardDouble(const std::string &key, double default_value) const
+        {
+            double value = default_value;
+            blackboard_->get(key, value);
+            return value;
+        }
+
+        bool isCurrentPoseFresh() const
+        {
+            if (!waypoint_now_received_) {
+                return false;
+            }
+
+            const double stale_timeout = getBlackboardDouble("ul_pose_stale_timeout_s", 0.50);
+            return (node_->now() - last_waypoint_update_time_).seconds() <= stale_timeout;
+        }
+
+        void updateCurrentPoseValidity()
+        {
+            const bool pose_valid = isCurrentPoseFresh();
+            blackboard_->set("waypoint_now_valid", pose_valid);
+
+            if (pose_valid == last_waypoint_now_valid_) {
+                return;
+            }
+
+            if (pose_valid) {
+                RCLCPP_INFO(node_->get_logger(), "[UL] 当前位姿恢复，重新启用中心相关点位判定");
+            } else {
+                RCLCPP_WARN(node_->get_logger(), "[UL] 当前位姿已过期，暂停中心相关点位判定与 /vw 驻守");
+            }
+            last_waypoint_now_valid_ = pose_valid;
+        }
 
         bool isNearWaypoint(const std::string &waypoint_name, double threshold = 0.50) const
         {
+            if (!isCurrentPoseFresh()) {
+                return false;
+            }
             geometry_msgs::msg::PoseStamped current_pose;
             geometry_msgs::msg::PoseStamped target_pose;
 
@@ -627,8 +670,12 @@ namespace sentry_nav_bt_test
             return std::hypot(dx, dy) <= threshold;
         }
 
-        bool isNearCurrentCenterGoal(double threshold = 0.50) const
+        bool isNearCurrentCenterGoal(double threshold = -1.0) const
         {
+            if (threshold < 0.0) {
+                threshold = getBlackboardDouble("ul_center_hold_distance_threshold", 0.50);
+            }
+
             std::string goal_name = "center_point";
             blackboard_->get("ul_center_goal_name", goal_name);
             return isNearWaypoint(goal_name, threshold);
@@ -737,6 +784,7 @@ namespace sentry_nav_bt_test
             else if (last_center_hold_vw_active_)
             {
                 RCLCPP_INFO(node_->get_logger(), "[UL] 退出中心驻守，停止持续发布 /vw");
+                publishVwCommand(0.0f);
             }
 
             last_center_hold_vw_active_ = center_hold_active;
@@ -766,6 +814,9 @@ namespace sentry_nav_bt_test
 
                 // 将当前位置存储到黑板，命名为 waypoint_now
                 blackboard_->set("waypoint_now", current_pose);
+                last_waypoint_update_time_ = current_pose.header.stamp;
+                waypoint_now_received_ = true;
+                updateCurrentPoseValidity();
 
                 // 打印调试信息（使用 DEBUG 级别避免太多日志）
                 RCLCPP_DEBUG(node_->get_logger(),
@@ -781,6 +832,7 @@ namespace sentry_nav_bt_test
                     *node_->get_clock(),
                     1000, // 每 1 秒最多警告一次
                     "无法获取当前位置: %s", ex.what());
+                updateCurrentPoseValidity();
             }
         }
     };

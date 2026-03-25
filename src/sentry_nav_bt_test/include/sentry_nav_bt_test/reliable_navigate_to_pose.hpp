@@ -65,6 +65,7 @@ private:
   uint64_t send_seq_{0};
   int send_attempts_{0};
   int retry_count_{0};
+  mutable bool last_pose_invalid_logged_{false};
   rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle_;
 };
 

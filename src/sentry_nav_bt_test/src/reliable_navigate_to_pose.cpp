@@ -83,6 +83,7 @@ void ReliableNavigateToPose::resetRuntimeState_()
   const auto clock_type = node_->get_clock()->get_clock_type();
   last_send_time_ = rclcpp::Time(0, 0, clock_type);
   last_log_time_ = rclcpp::Time(0, 0, clock_type);
+  last_pose_invalid_logged_ = false;
 }
 
 BT::NodeStatus ReliableNavigateToPose::onStart()
@@ -122,9 +123,20 @@ bool ReliableNavigateToPose::isGoalReached_() const
   }
 
   geometry_msgs::msg::PoseStamped current_pose;
+  bool current_pose_valid = false;
+  if (!blackboard->get("waypoint_now_valid", current_pose_valid) || !current_pose_valid) {
+    if (!last_pose_invalid_logged_) {
+      RCLCPP_WARN(node_->get_logger(), "[ReliableNavigate] 当前位姿没有更新，暂不使用到点判定");
+      last_pose_invalid_logged_ = true;
+    }
+    return false;
+  }
+
   if (!blackboard->get("waypoint_now", current_pose)) {
     return false;
   }
+
+  last_pose_invalid_logged_ = false;
 
   const double dx = current_goal_.pose.position.x - current_pose.pose.position.x;
   const double dy = current_goal_.pose.position.y - current_pose.pose.position.y;

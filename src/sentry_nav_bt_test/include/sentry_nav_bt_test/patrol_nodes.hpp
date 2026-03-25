@@ -42,6 +42,7 @@ private:
   double last_threshold_{-1.0};
   bool has_goal_context_{false};
   bool last_reported_reached_{false};
+  bool last_pose_invalid_reported_{false};
 };
 
 }  // namespace sentry_nav_bt_test

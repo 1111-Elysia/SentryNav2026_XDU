@@ -188,10 +188,10 @@
           </Fallback>
           <Fallback name="已到中心或前往中心">
             <CheckGoalReached goal="{goal}"
-                              threshold="0.50"/>
+                              threshold="{ul_center_hold_distance_threshold}"/>
             <ReliableNavigateToPose goal="{goal}"
                                     goal_name="{ul_center_goal_name}"
-                                    reach_threshold="0.25"
+                                    reach_threshold="{ul_center_hold_distance_threshold}"
                                     resend_interval="0.30"
                                     response_timeout="0.80"
                                     result_retry_delay="0.30"/>
@@ -234,12 +234,12 @@
           <Fallback name="中心相关位置维持">
             <Sequence name="已在目标附近">
               <CheckGoalReached goal="{goal}"
-                                threshold="0.50"/>
+                                threshold="{ul_center_hold_distance_threshold}"/>
               <Wait wait_duration="0.5"/>
             </Sequence>
             <ReliableNavigateToPose goal="{goal}"
                                     goal_name="{ul_center_goal_name}"
-                                    reach_threshold="0.50"
+                                    reach_threshold="{ul_center_hold_distance_threshold}"
                                     resend_interval="0.50"
                                     response_timeout="1.00"
                                     result_retry_delay="0.50"/>
