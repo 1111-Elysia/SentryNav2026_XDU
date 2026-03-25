@@ -8,15 +8,21 @@
     },
     {
       "name": "supply_point",
-      "x": 0.0,
-      "y": 0.0,
+      "x": -0.3,
+      "y": 0.3,
       "yaw": 0.0
     },
     {
       "name": "center_point",
-      "x": 5.4,
-      "y": -2.5,
-      "yaw": 1.57
+      "x": 5.7,
+      "y": -3.0,
+      "yaw": 0.0
+    },
+    {
+      "name": "fallback_point",
+      "x": 4.8,
+      "y": -5.0,
+      "yaw": 0.0
     },
     {
       "name": "point1",
