@@ -18,6 +18,8 @@ tf_only_odom:
   ros__parameters:
     # 发布频率 (Hz)
     publish_rate: 100.0
+    # 启动时将 base_link 对齐到 map/odom 原点
+    align_base_link_to_map_on_start: true
     
     # 平移 (m)
     base_link_to_livox_x: 0.22

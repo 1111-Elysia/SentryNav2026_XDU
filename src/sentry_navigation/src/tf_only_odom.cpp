@@ -20,12 +20,13 @@ public:
     {
         // 参数：base_link → livox_frame 的变换 C
         this->declare_parameter<double>("base_link_to_livox_x", 0.0);
-        this->declare_parameter<double>("base_link_to_livox_y", 0.117);
+        this->declare_parameter<double>("base_link_to_livox_y", 0.0);
         this->declare_parameter<double>("base_link_to_livox_z", 0.0);
         this->declare_parameter<double>("base_link_to_livox_roll", 0.0);
         this->declare_parameter<double>("base_link_to_livox_pitch", 0.0);
         this->declare_parameter<double>("base_link_to_livox_yaw", 0.0);
         this->declare_parameter<double>("publish_rate", 50.0);
+        this->declare_parameter<bool>("align_base_link_to_map_on_start", true);
 
         // frame 名称参数（用于 map->odom 静态单位变换）
         this->declare_parameter<std::string>("map_frame_for_A", "map");
@@ -47,6 +48,7 @@ public:
 
         double publish_rate = 100.0;
         this->get_parameter("publish_rate", publish_rate);
+        this->get_parameter("align_base_link_to_map_on_start", align_base_link_to_map_on_start_);
 
         this->get_parameter("map_frame_for_A", map_frame_for_A_);
         this->get_parameter("odom_frame", odom_frame_);
@@ -79,6 +81,9 @@ public:
         RCLCPP_INFO(this->get_logger(),
                     "已发布静态 C(base_link->livox_frame) 与静态 A(%s->%s) = 单位变换。",
                     map_frame_for_A_.c_str(), odom_frame_.c_str());
+        RCLCPP_INFO(this->get_logger(),
+                "align_base_link_to_map_on_start = %s",
+                align_base_link_to_map_on_start_ ? "true" : "false");
     }
 
 private:
@@ -157,12 +162,24 @@ private:
             // 计算 B = E * C_inv
             tf2::Transform tf_B = tf_E * tf_C_inv_;
 
+            // 可选：把首帧 B 作为零点，使启动时 base_link 与 map/odom 对齐。
+            tf2::Transform tf_B_out = tf_B;
+            if (align_base_link_to_map_on_start_) {
+                if (!have_initial_tf_B_) {
+                    tf_B0_inv_ = tf_B.inverse();
+                    have_initial_tf_B_ = true;
+                    RCLCPP_INFO(this->get_logger(),
+                                "已记录首帧 odom->base_link，后续发布相对位姿（首帧归零）。");
+                }
+                tf_B_out = tf_B0_inv_ * tf_B;
+            }
+
             // 发布 B(odom->base_link) TF
             geometry_msgs::msg::TransformStamped B_msg;
             B_msg.header.stamp = last_lio_odom_.header.stamp;
             B_msg.header.frame_id = odom_frame_;
             B_msg.child_frame_id = "base_link";
-            B_msg.transform = tf2::toMsg(tf_B);
+            B_msg.transform = tf2::toMsg(tf_B_out);
             tf_broadcaster_->sendTransform(B_msg);
 
             // 发布 /odom（保持原来速度/协方差映射）
@@ -171,10 +188,10 @@ private:
             odom_msg.header.frame_id = odom_frame_;
             odom_msg.child_frame_id = "base_link";
 
-            odom_msg.pose.pose.position.x = tf_B.getOrigin().x();
-            odom_msg.pose.pose.position.y = tf_B.getOrigin().y();
-            odom_msg.pose.pose.position.z = tf_B.getOrigin().z();
-            odom_msg.pose.pose.orientation = tf2::toMsg(tf_B.getRotation());
+            odom_msg.pose.pose.position.x = tf_B_out.getOrigin().x();
+            odom_msg.pose.pose.position.y = tf_B_out.getOrigin().y();
+            odom_msg.pose.pose.position.z = tf_B_out.getOrigin().z();
+            odom_msg.pose.pose.orientation = tf2::toMsg(tf_B_out.getRotation());
 
             tf2::Vector3 linear_vel(
                 last_lio_odom_.twist.twist.linear.x,
@@ -227,6 +244,10 @@ private:
     // E 来源为 /lio/robo/odom
     nav_msgs::msg::Odometry last_lio_odom_;
     bool have_lio_odom_ = false;
+
+    bool align_base_link_to_map_on_start_ = true;
+    bool have_initial_tf_B_ = false;
+    tf2::Transform tf_B0_inv_;
 
     std::string map_frame_for_A_ = "map";
     std::string odom_frame_ = "odom";
