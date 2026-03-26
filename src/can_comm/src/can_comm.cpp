@@ -87,7 +87,8 @@ public:
             game_status_topic, 10,
             [this](const rm_referee_msgs::msg::GameStatus::SharedPtr m) {
                 std::lock_guard<std::mutex> lk(mutex_);
-                scan_mod_type_ = (m->game_type == 4);
+                game_progress_ = m->game_progress;
+                scan_mod_type_ = (m->game_progress == 4);
             });
 
         armor_presence_sub_ = this->create_subscription<sentry_msgs::msg::ArmorPresence>(
@@ -198,6 +199,16 @@ private:
                     }
                 }
             }
+
+            // 运动和装甲检测位门控直接依据 game_status 话题内容
+            if (game_progress_ != 4) {
+                vx = 0.0f;
+                vy = 0.0f;
+                vyaw = 0.0f;
+                left = 0;
+                behind = 0;
+                right = 0;
+            }
         }
 
         // 限幅 lambda
@@ -265,7 +276,8 @@ private:
     float vw_default_before_first_msg_ = 0.0f;
     float vw_default_after_first_msg_ = 0.3f;
     bool vw_received_once_ = false;
-    bool  scan_mod_type_ = false;
+    uint8_t game_progress_ = 0;
+    bool scan_mod_type_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
     bool hurt_active_ = false;
     rclcpp::Time hurt_start_time_;
