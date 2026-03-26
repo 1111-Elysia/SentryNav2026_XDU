@@ -1,9 +1,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <sentry_msgs/msg/vw.hpp>
-#include <sentry_msgs/msg/scan_mode.hpp>
 #include <sentry_msgs/msg/armor_presence.hpp>
 #include "rm_referee_msgs/msg/hurt_data.hpp"
+#include "rm_referee_msgs/msg/game_status.hpp"
 #include <rclcpp/qos.hpp>
 
 #include <librm.hpp>
@@ -32,9 +32,9 @@ public:
         this->declare_parameter<int>("id_scan", 0x190);
         this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
         this->declare_parameter<std::string>("vw_topic", "/vw");
-        this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
         this->declare_parameter<std::string>("hurt_data_topic", "/rm_referee/hurt_data");
+        this->declare_parameter<std::string>("game_status_topic", "/rm_referee/game_status");
         this->declare_parameter<double>("cmd_vel_timeout_s", 0.1);
         this->declare_parameter<double>("vw_timeout_s", 0.1);
 
@@ -48,9 +48,9 @@ public:
 
         std::string cmd_vel_topic       = this->get_parameter("cmd_vel_topic").as_string();
         std::string vw_topic            = this->get_parameter("vw_topic").as_string();
-        std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
+        std::string game_status_topic   = this->get_parameter("game_status_topic").as_string();
         cmd_vel_timeout_s_ = this->get_parameter("cmd_vel_timeout_s").as_double();
         vw_timeout_s_ = this->get_parameter("vw_timeout_s").as_double();
 
@@ -83,11 +83,11 @@ public:
                 vw_default_override_active_ = false;
             });
 
-        scan_mod_sub_ = this->create_subscription<sentry_msgs::msg::ScanMode>(
-            scan_mod_type_topic, 10,
-            [this](const sentry_msgs::msg::ScanMode::SharedPtr m) {
+        game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
+            game_status_topic, 10,
+            [this](const rm_referee_msgs::msg::GameStatus::SharedPtr m) {
                 std::lock_guard<std::mutex> lk(mutex_);
-                scan_mod_type_ = m->scan_mod_type;
+                scan_mod_type_ = (m->game_type == 4);
             });
 
         armor_presence_sub_ = this->create_subscription<sentry_msgs::msg::ArmorPresence>(
@@ -255,7 +255,7 @@ private:
 
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr       cmd_vel_sub_;
     rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr            vw_sub_;
-    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
+    rclcpp::Subscription<rm_referee_msgs::msg::GameStatus>::SharedPtr game_status_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
     rclcpp::TimerBase::SharedPtr                                     timer_;
