@@ -56,6 +56,12 @@ def generate_launch_description():
         default_value=waypoints_blue_path,
         description='蓝方路径点文件路径'
     )
+
+    bt_message_log_arg = DeclareLaunchArgument(
+        'bt_message_log_file',
+        default_value='/tmp/sentry_nav_bt_messages.log',
+        description='行为树 PrintNode 消息日志文件路径，置空可关闭'
+    )
     
     bridge_node = Node(
         package='sentry_nav_bt_test',
@@ -78,7 +84,8 @@ def generate_launch_description():
             'bt_xml_filename': LaunchConfiguration('bt_xml_filename'),
             'waypoints_red_file': LaunchConfiguration('waypoints_red_file'),
             'waypoints_blue_file': LaunchConfiguration('waypoints_blue_file'),
-            'use_sim_time': True,
+            'bt_message_log_file': LaunchConfiguration('bt_message_log_file'),
+            'use_sim_time': False,
         }]
     )
     
@@ -86,6 +93,7 @@ def generate_launch_description():
         bt_xml_arg,
         red_wp_arg,
         blue_wp_arg,
+        bt_message_log_arg,
         use_old_protocol_arg,
         team_color_arg,
         sentry_nav_bt_test,

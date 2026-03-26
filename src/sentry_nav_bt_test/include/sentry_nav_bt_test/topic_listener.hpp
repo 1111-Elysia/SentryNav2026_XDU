@@ -34,7 +34,7 @@
 #include "rm_referee_msgs/msg/event_data.hpp"
 
 #include <geometry_msgs/msg/twist.hpp>
-#include "sentry_msgs/msg/vw.hpp"
+#include "sentry_nav_bt_test/center_hold_vw_controller.hpp"
 
 namespace sentry_nav_bt_test
 {
@@ -158,6 +158,7 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("ul_center_ready", 0);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
+            blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);
             blackboard_->set<double>("ul_center_hold_distance_threshold", 0.50);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
@@ -402,12 +403,9 @@ namespace sentry_nav_bt_test
             current_posture_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/sentry_nav_bt_test/decoded_sentry_info/current_posture", 10);
             can_activate_rune_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_activate_rune", 10);
 
-            // 初始化发布者 (发给底盘驱动)
-            vw_pub_ = node_->create_publisher<sentry_msgs::msg::Vw>("/vw", 10);
-            vw_timer_ = node_->create_wall_timer(
-                std::chrono::milliseconds(100),
-                [this]()
-                { updateCenterHoldVwCommand(); });
+            center_hold_vw_controller_ =
+                std::make_shared<CenterHoldVwController>(node_, blackboard_);
+            center_hold_vw_controller_->start();
 
             // 订阅伤害状态数据 0x0206
             this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::HurtData>(
@@ -596,16 +594,13 @@ namespace sentry_nav_bt_test
         rclcpp::TimerBase::SharedPtr hurt_reset_timer_;
         std::mutex hurt_mutex_;
 
-        rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
         rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr exchanged_ammo_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_confirm_resurrection_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_buy_resurrection_pub_;
         rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr buy_resurrection_cost_pub_;
         rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr current_posture_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_activate_rune_pub_;
-        rclcpp::TimerBase::SharedPtr vw_timer_;
-        bool last_center_hold_vw_active_ = false;
-        bool vw_command_initialized_ = false;
+        std::shared_ptr<CenterHoldVwController> center_hold_vw_controller_;
         // TF
         std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
         std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -646,39 +641,6 @@ namespace sentry_nav_bt_test
                 RCLCPP_WARN(node_->get_logger(), "[UL] 当前位姿已过期，暂停中心相关点位判定与 /vw 驻守");
             }
             last_waypoint_now_valid_ = pose_valid;
-        }
-
-        bool isNearWaypoint(const std::string &waypoint_name, double threshold = 0.50) const
-        {
-            if (!isCurrentPoseFresh()) {
-                return false;
-            }
-            geometry_msgs::msg::PoseStamped current_pose;
-            geometry_msgs::msg::PoseStamped target_pose;
-
-            if (!blackboard_->get("waypoint_now", current_pose)) {
-                return false;
-            }
-
-            const std::string waypoint_key = "waypoint_" + waypoint_name;
-            if (!blackboard_->get(waypoint_key, target_pose)) {
-                return false;
-            }
-
-            const double dx = target_pose.pose.position.x - current_pose.pose.position.x;
-            const double dy = target_pose.pose.position.y - current_pose.pose.position.y;
-            return std::hypot(dx, dy) <= threshold;
-        }
-
-        bool isNearCurrentCenterGoal(double threshold = -1.0) const
-        {
-            if (threshold < 0.0) {
-                threshold = getBlackboardDouble("ul_center_hold_distance_threshold", 0.50);
-            }
-
-            std::string goal_name = "center_point";
-            blackboard_->get("ul_center_goal_name", goal_name);
-            return isNearWaypoint(goal_name, threshold);
         }
 
         void publishDecodedSentryInfo(
@@ -724,70 +686,6 @@ namespace sentry_nav_bt_test
                 msg.data = can_activate_rune;
                 can_activate_rune_pub_->publish(msg);
             }
-        }
-
-        bool isCenterHoldActive() const
-        {
-            int center_ready = 0;
-            int retreat_active = 0;
-            int ul_initialized = 0;
-            uint16_t current_hp = 0;
-            uint8_t game_progress = 0;
-
-            const bool center_ready_ok =
-                blackboard_->get("ul_center_ready", center_ready) && center_ready == 1;
-            const bool retreat_inactive =
-                blackboard_->get("ul_retreat_active", retreat_active) && retreat_active == 0;
-            const bool initialized =
-                blackboard_->get("ul_initialized", ul_initialized) && ul_initialized == 1;
-            const bool hp_ok =
-                blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
-            const bool match_started =
-                blackboard_->get("game_progress", game_progress) && game_progress > 3U;
-            const bool current_center_goal_nearby = isNearCurrentCenterGoal();
-
-            return match_started && initialized && retreat_inactive && hp_ok &&
-                   center_ready_ok && current_center_goal_nearby;
-        }
-
-        void publishVwCommand(float value)
-        {
-            if (!vw_pub_) {
-                return;
-            }
-
-            sentry_msgs::msg::Vw msg;
-            msg.vw = value;
-            vw_pub_->publish(msg);
-        }
-
-        void updateCenterHoldVwCommand()
-        {
-            const bool center_hold_active = isCenterHoldActive();
-
-            if (!vw_command_initialized_)
-            {
-                publishVwCommand(center_hold_active ? 1.0f : 0.0f);
-                vw_command_initialized_ = true;
-                last_center_hold_vw_active_ = center_hold_active;
-                return;
-            }
-
-            if (center_hold_active)
-            {
-                if (!last_center_hold_vw_active_)
-                {
-                    RCLCPP_INFO(node_->get_logger(), "[UL] 中心驻守激活，开始持续发布 /vw = 1");
-                }
-                publishVwCommand(1.0f);
-            }
-            else if (last_center_hold_vw_active_)
-            {
-                RCLCPP_INFO(node_->get_logger(), "[UL] 退出中心驻守，停止持续发布 /vw");
-                publishVwCommand(0.0f);
-            }
-
-            last_center_hold_vw_active_ = center_hold_active;
         }
 
         // 更新当前位置的方法

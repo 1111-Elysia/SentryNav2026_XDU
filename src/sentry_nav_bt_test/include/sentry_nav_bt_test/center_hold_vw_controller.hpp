@@ -1,0 +1,149 @@
+#ifndef SENTRY_NAV_BT_TEST_CENTER_HOLD_VW_CONTROLLER_HPP_
+#define SENTRY_NAV_BT_TEST_CENTER_HOLD_VW_CONTROLLER_HPP_
+
+#include <cmath>
+#include <memory>
+#include <string>
+
+#include "behaviortree_cpp_v3/blackboard.h"
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "sentry_msgs/msg/vw.hpp"
+
+namespace sentry_nav_bt_test
+{
+
+class CenterHoldVwController
+{
+public:
+  CenterHoldVwController(
+    const rclcpp::Node::SharedPtr &node,
+    const BT::Blackboard::Ptr &blackboard)
+  : node_(node), blackboard_(blackboard)
+  {
+  }
+
+  void start()
+  {
+    if (!node_ || !blackboard_) {
+      throw std::runtime_error("CenterHoldVwController: node or blackboard is null");
+    }
+
+    vw_pub_ = node_->create_publisher<sentry_msgs::msg::Vw>("/vw", 10);
+    vw_timer_ = node_->create_wall_timer(
+      std::chrono::milliseconds(100),
+      [this]() { updateCenterHoldVwCommand(); });
+  }
+
+private:
+  double getBlackboardDouble(const std::string &key, double default_value) const
+  {
+    double value = default_value;
+    blackboard_->get(key, value);
+    return value;
+  }
+
+  bool isNearWaypoint(const std::string &waypoint_name, double threshold) const
+  {
+    bool current_pose_valid = false;
+    if (!blackboard_->get("waypoint_now_valid", current_pose_valid) || !current_pose_valid) {
+      return false;
+    }
+
+    geometry_msgs::msg::PoseStamped current_pose;
+    geometry_msgs::msg::PoseStamped target_pose;
+
+    if (!blackboard_->get("waypoint_now", current_pose)) {
+      return false;
+    }
+
+    const std::string waypoint_key = "waypoint_" + waypoint_name;
+    if (!blackboard_->get(waypoint_key, target_pose)) {
+      return false;
+    }
+
+    const double dx = target_pose.pose.position.x - current_pose.pose.position.x;
+    const double dy = target_pose.pose.position.y - current_pose.pose.position.y;
+    return std::hypot(dx, dy) <= threshold;
+  }
+
+  bool isNearCurrentCenterGoal(double threshold = -1.0) const
+  {
+    if (threshold < 0.0) {
+      threshold = getBlackboardDouble("ul_center_hold_distance_threshold", 0.50);
+    }
+
+    std::string goal_name = "center_point";
+    blackboard_->get("ul_center_goal_name", goal_name);
+    return isNearWaypoint(goal_name, threshold);
+  }
+
+  bool isCenterHoldActive() const
+  {
+    int center_ready = 0;
+    int retreat_active = 0;
+    int ul_initialized = 0;
+    uint16_t current_hp = 0;
+    uint8_t game_progress = 0;
+
+    const bool center_ready_ok =
+      blackboard_->get("ul_center_ready", center_ready) && center_ready == 1;
+    const bool retreat_inactive =
+      blackboard_->get("ul_retreat_active", retreat_active) && retreat_active == 0;
+    const bool initialized =
+      blackboard_->get("ul_initialized", ul_initialized) && ul_initialized == 1;
+    const bool hp_ok =
+      blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
+    const bool match_started =
+      blackboard_->get("game_progress", game_progress) && game_progress > 3U;
+    const bool current_center_goal_nearby = isNearCurrentCenterGoal();
+
+    return match_started && initialized && retreat_inactive && hp_ok &&
+      center_ready_ok && current_center_goal_nearby;
+  }
+
+  void publishVwCommand(float value)
+  {
+    if (!vw_pub_) {
+      return;
+    }
+
+    sentry_msgs::msg::Vw msg;
+    msg.vw = value;
+    vw_pub_->publish(msg);
+  }
+
+  void updateCenterHoldVwCommand()
+  {
+    const bool center_hold_active = isCenterHoldActive();
+
+    if (!vw_command_initialized_) {
+      publishVwCommand(center_hold_active ? 1.0f : 0.0f);
+      vw_command_initialized_ = true;
+      last_center_hold_vw_active_ = center_hold_active;
+      return;
+    }
+
+    if (center_hold_active) {
+      if (!last_center_hold_vw_active_) {
+        RCLCPP_INFO(node_->get_logger(), "[UL] 中心驻守激活，开始持续发布 /vw = 1");
+      }
+      publishVwCommand(1.0f);
+    } else if (last_center_hold_vw_active_) {
+      RCLCPP_INFO(node_->get_logger(), "[UL] 退出中心驻守，停止持续发布 /vw");
+    }
+
+    last_center_hold_vw_active_ = center_hold_active;
+  }
+
+  rclcpp::Node::SharedPtr node_;
+  BT::Blackboard::Ptr blackboard_;
+  rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
+  rclcpp::TimerBase::SharedPtr vw_timer_;
+  bool last_center_hold_vw_active_{false};
+  bool vw_command_initialized_{false};
+};
+
+}  // namespace sentry_nav_bt_test
+
+#endif  // SENTRY_NAV_BT_TEST_CENTER_HOLD_VW_CONTROLLER_HPP_

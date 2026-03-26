@@ -1,6 +1,8 @@
 #ifndef SENTRY_NAV_BT_TEST_PRINT_NODE_HPP_
 #define SENTRY_NAV_BT_TEST_PRINT_NODE_HPP_
 
+#include <fstream>
+#include <mutex>
 #include <string>
 #include <memory>
 #include "behaviortree_cpp_v3/action_node.h"
@@ -52,6 +54,27 @@ public:
     
     // 简单打印消息，使用INFO级别
     RCLCPP_INFO(node_->get_logger(), "%s", message.c_str());
+
+    std::string log_file;
+    if (config().blackboard &&
+        config().blackboard->get("bt_message_log_file", log_file) &&
+        !log_file.empty())
+    {
+      static std::mutex log_mutex;
+      std::lock_guard<std::mutex> lock(log_mutex);
+
+      std::ofstream ofs(log_file, std::ios::app);
+      if (ofs.is_open()) {
+        ofs << "[" << node_->now().seconds() << "] " << message << '\n';
+      } else {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(),
+          *node_->get_clock(),
+          2000,
+          "无法打开行为树消息日志文件: %s",
+          log_file.c_str());
+      }
+    }
     
     return BT::NodeStatus::SUCCESS;
   }

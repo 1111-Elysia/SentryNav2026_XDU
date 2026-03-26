@@ -4,6 +4,7 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <fstream>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -123,12 +124,15 @@ int main(int argc, char **argv)
     // 获取路径点文件参数
     std::string waypoints_red_file;
     std::string waypoints_blue_file;
+    std::string bt_message_log_file;
 
     node->declare_parameter("waypoints_red_file", "");
     node->declare_parameter("waypoints_blue_file", "");
+    node->declare_parameter("bt_message_log_file", "/tmp/sentry_nav_bt_messages.log");
 
     node->get_parameter("waypoints_red_file", waypoints_red_file);
     node->get_parameter("waypoints_blue_file", waypoints_blue_file);
+    node->get_parameter("bt_message_log_file", bt_message_log_file);
 
     // 创建行为树工厂
     BT::BehaviorTreeFactory factory;
@@ -140,6 +144,19 @@ int main(int argc, char **argv)
     // 从XML创建行为树
     auto blackboard = BT::Blackboard::create();
     blackboard->set("node", node);
+    blackboard->set("bt_message_log_file", bt_message_log_file);
+
+    if (!bt_message_log_file.empty())
+    {
+        std::ofstream ofs(bt_message_log_file, std::ios::trunc);
+        if (ofs.is_open()) {
+            ofs << "# sentry_nav_bt_test behavior tree messages\n";
+            RCLCPP_INFO(node->get_logger(), "行为树消息日志文件: %s", bt_message_log_file.c_str());
+        }
+        else {
+            RCLCPP_WARN(node->get_logger(), "无法初始化行为树消息日志文件: %s", bt_message_log_file.c_str());
+        }
+    }
 
     // 创建黑板管理器
     auto bb_manager = std::make_shared<sentry_nav_bt_test::BlackboardManager>(node, blackboard);

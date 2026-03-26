@@ -188,10 +188,10 @@
           </Fallback>
           <Fallback name="已到中心或前往中心">
             <CheckGoalReached goal="{goal}"
-                              threshold="{ul_center_hold_distance_threshold}"/>
+                              threshold="{ul_center_arrive_distance_threshold}"/>
             <ReliableNavigateToPose goal="{goal}"
                                     goal_name="{ul_center_goal_name}"
-                                    reach_threshold="{ul_center_hold_distance_threshold}"
+                                    reach_threshold="{ul_center_arrive_distance_threshold}"
                                     resend_interval="0.30"
                                     response_timeout="0.80"
                                     result_retry_delay="0.30"/>
@@ -237,12 +237,12 @@
                                 threshold="{ul_center_hold_distance_threshold}"/>
               <Wait wait_duration="0.5"/>
             </Sequence>
-            <ReliableNavigateToPose goal="{goal}"
-                                    goal_name="{ul_center_goal_name}"
-                                    reach_threshold="{ul_center_hold_distance_threshold}"
-                                    resend_interval="0.50"
-                                    response_timeout="1.00"
-                                    result_retry_delay="0.50"/>
+            <Sequence name="偏离驻守半径，重新回中">
+              <PrintNode message="[UL] 已偏离中心驻守半径，重新回到中心相关点位"/>
+              <SetBlackboardValue key="ul_center_ready"
+                                  value="0"
+                                  type="int"/>
+            </Sequence>
           </Fallback>
         </ReactiveSequence>
       </ReactiveFallback>
