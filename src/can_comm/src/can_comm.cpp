@@ -35,6 +35,8 @@ public:
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
         this->declare_parameter<std::string>("hurt_data_topic", "/rm_referee/hurt_data");
+        this->declare_parameter<double>("cmd_vel_timeout_s", 0.1);
+        this->declare_parameter<double>("vw_timeout_s", 0.1);
 
         // 读取参数
         std::string port      = this->get_parameter("port").as_string();
@@ -49,6 +51,8 @@ public:
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
+        cmd_vel_timeout_s_ = this->get_parameter("cmd_vel_timeout_s").as_double();
+        vw_timeout_s_ = this->get_parameter("vw_timeout_s").as_double();
 
         // 打开 CAN 设备
         try {
@@ -74,6 +78,9 @@ public:
                     vw_received_once_ = true;
                 }
                 vw_ = m->vw;
+                last_vw_msg_time_ = this->now();
+                // 新的 /vw 指令到达后，退出默认值覆盖模式
+                vw_default_override_active_ = false;
             });
 
         scan_mod_sub_ = this->create_subscription<sentry_msgs::msg::ScanMode>(
@@ -120,6 +127,8 @@ private:
         vx_   = static_cast<float>(msg->linear.x);
         vy_   = static_cast<float>(msg->linear.y);
         vyaw_ = static_cast<float>(msg->angular.z);
+        cmd_vel_received_once_ = true;
+        last_cmd_vel_msg_time_ = this->now();
     }
 
     void hurtCallback(const rm_referee_msgs::msg::HurtData::SharedPtr msg)
@@ -140,7 +149,9 @@ private:
 
         float vx, vy, vyaw, vw;
         bool scan;
-        uint8_t left, behind, right;
+        uint8_t left = 0;
+        uint8_t behind = 0;
+        uint8_t right = 0;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             vx    = vx_;
@@ -152,8 +163,17 @@ private:
             behind = armor_behind_;
             right  = armor_right_;
 
+            const auto now = this->now();
+            const bool cmd_vel_fresh =
+                cmd_vel_received_once_ &&
+                (now - last_cmd_vel_msg_time_).seconds() <= cmd_vel_timeout_s_;
+            if (!cmd_vel_fresh) {
+                vx = 0.0f;
+                vy = 0.0f;
+                vyaw = 0.0f;
+            }
+
             if (hurt_active_) {
-                auto now = this->now();
                 double dt = (now - hurt_start_time_).seconds();
                 if (dt < 5.0) {
                     vw = 1.0f;
@@ -162,6 +182,20 @@ private:
                     hurt_active_ = false;
                     vw = vw_received_once_ ? vw_default_after_first_msg_ : vw_default_before_first_msg_;
                     vw_ = vw;
+                    // 受击结束后切到 0.3 的默认值时，其优先级高于 vw 超时置零
+                    vw_default_override_active_ = vw_received_once_;
+                }
+            } else {
+                if (vw_default_override_active_) {
+                    vw = vw_default_after_first_msg_;
+                    vw_ = vw;
+                } else {
+                    const bool vw_fresh =
+                        vw_received_once_ &&
+                        (now - last_vw_msg_time_).seconds() <= vw_timeout_s_;
+                    if (!vw_fresh) {
+                        vw = 0.0f;
+                    }
                 }
             }
         }
@@ -235,6 +269,13 @@ private:
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
     bool hurt_active_ = false;
     rclcpp::Time hurt_start_time_;
+
+    bool cmd_vel_received_once_ = false;
+    rclcpp::Time last_cmd_vel_msg_time_;
+    rclcpp::Time last_vw_msg_time_;
+    double cmd_vel_timeout_s_ = 0.5;
+    double vw_timeout_s_ = 0.5;
+    bool vw_default_override_active_ = false;
 
     uint32_t id_xyz_  = 0x180;
     uint32_t id_scan_ = 0x190;
