@@ -83,13 +83,18 @@ public:
                 vw_default_override_active_ = false;
             });
 
+        // game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
+        //     game_status_topic, 10,
+        //     [this](const rm_referee_msgs::msg::GameStatus::SharedPtr m) {
+        //         std::lock_guard<std::mutex> lk(mutex_);
+        //         game_progress_ = m->game_progress;
+        //         scan_mod_type_ = (m->game_progress == 4);
+        //     });
+
         game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
-            game_status_topic, 10,
-            [this](const rm_referee_msgs::msg::GameStatus::SharedPtr m) {
-                std::lock_guard<std::mutex> lk(mutex_);
-                game_progress_ = m->game_progress;
-                scan_mod_type_ = (m->game_progress == 4);
-            });
+            game_status_topic,
+            rclcpp::SensorDataQoS(),   
+            std::bind(&CanCommNode::gamestatusCallback, this, std::placeholders::_1));
 
         armor_presence_sub_ = this->create_subscription<sentry_msgs::msg::ArmorPresence>(
             all_detect_topic, 10,
@@ -142,6 +147,13 @@ private:
 
             vw_ = 1.0f;
         }
+    }
+
+    void gamestatusCallback(const rm_referee_msgs::msg::GameStatus::SharedPtr msg)
+    {
+        if (!msg) return;
+        game_progress_ = msg->game_progress;
+        scan_mod_type_ = (msg->game_progress == 4);
     }
 
     void sendFrame()
