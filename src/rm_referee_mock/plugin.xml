@@ -1,0 +1,58 @@
+<library path="rm_referee_mock">
+  <class name="MatchControl" type="rm_referee_mock.rqt_plugin_match_control.MatchControlPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      Match control panel for RoboMaster referee system testing
+    </description>
+    <qtgui>
+      <group>
+        <label>RM Referee Mock</label>
+        <icon type="theme">folder</icon>
+      </group>
+      <label>Match Control</label>
+      <icon type="theme">input-gaming</icon>
+      <statustip>RoboMaster match control panel</statustip>
+    </qtgui>
+  </class>
+  <class name="KeyboardPublisher" type="rm_referee_mock.rqt_plugin_keyboard_publisher.KeyboardPublisherPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      Keyboard input publisher for RoboMaster referee system testing
+    </description>
+    <qtgui>
+      <group>
+        <label>RM Referee Mock</label>
+        <icon type="theme">folder</icon>
+      </group>
+      <label>Keyboard Publisher</label>
+      <icon type="theme">input-keyboard</icon>
+      <statustip>RoboMaster keyboard input publisher</statustip>
+    </qtgui>
+  </class>
+  <class name="DartClient" type="rm_referee_mock.rqt_plugin_dart_client.DartClientPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      Dart launch system control panel for RoboMaster referee system testing
+    </description>
+    <qtgui>
+      <group>
+        <label>RM Referee Mock</label>
+        <icon type="theme">folder</icon>
+      </group>
+      <label>Dart Client</label>
+      <icon type="theme">system-run</icon>
+      <statustip>RoboMaster dart launch system controller</statustip>
+    </qtgui>
+  </class>
+  <class name="FakeLocation" type="rm_referee_mock.rqt_plugin_fake_location.FakeLocationPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      Fake location data publisher for RoboMaster referee system testing
+    </description>
+    <qtgui>
+      <group>
+        <label>RM Referee Mock</label>
+        <icon type="theme">folder</icon>
+      </group>
+      <label>Fake Location</label>
+      <icon type="theme">applications-internet</icon>
+      <statustip>RoboMaster fake location data publisher</statustip>
+    </qtgui>
+  </class>
+</library>
