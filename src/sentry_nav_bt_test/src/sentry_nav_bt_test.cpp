@@ -4,6 +4,8 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
 
 // ROS
@@ -40,6 +42,87 @@
 #include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
 
 #include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
+
+namespace
+{
+
+std::string getCurrentDateString()
+{
+    const std::time_t now = std::time(nullptr);
+    std::tm local_tm{};
+    localtime_r(&now, &local_tm);
+
+    char buffer[16];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &local_tm);
+    return std::string(buffer);
+}
+
+std::string resolveBtMessageLogFilePath(const std::string &configured_path)
+{
+    namespace fs = std::filesystem;
+
+    fs::path configured(configured_path);
+    fs::path directory_path = configured.parent_path();
+    std::string file_stem = configured.stem().string();
+    std::string extension = configured.extension().string();
+
+    if (!configured.has_extension()) {
+        directory_path = configured;
+        file_stem = "sentry_nav_bt_messages";
+        extension = ".log";
+    }
+
+    if (directory_path.empty()) {
+        directory_path = ".";
+    }
+    if (file_stem.empty()) {
+        file_stem = "sentry_nav_bt_messages";
+    }
+    if (extension.empty()) {
+        extension = ".log";
+    }
+
+    const fs::path dated_log_path =
+        directory_path / (file_stem + "_" + getCurrentDateString() + extension);
+    return dated_log_path.string();
+}
+
+bool initializeBtMessageLogFile(const std::string &log_file_path, const rclcpp::Logger &logger)
+{
+    namespace fs = std::filesystem;
+
+    const fs::path log_path(log_file_path);
+    std::error_code ec;
+    const fs::path directory_path = log_path.parent_path();
+    if (!directory_path.empty() && !fs::exists(directory_path, ec)) {
+        fs::create_directories(directory_path, ec);
+        if (ec) {
+            RCLCPP_WARN(
+                logger,
+                "无法创建行为树消息日志目录: %s (%s)",
+                directory_path.string().c_str(),
+                ec.message().c_str());
+            return false;
+        }
+    }
+
+    const bool needs_header =
+        !fs::exists(log_path, ec) || (ec ? false : fs::file_size(log_path, ec) == 0U);
+
+    std::ofstream ofs(log_file_path, std::ios::app);
+    if (!ofs.is_open()) {
+        RCLCPP_WARN(logger, "无法初始化行为树消息日志文件: %s", log_file_path.c_str());
+        return false;
+    }
+
+    if (needs_header) {
+        ofs << "# sentry_nav_bt_test behavior tree messages\n";
+    }
+
+    return true;
+}
+
+}  // namespace
 
 void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
                                  const rclcpp::Node::SharedPtr &node)
@@ -144,19 +227,16 @@ int main(int argc, char **argv)
     // 从XML创建行为树
     auto blackboard = BT::Blackboard::create();
     blackboard->set("node", node);
-    blackboard->set("bt_message_log_file", bt_message_log_file);
 
     if (!bt_message_log_file.empty())
     {
-        std::ofstream ofs(bt_message_log_file, std::ios::trunc);
-        if (ofs.is_open()) {
-            ofs << "# sentry_nav_bt_test behavior tree messages\n";
+        bt_message_log_file = resolveBtMessageLogFilePath(bt_message_log_file);
+        if (initializeBtMessageLogFile(bt_message_log_file, node->get_logger())) {
             RCLCPP_INFO(node->get_logger(), "行为树消息日志文件: %s", bt_message_log_file.c_str());
         }
-        else {
-            RCLCPP_WARN(node->get_logger(), "无法初始化行为树消息日志文件: %s", bt_message_log_file.c_str());
-        }
     }
+
+    blackboard->set("bt_message_log_file", bt_message_log_file);
 
     // 创建黑板管理器
     auto bb_manager = std::make_shared<sentry_nav_bt_test::BlackboardManager>(node, blackboard);
