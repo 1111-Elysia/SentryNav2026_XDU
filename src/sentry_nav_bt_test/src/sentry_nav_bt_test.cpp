@@ -47,6 +47,12 @@
 namespace
 {
 
+struct BtMessageLogPaths
+{
+    std::string history_log_path;
+    std::string run_log_path;
+};
+
 std::string getCurrentTimestampString()
 {
     const std::time_t now = std::time(nullptr);
@@ -58,7 +64,7 @@ std::string getCurrentTimestampString()
     return std::string(buffer);
 }
 
-std::string resolveBtMessageLogFilePath(const std::string &configured_path)
+std::string resolveBtMessageLogBaseFilePath(const std::string &configured_path)
 {
     namespace fs = std::filesystem;
 
@@ -83,13 +89,57 @@ std::string resolveBtMessageLogFilePath(const std::string &configured_path)
         extension = ".log";
     }
 
-    const fs::path dated_log_path = directory_path /
-        (file_stem + "_" + getCurrentTimestampString() + "_pid" +
-         std::to_string(static_cast<long long>(::getpid())) + extension);
-    return dated_log_path.string();
+    return (directory_path / (file_stem + extension)).string();
 }
 
-bool initializeBtMessageLogFile(const std::string &log_file_path, const rclcpp::Logger &logger)
+BtMessageLogPaths resolveBtMessageLogPaths(const std::string &configured_path)
+{
+    namespace fs = std::filesystem;
+
+    BtMessageLogPaths paths;
+    if (configured_path.empty()) {
+        return paths;
+    }
+
+    paths.history_log_path = resolveBtMessageLogBaseFilePath(configured_path);
+
+    const fs::path history_path(paths.history_log_path);
+    const std::string file_stem = history_path.stem().string();
+    const std::string extension = history_path.extension().string();
+    const fs::path dated_log_path = history_path.parent_path() /
+        (file_stem + "_" + getCurrentTimestampString() + "_pid" +
+         std::to_string(static_cast<long long>(::getpid())) + extension);
+    paths.run_log_path = dated_log_path.string();
+
+    return paths;
+}
+
+std::string buildBtMessageLogSessionTag()
+{
+    return getCurrentTimestampString() + " pid=" +
+           std::to_string(static_cast<long long>(::getpid()));
+}
+
+std::string resolveBtMessageLogProcessLabel(const char *argv0)
+{
+    namespace fs = std::filesystem;
+
+    if (argv0 == nullptr) {
+        return "";
+    }
+
+    const std::string executable_name = fs::path(argv0).filename().string();
+    if (executable_name.empty()) {
+        return "";
+    }
+
+    return executable_name + "-1";
+}
+
+bool initializeBtMessageLogFile(
+    const std::string &log_file_path,
+    const rclcpp::Logger &logger,
+    const std::string &session_tag)
 {
     namespace fs = std::filesystem;
 
@@ -119,6 +169,9 @@ bool initializeBtMessageLogFile(const std::string &log_file_path, const rclcpp::
 
     if (needs_header) {
         ofs << "# sentry_nav_bt_test behavior tree messages\n";
+    }
+    if (!session_tag.empty()) {
+        ofs << "\n# session_start " << session_tag << '\n';
     }
 
     return true;
@@ -229,13 +282,41 @@ int main(int argc, char **argv)
     // 从XML创建行为树
     auto blackboard = BT::Blackboard::create();
     blackboard->set("node", node);
+    blackboard->set(
+        "bt_message_log_process_label",
+        resolveBtMessageLogProcessLabel(argv[0]));
 
     if (!bt_message_log_file.empty())
     {
-        bt_message_log_file = resolveBtMessageLogFilePath(bt_message_log_file);
-        if (initializeBtMessageLogFile(bt_message_log_file, node->get_logger())) {
-            RCLCPP_INFO(node->get_logger(), "行为树消息日志文件: %s", bt_message_log_file.c_str());
+        const auto bt_message_log_paths = resolveBtMessageLogPaths(bt_message_log_file);
+        const std::string session_tag = buildBtMessageLogSessionTag();
+        std::string bt_message_log_history_file;
+
+        if (!bt_message_log_paths.history_log_path.empty() &&
+            initializeBtMessageLogFile(
+                bt_message_log_paths.history_log_path, node->get_logger(), session_tag))
+        {
+            bt_message_log_history_file = bt_message_log_paths.history_log_path;
+            RCLCPP_INFO(
+                node->get_logger(),
+                "行为树消息累计日志文件: %s",
+                bt_message_log_history_file.c_str());
         }
+
+        if (!bt_message_log_paths.run_log_path.empty() &&
+            initializeBtMessageLogFile(
+                bt_message_log_paths.run_log_path, node->get_logger(), session_tag))
+        {
+            bt_message_log_file = bt_message_log_paths.run_log_path;
+            RCLCPP_INFO(
+                node->get_logger(),
+                "行为树消息本次运行日志文件: %s",
+                bt_message_log_file.c_str());
+        } else {
+            bt_message_log_file.clear();
+        }
+
+        blackboard->set("bt_message_log_history_file", bt_message_log_history_file);
     }
 
     blackboard->set("bt_message_log_file", bt_message_log_file);

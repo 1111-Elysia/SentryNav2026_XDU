@@ -1,9 +1,11 @@
 #ifndef SENTRY_NAV_BT_TEST_BLACKBOARD_UTILS_HPP_
 #define SENTRY_NAV_BT_TEST_BLACKBOARD_UTILS_HPP_
 
+#include <algorithm>
 #include <rclcpp/logging.hpp>
-#include <string>
 #include <cmath>
+#include <sstream>
+#include <string>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
 #include "behaviortree_cpp_v3/blackboard.h"
@@ -113,6 +115,190 @@ namespace sentry_nav_bt_test
         }
 
         /**
+         * @brief 将黑板中的值格式化为字符串，支持多种类型
+         * @param blackboard 黑板指针
+         * @param key 黑板键名
+         * @param formatted_value 输出的格式化字符串
+         * @return 是否成功格式化
+         */
+        inline bool formatValue(BT::Blackboard::Ptr blackboard,
+                                const std::string &key,
+                                std::string &formatted_value)
+        {
+            try
+            {
+                int int_value;
+                if (blackboard->get(key, int_value))
+                {
+                    formatted_value = std::to_string(int_value);
+                    return true;
+                }
+
+                double double_value;
+                if (blackboard->get(key, double_value))
+                {
+                    std::ostringstream oss;
+                    oss << double_value;
+                    formatted_value = oss.str();
+                    return true;
+                }
+
+                float float_value;
+                if (blackboard->get(key, float_value))
+                {
+                    std::ostringstream oss;
+                    oss << static_cast<double>(float_value);
+                    formatted_value = oss.str();
+                    return true;
+                }
+
+                bool bool_value;
+                if (blackboard->get(key, bool_value))
+                {
+                    formatted_value = bool_value ? "true" : "false";
+                    return true;
+                }
+
+                std::string string_value;
+                if (blackboard->get(key, string_value))
+                {
+                    formatted_value = string_value;
+                    return true;
+                }
+
+                uint8_t uint8_value;
+                if (blackboard->get(key, uint8_value))
+                {
+                    formatted_value = std::to_string(static_cast<int>(uint8_value));
+                    return true;
+                }
+
+                uint16_t uint16_value;
+                if (blackboard->get(key, uint16_value))
+                {
+                    formatted_value = std::to_string(uint16_value);
+                    return true;
+                }
+
+                uint32_t uint32_value;
+                if (blackboard->get(key, uint32_value))
+                {
+                    formatted_value = std::to_string(uint32_value);
+                    return true;
+                }
+
+                try
+                {
+                    auto pose = blackboard->get<geometry_msgs::msg::PoseStamped>(key);
+                    std::ostringstream oss;
+                    oss << "位置("
+                        << pose.pose.position.x << ", "
+                        << pose.pose.position.y << ", "
+                        << pose.pose.position.z << ") 方向("
+                        << pose.pose.orientation.x << ", "
+                        << pose.pose.orientation.y << ", "
+                        << pose.pose.orientation.z << ", "
+                        << pose.pose.orientation.w << ")";
+                    formatted_value = oss.str();
+                    return true;
+                }
+                catch (...)
+                {
+                }
+
+                try
+                {
+                    std::vector<int> int_vector;
+                    if (blackboard->get(key, int_vector))
+                    {
+                        std::ostringstream oss;
+                        oss << "[";
+                        for (size_t i = 0; i < int_vector.size(); ++i)
+                        {
+                            if (i > 0) {
+                                oss << ", ";
+                            }
+                            oss << int_vector[i];
+                        }
+                        oss << "]";
+                        formatted_value = oss.str();
+                        return true;
+                    }
+                }
+                catch (...)
+                {
+                }
+
+                try
+                {
+                    std::vector<double> double_vector;
+                    if (blackboard->get(key, double_vector))
+                    {
+                        std::ostringstream oss;
+                        oss << "[";
+                        for (size_t i = 0; i < double_vector.size(); ++i)
+                        {
+                            if (i > 0) {
+                                oss << ", ";
+                            }
+                            oss << double_vector[i];
+                        }
+                        oss << "]";
+                        formatted_value = oss.str();
+                        return true;
+                    }
+                }
+                catch (...)
+                {
+                }
+
+                try
+                {
+                    std::vector<uint8_t> uint8_vector;
+                    if (blackboard->get(key, uint8_vector))
+                    {
+                        std::ostringstream oss;
+                        oss << "[总计" << uint8_vector.size() << "个元素, 前10个: ";
+                        for (size_t i = 0; i < std::min(uint8_vector.size(), static_cast<size_t>(10)); ++i)
+                        {
+                            if (i > 0) {
+                                oss << ", ";
+                            }
+                            oss << static_cast<int>(uint8_vector[i]);
+                        }
+                        if (uint8_vector.size() > 10) {
+                            oss << ", ...";
+                        }
+                        oss << "]";
+                        formatted_value = oss.str();
+                        return true;
+                    }
+                }
+                catch (...)
+                {
+                }
+
+                return false;
+            }
+            catch (...)
+            {
+                return false;
+            }
+        }
+
+        inline std::string formatKeyValueMessage(const std::string &key,
+                                                 const std::string &prefix,
+                                                 const std::string &formatted_value)
+        {
+            if (prefix.empty())
+            {
+                return key + " = " + formatted_value;
+            }
+
+            return prefix + ": " + key + " = " + formatted_value;
+        }
+
+        /**
          * @brief 尝试打印黑板中的值，支持多种类型
          * @param blackboard 黑板指针
          * @param key 黑板键名
@@ -126,159 +312,15 @@ namespace sentry_nav_bt_test
             // 尝试打印基本类型
             try
             {
-                // 尝试获取int
-                int int_value;
-                if (blackboard->get(key, int_value))
+                std::string formatted_value;
+                if (!formatValue(blackboard, key, formatted_value))
                 {
-                    RCLCPP_INFO(logger, "%s: %s = %d", prefix.c_str(), key.c_str(), int_value);
-                    return true;
+                    return false;
                 }
 
-                // 尝试获取double
-                double double_value;
-                if (blackboard->get(key, double_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %f", prefix.c_str(), key.c_str(), double_value);
-                    return true;
-                }
-
-                // 尝试获取float
-                float float_value;
-                if (blackboard->get(key, float_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %f", prefix.c_str(), key.c_str(), static_cast<double>(float_value));
-                    return true;
-                }
-
-                // 尝试获取bool
-                bool bool_value;
-                if (blackboard->get(key, bool_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %s", prefix.c_str(), key.c_str(), bool_value ? "true" : "false");
-                    return true;
-                }
-
-                // 尝试获取string
-                std::string string_value;
-                if (blackboard->get(key, string_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %s", prefix.c_str(), key.c_str(), string_value.c_str());
-                    return true;
-                }
-
-                // 尝试获取无符号整型
-                uint8_t uint8_value;
-                if (blackboard->get(key, uint8_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %d", prefix.c_str(), key.c_str(), static_cast<int>(uint8_value));
-                    return true;
-                }
-
-                uint16_t uint16_value;
-                if (blackboard->get(key, uint16_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %u", prefix.c_str(), key.c_str(), uint16_value);
-                    return true;
-                }
-
-                uint32_t uint32_value;
-                if (blackboard->get(key, uint32_value))
-                {
-                    RCLCPP_INFO(logger, "%s: %s = %u", prefix.c_str(), key.c_str(), uint32_value);
-                    return true;
-                }
-
-                // 尝试获取PoseStamped
-                try
-                {
-                    auto pose = blackboard->get<geometry_msgs::msg::PoseStamped>(key);
-                    RCLCPP_INFO(logger,
-                                "%s: %s = 位置(%.2f, %.2f, %.2f) 方向(%.2f, %.2f, %.2f, %.2f)",
-                                prefix.c_str(), key.c_str(),
-                                pose.pose.position.x, pose.pose.position.y, pose.pose.position.z,
-                                pose.pose.orientation.x, pose.pose.orientation.y,
-                                pose.pose.orientation.z, pose.pose.orientation.w);
-                    return true;
-                }
-                catch (...)
-                {
-                    // 忽略处理
-                }
-
-                // 尝试获取向量类型
-                try
-                {
-                    std::vector<int> int_vector;
-                    if (blackboard->get(key, int_vector))
-                    {
-                        std::stringstream ss;
-                        ss << "[";
-                        for (size_t i = 0; i < int_vector.size(); ++i)
-                        {
-                            if (i > 0)
-                                ss << ", ";
-                            ss << int_vector[i];
-                        }
-                        ss << "]";
-                        RCLCPP_INFO(logger, "%s: %s = %s", prefix.c_str(), key.c_str(), ss.str().c_str());
-                        return true;
-                    }
-                }
-                catch (...)
-                {
-                    // 忽略处理
-                }
-
-                try
-                {
-                    std::vector<double> double_vector;
-                    if (blackboard->get(key, double_vector))
-                    {
-                        std::stringstream ss;
-                        ss << "[";
-                        for (size_t i = 0; i < double_vector.size(); ++i)
-                        {
-                            if (i > 0)
-                                ss << ", ";
-                            ss << double_vector[i];
-                        }
-                        ss << "]";
-                        RCLCPP_INFO(logger, "%s: %s = %s", prefix.c_str(), key.c_str(), ss.str().c_str());
-                        return true;
-                    }
-                }
-                catch (...)
-                {
-                    // 忽略处理
-                }
-
-                try
-                {
-                    std::vector<uint8_t> uint8_vector;
-                    if (blackboard->get(key, uint8_vector))
-                    {
-                        std::stringstream ss;
-                        ss << "[总计" << uint8_vector.size() << "个元素, 前10个: ";
-                        for (size_t i = 0; i < std::min(uint8_vector.size(), static_cast<size_t>(10)); ++i)
-                        {
-                            if (i > 0)
-                                ss << ", ";
-                            ss << static_cast<int>(uint8_vector[i]); // 转成int避免被解释为字符
-                        }
-                        if (uint8_vector.size() > 10)
-                            ss << ", ...";
-                        ss << "]";
-                        RCLCPP_INFO(logger, "%s: %s = %s", prefix.c_str(), key.c_str(), ss.str().c_str());
-                        return true;
-                    }
-                }
-                catch (...)
-                {
-                    // 忽略处理
-                }
-
-                // 所有尝试都失败
-                return false;
+                const auto log_message = formatKeyValueMessage(key, prefix, formatted_value);
+                RCLCPP_INFO(logger, "%s", log_message.c_str());
+                return true;
             }
             catch (const std::exception &e)
             {

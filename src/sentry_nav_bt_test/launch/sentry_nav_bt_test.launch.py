@@ -60,7 +60,7 @@ def generate_launch_description():
     bt_message_log_arg = DeclareLaunchArgument(
         'bt_message_log_file',
         default_value='/tmp/sentry_nav_bt_messages.log',
-        description='行为树 PrintNode 日志目录/基准文件路径，实际会按启动时间生成唯一文件，置空可关闭'
+        description='行为树 PrintNode 日志目录/基准文件路径；固定路径会累计所有运行记录，同时也会为每次启动生成唯一日志文件，置空可关闭'
     )
     
     bridge_node = Node(

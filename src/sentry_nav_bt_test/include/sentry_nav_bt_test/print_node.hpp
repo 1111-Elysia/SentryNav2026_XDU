@@ -2,9 +2,12 @@
 #define SENTRY_NAV_BT_TEST_PRINT_NODE_HPP_
 
 #include <fstream>
+#include <iomanip>
+#include <cstdint>
 #include <mutex>
-#include <string>
 #include <memory>
+#include <sstream>
+#include <string>
 #include "behaviortree_cpp_v3/action_node.h"
 #include "rclcpp/rclcpp.hpp"
 
@@ -26,6 +29,9 @@ public:
   : BT::SyncActionNode(name, config)
   {
     node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");
+    if (config.blackboard) {
+      config.blackboard->get("bt_message_log_process_label", process_label_);
+    }
   }
 
   /**
@@ -56,23 +62,22 @@ public:
     RCLCPP_INFO(node_->get_logger(), "%s", message.c_str());
 
     std::string log_file;
+    std::string history_log_file;
     if (config().blackboard &&
-        config().blackboard->get("bt_message_log_file", log_file) &&
-        !log_file.empty())
+        config().blackboard->get("bt_message_log_file", log_file))
     {
       static std::mutex log_mutex;
       std::lock_guard<std::mutex> lock(log_mutex);
 
-      std::ofstream ofs(log_file, std::ios::app);
-      if (ofs.is_open()) {
-        ofs << "[" << node_->now().seconds() << "] " << message << '\n';
-      } else {
-        RCLCPP_WARN_THROTTLE(
-          node_->get_logger(),
-          *node_->get_clock(),
-          2000,
-          "无法打开行为树消息日志文件: %s",
-          log_file.c_str());
+      if (!log_file.empty()) {
+        writeLogLine(log_file, message);
+      }
+
+      if (config().blackboard->get("bt_message_log_history_file", history_log_file) &&
+          !history_log_file.empty() &&
+          history_log_file != log_file)
+      {
+        writeLogLine(history_log_file, message);
       }
     }
     
@@ -80,7 +85,46 @@ public:
   }
 
 private:
+  std::string formatLogLine(const std::string &message) const
+  {
+    const auto now = node_->get_clock()->now();
+    const std::int64_t total_nanoseconds = now.nanoseconds();
+    const std::int64_t seconds = total_nanoseconds / 1000000000LL;
+    const std::int64_t nanoseconds = total_nanoseconds % 1000000000LL;
+
+    std::ostringstream oss;
+    if (!process_label_.empty()) {
+      oss << "[" << process_label_ << "] ";
+    }
+    oss << "[INFO] ["
+        << seconds << "."
+        << std::setw(9) << std::setfill('0') << nanoseconds
+        << "] ["
+        << node_->get_logger().get_name()
+        << "]: "
+        << message;
+    return oss.str();
+  }
+
+  bool writeLogLine(const std::string &log_file, const std::string &message)
+  {
+    std::ofstream ofs(log_file, std::ios::app);
+    if (!ofs.is_open()) {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(),
+        *node_->get_clock(),
+        2000,
+        "无法打开行为树消息日志文件: %s",
+        log_file.c_str());
+      return false;
+    }
+
+    ofs << formatLogLine(message) << '\n';
+    return true;
+  }
+
   rclcpp::Node::SharedPtr node_;
+  std::string process_label_;
 };
 
 }  // namespace sentry_nav_bt_test

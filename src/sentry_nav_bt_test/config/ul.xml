@@ -125,6 +125,8 @@
                               comparison="lt"
                               threshold="150.0"/>
               <PrintNode message="[UL] 血量低于150，触发回补模式"/>
+              <PrintBlackboardValue key="current_hp"
+                                    prefix="[UL] 触发回补时血量"/>
               <SetBlackboardValue key="ul_retreat_active"
                                   value="1"
                                   type="int"/>
@@ -154,6 +156,8 @@
               </Sequence>
             </KeepRunningUntilFailure>
           </Inverter>
+          <PrintBlackboardValue key="current_hp"
+                                prefix="[UL] 回补结束时血量"/>
           <PrintNode message="[UL] 回补完成，准备重新前往中心"/>
           <SetBlackboardValue key="ul_retreat_active"
                               value="0"
