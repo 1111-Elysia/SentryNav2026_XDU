@@ -83,14 +83,6 @@ public:
                 vw_default_override_active_ = false;
             });
 
-        // game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
-        //     game_status_topic, 10,
-        //     [this](const rm_referee_msgs::msg::GameStatus::SharedPtr m) {
-        //         std::lock_guard<std::mutex> lk(mutex_);
-        //         game_progress_ = m->game_progress;
-        //         scan_mod_type_ = (m->game_progress == 4);
-        //     });
-
         game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
             game_status_topic,
             rclcpp::SensorDataQoS(),   
@@ -152,8 +144,18 @@ private:
     void gamestatusCallback(const rm_referee_msgs::msg::GameStatus::SharedPtr msg)
     {
         if (!msg) return;
+        std::lock_guard<std::mutex> lock(mutex_);
         game_progress_ = msg->game_progress;
         scan_mod_type_ = (msg->game_progress == 4);
+
+        if (msg->game_progress == 4) {
+            if (!game_progress_4_timing_active_) {
+                game_progress_4_timing_active_ = true;
+                game_progress_4_start_time_ = this->now();
+            }
+        } else {
+            game_progress_4_timing_active_ = false;
+        }
     }
 
     void sendFrame()
@@ -177,6 +179,9 @@ private:
             right  = armor_right_;
 
             const auto now = this->now();
+            const bool game_progress_4_ready =
+                game_progress_4_timing_active_ &&
+                (now - game_progress_4_start_time_).seconds() >= 5.0;
             const bool cmd_vel_fresh =
                 cmd_vel_received_once_ &&
                 (now - last_cmd_vel_msg_time_).seconds() <= cmd_vel_timeout_s_;
@@ -207,7 +212,7 @@ private:
                         vw_received_once_ &&
                         (now - last_vw_msg_time_).seconds() <= vw_timeout_s_;
                     if (!vw_fresh) {
-                        vw = 0.0f;
+                        vw = game_progress_4_ready ? vw_default_after_first_msg_ : 0.0f;
                     }
                 }
             }
@@ -297,6 +302,8 @@ private:
     bool cmd_vel_received_once_ = false;
     rclcpp::Time last_cmd_vel_msg_time_;
     rclcpp::Time last_vw_msg_time_;
+    bool game_progress_4_timing_active_ = false;
+    rclcpp::Time game_progress_4_start_time_;
     double cmd_vel_timeout_s_ = 0.5;
     double vw_timeout_s_ = 0.5;
     bool vw_default_override_active_ = false;
