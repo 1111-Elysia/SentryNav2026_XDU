@@ -7,6 +7,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <unistd.h>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -46,14 +47,14 @@
 namespace
 {
 
-std::string getCurrentDateString()
+std::string getCurrentTimestampString()
 {
     const std::time_t now = std::time(nullptr);
     std::tm local_tm{};
     localtime_r(&now, &local_tm);
 
-    char buffer[16];
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &local_tm);
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d_%H-%M-%S", &local_tm);
     return std::string(buffer);
 }
 
@@ -82,8 +83,9 @@ std::string resolveBtMessageLogFilePath(const std::string &configured_path)
         extension = ".log";
     }
 
-    const fs::path dated_log_path =
-        directory_path / (file_stem + "_" + getCurrentDateString() + extension);
+    const fs::path dated_log_path = directory_path /
+        (file_stem + "_" + getCurrentTimestampString() + "_pid" +
+         std::to_string(static_cast<long long>(::getpid())) + extension);
     return dated_log_path.string();
 }
 

@@ -130,7 +130,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `bt_message_log_file`
   - `PrintNode` 额外落盘的日志目录/基准文件路径
   - 默认值：`/tmp/sentry_nav_bt_messages.log`
-  - 实际会写成按日期分文件，例如：`/tmp/sentry_nav_bt_messages_2026-03-27.log`
+  - 实际会按每次启动生成唯一文件，例如：`/tmp/sentry_nav_bt_messages_2026-03-27_21-05-33_pid12345.log`
   - 传空字符串可关闭该文件输出
 - `use_old_protocol`
   - 是否启动旧协议到新协议的桥接
@@ -378,8 +378,8 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 当前位置由 TF 定时写入黑板键 `waypoint_now`
 - 中心驻守激活时会持续发布 `/vw = 1`
 - 退出中心驻守后会停止继续发布 `/vw`
-- `PrintNode` 消息默认会额外写入按日期命名的日志文件，例如 `/tmp/sentry_nav_bt_messages_2026-03-27.log`
-- 不会在每次启动时清空旧日志；同一天内会继续追加写入
+- `PrintNode` 消息默认会额外写入按启动时间命名的日志文件，例如 `/tmp/sentry_nav_bt_messages_2026-03-27_21-05-33_pid12345.log`
+- 每次启动都会生成新的日志文件，不会把同一天内多次运行混写到同一个文件
 - 默认中心到点阈值 `ul_center_arrive_distance_threshold = 0.10 m`
 - 默认中心驻守半径 `ul_center_hold_distance_threshold = 0.50 m`
 - `/vw` 驻守发布逻辑已从 `topic_listener.hpp` 中拆到独立的 `center_hold_vw_controller.hpp`
