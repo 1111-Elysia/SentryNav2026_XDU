@@ -243,7 +243,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 2.0
-        inflation_radius: 0.1
+        inflation_radius: 0.5
 
       always_send_full_costmap: True      # 始终发布完整地图
 
