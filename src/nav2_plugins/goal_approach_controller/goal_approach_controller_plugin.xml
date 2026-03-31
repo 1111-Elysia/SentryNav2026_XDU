@@ -1,0 +1,10 @@
+<library path="goal_approach_controller">
+  <class name="goal_approach_controller::GoalApproachController"
+         type="goal_approach_controller::GoalApproachController"
+         base_class_type="nav2_core::Controller">
+    <description>
+      Nav2控制器wrapper，在距离目标点小于阈值时将线速度限制在指定值，防止高速冲过目标。
+      通过pluginlib动态加载内部控制器（如MPPI），对外透明代理所有接口。
+    </description>
+  </class>
+</library>

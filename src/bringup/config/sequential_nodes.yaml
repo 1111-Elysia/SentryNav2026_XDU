@@ -2,12 +2,30 @@ sequential_nodes:
   - label: Livox-Driver
     type: execute
     cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
-    wait_after: 3
+    wait_after: 0
 
   - label: RM-messages
     type: execute
     cmd: ["ros2", "launch", "referee_node", "referee_node.launch.py"]
-    wait_after: 3
+    wait_after: 0
+
+  - label: Lidar-Filter
+    type: node
+    package: cpp_lidar_filter
+    executable: lidar_filter_node
+    name: my_lidar_filter
+    parameters:
+      - input_topic: /livox/lidar/pointcloud
+        output_topic: /livox/lidar_filtered
+        min_x: -0.2
+        max_x: 0.2
+        min_y: -0.2
+        max_y: 0.4
+        min_z: -0.1
+        max_z: 0.2
+        negative: true
+        leaf_size: 0.05
+    wait_after: 0
 
   # - label: Lightning-LM
   #   type: execute
@@ -16,27 +34,17 @@ sequential_nodes:
   #     "--config", "/home/nuc/Desktop/SentryNav2026_XDU/src/bringup/config/default_livox.yaml"
   #   ]
   #   use_config_dir_as_cwd: true
-  #   wait_after: 2
+  #   wait_after: 0
 
   # - label: Fast-LIO
   #   type: execute
   #   cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
   #   wait_after: 0
 
-  # - label: kiss-ICP
-  #   type: execute
-  #   cmd: ["ros2", "launch", "kiss_icp", "odometry.launch.py"]
-  #   wait_after: 2
-
-  # - label: odom-ekf
-  #   type: execute
-  #   cmd: ["ros2", "launch", "odom_ekf", "odom_ekf.launch.py"]
-  #   wait_after: 2
-
   - label: Super-LIO
     type: execute
     cmd: ["ros2", "launch", "super_lio", "Livox_mid360.py"]
-    wait_after: 2
+    wait_after: 0
 
   # - label: TF-Odom-Publisher
   #   type: node
@@ -46,7 +54,7 @@ sequential_nodes:
   #   parameters:
   #     - lidar.yaml
   #   arguments: ["--ros-args"]
-  #   wait_after: 2
+  #   wait_after: 0
 
   - label: TF-Only-Odom
     type: node
@@ -56,7 +64,7 @@ sequential_nodes:
     parameters:
       - lidar.yaml
     arguments: ["--ros-args"]
-    wait_after: 2
+    wait_after: 0
 
   # - label: Livox-to-Scan
   #   type: node
@@ -65,17 +73,17 @@ sequential_nodes:
   #   name: livox_to_scan_node
   #   parameters:
   #     - livox_to_scan.yaml
-  #   wait_after: 4
+  #   wait_after: 0
 
   # - label: USB-Serial-Comm
   #   type: execute
   #   cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
-  #   wait_after: 2
+  #   wait_after: 0
 
   - label: Can-Comm
     type: execute
     cmd: ["ros2", "launch", "can_comm", "can_comm.launch.py"]
-    wait_after: 2
+    wait_after: 0
 
   - label: Navigation-Stack
     type: execute
@@ -83,7 +91,7 @@ sequential_nodes:
       "ros2", "launch", "sentry_navigation", "navigation_launch.py",
       "map:=/home/nuc/Desktop/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
     ]
-    wait_after: 3
+    wait_after: 0
 
   # - label: behavior-tree-nodes
   #   type: execute

@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>costmap_voxel</name>
+  <version>0.0.1</version>
+  <description>Nav2 costmap layer plugin using PCL voxel filtering</description>
+  <maintainer email="dev@example.com">dev</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>pluginlib</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav2_costmap_2d</depend>
+  <depend>pcl_conversions</depend>
+
+  <build_depend>pcl_msgs</build_depend>
+  <build_depend>PCL</build_depend>
+  <exec_depend>pcl_msgs</exec_depend>
+  <exec_depend>PCL</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <pluginlib plugin="${prefix}/share/costmap_voxel/costmap_voxel_plugins.xml"/>
+  </export>
+</package>

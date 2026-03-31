@@ -1,0 +1,8 @@
+<library path="costmap_voxel_layer">
+  <class
+    name="costmap_voxel::VoxelFilterLayer"
+    type="costmap_voxel::VoxelFilterLayer"
+    base_class_type="nav2_costmap_2d::Layer">
+    <description>PCL voxel grid based costmap layer</description>
+  </class>
+</library>
