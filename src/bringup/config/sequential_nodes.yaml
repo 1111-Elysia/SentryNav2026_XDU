@@ -6,7 +6,7 @@ sequential_nodes:
 
   - label: RM-messages
     type: execute
-    cmd: ["ros2", "launch", "referee_node", "referee_node.launch.py"]
+    cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
     wait_after: 0
 
   - label: Lidar-Filter
