@@ -18,6 +18,10 @@ add_executable(can_comm_node
   src/can_comm.cpp
 )
 
+add_executable(vyaw_tf_yaw_controller_node
+  src/vyaw_tf_yaw_controller_node.cpp
+)
+
 target_include_directories(can_comm_node PRIVATE
   include
 )
@@ -32,10 +36,21 @@ ament_target_dependencies(can_comm_node
   tf2_ros
 )
 
+ament_target_dependencies(vyaw_tf_yaw_controller_node
+  rclcpp
+  geometry_msgs
+  tf2
+  tf2_ros
+)
+
 add_subdirectory(librm)
 target_link_libraries(can_comm_node rm)
 
 install(TARGETS can_comm_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS vyaw_tf_yaw_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
