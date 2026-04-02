@@ -29,15 +29,17 @@ fasterlio:
   b_acc_cov: 0.0001
   b_gyr_cov: 0.0001
   extrinsic_est_en: false      # true: enable the online estimation of IMU-LiDAR extrinsic
-  extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
+  extrinsic_T: [ 0, 0, 0.28 ]
   extrinsic_R: [ 1, 0, 0,
                  0, 1, 0,
                  0, 0, 1 ]
   keep_first_imu_estimation: false
+  kf_dis_th: 1.0
+  kf_angle_th: 5.0
 
 
 g2p5:
-  esti_floor: true   # 是否动态估计地面
+  esti_floor: false   # 是否动态估计地面
   lidar_height: 0.0   # 雷达安装高度
   floor_height: -1.2   # 默认地面高度
   min_th_floor: 0.50  # 距离地面这个高度的障碍物被扫入栅格地图中
@@ -47,17 +49,17 @@ g2p5:
 system:
   with_loop_closing: true # 是否需要回环检测
   with_ui: false # 是否需要3D UI
-  with_2dui: false # 是否需要2D UI
-  with_g2p5: false # 是否需要栅格地图
+  with_2dui: true # 是否需要2D UI
+  with_g2p5: true # 是否需要栅格地图
   step_on_kf: false # 是否在关键帧处暂停
 
   enable_lidar_loc_skip: false
   enable_lidar_loc_rviz: false
   enable_lidar_odom_skip: false
-  evaluation: true
+  evaluation: false
   lidar_loc_skip_num: 4
   lidar_odom_skip_num: 2
-  map_path: ../map/
+  map_path: ./data/new_map/
   pub_tf: true
 
 loop_closing:

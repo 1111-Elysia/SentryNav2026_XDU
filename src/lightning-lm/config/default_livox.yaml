@@ -29,11 +29,13 @@ fasterlio:
   b_acc_cov: 0.0001
   b_gyr_cov: 0.0001
   extrinsic_est_en: false      # true: enable the online estimation of IMU-LiDAR extrinsic
-  extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
+  extrinsic_T: [ 0, 0, 0.28 ]
   extrinsic_R: [ 1, 0, 0,
                  0, 1, 0,
                  0, 0, 1 ]
   keep_first_imu_estimation: false
+  kf_dis_th: 1.0
+  kf_angle_th: 5.0
 
 
 g2p5:
@@ -54,7 +56,7 @@ system:
   enable_lidar_loc_skip: false
   enable_lidar_loc_rviz: false
   enable_lidar_odom_skip: false
-  evaluation: true
+  evaluation: false
   lidar_loc_skip_num: 4
   lidar_odom_skip_num: 2
   map_path: ./data/new_map/
@@ -129,6 +131,3 @@ ui:
   car_width: 1.6
   car_height: 1.7
   scans: 1
-# 建图旋转修改
-lio:
-  mount_correction_rpy: [0.0, 0.0, 0.0] #roll pitch yaw 角度制

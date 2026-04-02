@@ -146,7 +146,8 @@ bool PangolinWindowImpl::UpdateCurrentScan() {
 
         current_scan_ui_ = std::make_shared<ui::UiCloud>();
         current_scan_ui_->SetCloud(current_scan_, current_scan_pose_);
-        current_scan_ui_->SetRenderColor(ui::UiCloud::UseColor::HEIGHT_COLOR);
+        current_scan_ui_->SetRenderColor(ui::UiCloud::UseColor::CUSTOM_COLOR);
+        current_scan_ui_->SetCustomColor(Vec4f(1.0, 1.0, 1.0, 1.0));
 
         current_scan_need_update_.store(false);
 
@@ -223,7 +224,6 @@ void PangolinWindowImpl::DrawAll() {
         UL lock(mtx_current_scan_);
 
         if (all_keyframes_.size() > 1) {
-
             /// 闭环后的轨迹
             glLineWidth(5.0);
             glBegin(GL_LINE_STRIP);
