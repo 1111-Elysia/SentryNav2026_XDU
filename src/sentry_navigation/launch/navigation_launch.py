@@ -38,7 +38,7 @@ def generate_launch_description():
     # Static (non-substitution) defaults
     # ---------------------------
     default_map_yaml = os.path.join(bringup_dir, 'map', 'map.yaml')
-    default_params = os.path.join(bringup_dir, 'config', 'navigation_params.yaml')
+    default_params = os.path.join(bringup_dir, 'config', 'singlenav2_params.yaml')
     default_lidar_params = os.path.join(bringup_dir, 'config', 'lidar.yaml')
     default_rviz_config = os.path.join(bringup_dir, 'config', 'nav2_default_view.rviz')
 
