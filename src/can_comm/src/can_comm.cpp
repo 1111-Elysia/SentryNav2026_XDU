@@ -2,6 +2,8 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <sentry_msgs/msg/vw.hpp>
 #include <sentry_msgs/msg/armor_presence.hpp>
+#include <sentry_msgs/msg/scan_mode.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include "rm_referee_msgs/msg/hurt_data.hpp"
 #include "rm_referee_msgs/msg/game_status.hpp"
 #include <rclcpp/qos.hpp>
@@ -32,6 +34,8 @@ public:
         this->declare_parameter<int>("id_scan", 0x190);
         this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
         this->declare_parameter<std::string>("vw_topic", "/vw");
+        this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
+        this->declare_parameter<std::string>("auto_shoot_type_topic", "/auto_shoot_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
         this->declare_parameter<std::string>("hurt_data_topic", "/rm_referee/hurt_data");
         this->declare_parameter<std::string>("game_status_topic", "/rm_referee/game_status");
@@ -48,6 +52,8 @@ public:
 
         std::string cmd_vel_topic       = this->get_parameter("cmd_vel_topic").as_string();
         std::string vw_topic            = this->get_parameter("vw_topic").as_string();
+        std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
+        std::string auto_shoot_type_topic = this->get_parameter("auto_shoot_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
         std::string game_status_topic   = this->get_parameter("game_status_topic").as_string();
@@ -81,6 +87,21 @@ public:
                 last_vw_msg_time_ = this->now();
                 // 新的 /vw 指令到达后，退出默认值覆盖模式
                 vw_default_override_active_ = false;
+            });
+
+        scan_mod_sub_ = this->create_subscription<sentry_msgs::msg::ScanMode>(
+            scan_mod_type_topic, 10,
+            [this](const sentry_msgs::msg::ScanMode::SharedPtr m) {
+                std::lock_guard<std::mutex> lk(mutex_);
+                scan_mod_type_ = m->scan_mod_type;
+                scan_mod_type_topic_received_ = true;
+            });
+
+        auto_shoot_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            auto_shoot_type_topic, 10,
+            [this](const std_msgs::msg::Bool::SharedPtr m) {
+                std::lock_guard<std::mutex> lk(mutex_);
+                auto_shoot_ = m->data;
             });
 
         game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
@@ -146,15 +167,8 @@ private:
         if (!msg) return;
         std::lock_guard<std::mutex> lock(mutex_);
         game_progress_ = msg->game_progress;
-        scan_mod_type_ = (msg->game_progress == 4);
-
-        if (msg->game_progress == 4) {
-            if (!game_progress_4_timing_active_) {
-                game_progress_4_timing_active_ = true;
-                game_progress_4_start_time_ = this->now();
-            }
-        } else {
-            game_progress_4_timing_active_ = false;
+        if (!scan_mod_type_topic_received_) {
+            scan_mod_type_ = (msg->game_progress == 4);
         }
     }
 
@@ -164,6 +178,7 @@ private:
 
         float vx, vy, vyaw, vw;
         bool scan;
+        bool auto_shoot;
         uint8_t left = 0;
         uint8_t behind = 0;
         uint8_t right = 0;
@@ -174,14 +189,12 @@ private:
             vyaw  = vyaw_;
             vw    = vw_;
             scan  = scan_mod_type_;
+            auto_shoot = auto_shoot_;
             left   = armor_left_;
             behind = armor_behind_;
             right  = armor_right_;
 
             const auto now = this->now();
-            const bool game_progress_4_ready =
-                game_progress_4_timing_active_ &&
-                (now - game_progress_4_start_time_).seconds() >= 5.0;
             const bool cmd_vel_fresh =
                 cmd_vel_received_once_ &&
                 (now - last_cmd_vel_msg_time_).seconds() <= cmd_vel_timeout_s_;
@@ -212,7 +225,7 @@ private:
                         vw_received_once_ &&
                         (now - last_vw_msg_time_).seconds() <= vw_timeout_s_;
                     if (!vw_fresh) {
-                        vw = game_progress_4_ready ? vw_default_after_first_msg_ : 0.0f;
+                        vw = 0.0f;
                     }
                 }
             }
@@ -222,6 +235,7 @@ private:
                 vx = 0.0f;
                 vy = 0.0f;
                 vyaw = 0.0f;
+                vw = 0.0f;
                 left = 0;
                 behind = 0;
                 right = 0;
@@ -254,10 +268,11 @@ private:
 
         can_->Write(id_xyz_, data_xyz, sizeof(data_xyz));
 
-        // 发送 scan mode + ArmorPresence
+        // 发送 scan mode + ArmorPresence + auto shoot 
         uint8_t data_scan[8] = {0};
         data_scan[0] = scan ? 1 : 0;
         data_scan[1] = left | (behind << 1) | (right << 2);
+        data_scan[2] = auto_shoot ? 1 : 0;
         can_->Write(id_scan_, data_scan, sizeof(data_scan));
 
         // 频率日志
@@ -267,9 +282,10 @@ private:
         if (dt >= 1.0) {
             double freq = send_count_ / dt;
             RCLCPP_INFO(this->get_logger(),
-                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u left=%u behind=%u right=%u",
+                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u auto_shoot=%u left=%u behind=%u right=%u",
                         freq, vx, vy, vyaw, vw,
                         static_cast<unsigned>(scan),
+                        static_cast<unsigned>(auto_shoot),
                         static_cast<unsigned>(left),
                         static_cast<unsigned>(behind),
                         static_cast<unsigned>(right));
@@ -283,6 +299,8 @@ private:
 
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr       cmd_vel_sub_;
     rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr            vw_sub_;
+    rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr             auto_shoot_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::GameStatus>::SharedPtr game_status_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
@@ -295,6 +313,8 @@ private:
     bool vw_received_once_ = false;
     uint8_t game_progress_ = 0;
     bool scan_mod_type_ = false;
+    bool scan_mod_type_topic_received_ = false;
+    bool auto_shoot_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
     bool hurt_active_ = false;
     rclcpp::Time hurt_start_time_;
@@ -302,8 +322,6 @@ private:
     bool cmd_vel_received_once_ = false;
     rclcpp::Time last_cmd_vel_msg_time_;
     rclcpp::Time last_vw_msg_time_;
-    bool game_progress_4_timing_active_ = false;
-    rclcpp::Time game_progress_4_start_time_;
     double cmd_vel_timeout_s_ = 0.5;
     double vw_timeout_s_ = 0.5;
     bool vw_default_override_active_ = false;

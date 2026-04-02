@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(sentry_msgs REQUIRED)
 find_package(rm_referee_msgs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -24,6 +25,7 @@ target_include_directories(can_comm_node PRIVATE
 ament_target_dependencies(can_comm_node
   rclcpp
   geometry_msgs
+  std_msgs
   sentry_msgs
   rm_referee_msgs
   tf2
