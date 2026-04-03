@@ -26,11 +26,9 @@ public:
     this->declare_parameter<std::string>("base_frame", "base_link");
 
     // 方向相关参数全部使用角度制
-    // If unset, target yaw will be computed from pose-a and current base_link position.
-    this->declare_parameter<double>("target_yaw_deg");
     this->declare_parameter<double>("yaw_tolerance_deg", 3.0);
 
-    // Pose of point a in map frame, used when target_yaw_deg is unset.
+    // Pose of point a in map frame.
     this->declare_parameter<double>("a_x", 0.0);
     this->declare_parameter<double>("a_y", 0.0);
     this->declare_parameter<double>("a_yaw_deg", 0.0);
@@ -43,7 +41,6 @@ public:
     this->declare_parameter<double>("k_p", 1.2);
 
     this->declare_parameter<double>("control_frequency", 30.0);
-    this->declare_parameter<bool>("stop_and_exit_on_success", false);
 
     cmd_vel_topic_ = this->get_parameter("cmd_vel_topic").as_string();
     map_frame_ = this->get_parameter("map_frame").as_string();
@@ -59,7 +56,6 @@ public:
     k_p_ = this->get_parameter("k_p").as_double();
 
     control_frequency_ = this->get_parameter("control_frequency").as_double();
-    stop_and_exit_on_success_ = this->get_parameter("stop_and_exit_on_success").as_bool();
 
     if (max_abs_vyaw_ < min_abs_vyaw_) {
       RCLCPP_WARN(this->get_logger(), "max_abs_vyaw < min_abs_vyaw, swapping them automatically");
@@ -79,13 +75,9 @@ public:
       std::chrono::duration_cast<std::chrono::nanoseconds>(period),
       std::bind(&VyawTfYawControllerNode::onTimer, this));
 
-    double target_yaw_deg_param = 0.0;
-    const bool has_target_yaw = this->get_parameter("target_yaw_deg", target_yaw_deg_param);
     RCLCPP_INFO(
       this->get_logger(),
-      "Started. %s, tolerance=%.2f deg, vyaw[min,max]=[%.3f, %.3f]",
-      has_target_yaw ? (std::string("target_yaw_deg=") + std::to_string(target_yaw_deg_param)).c_str()
-                     : "target_yaw_deg is unset (will compute from pose-a)",
+      "Started. target_yaw will be computed from pose-a, tolerance=%.2f deg, vyaw[min,max]=[%.3f, %.3f]",
       yaw_tolerance_deg_,
       min_abs_vyaw_,
       max_abs_vyaw_);
@@ -164,17 +156,11 @@ private:
     const double base_y_map,
     double & target_yaw_rad_out)
   {
-    double target_yaw_deg_param = 0.0;
-    if (this->get_parameter("target_yaw_deg", target_yaw_deg_param)) {
-      target_yaw_rad_out = deg2rad(target_yaw_deg_param);
-      return true;
-    }
-
     // Compute target yaw from right-triangle geometry:
     // A=(a_x,a_y), B=(base_x,base_y), C=(a_x,base_y)
     // AC = |base_y - a_y|, BC = |a_x - base_x|
     // theta = atan(AC/BC) (angle at B, keep positive)
-    // target_yaw_deg = 180deg - theta
+    // target_yaw = 180deg - theta
     const double bc = std::abs(a_x_ - base_x_map);
     const double ac = std::abs(base_y_map - a_y_);
     if (bc < 1e-9) {
@@ -198,6 +184,7 @@ private:
     // Each 'true' message triggers one yaw-control execution.
     active_ = true;
     reached_once_ = false;
+    has_target_yaw_ = false;
     RCLCPP_INFO(this->get_logger(), "Triggered by /yaw_controller=true. Start yaw control.");
   }
 
@@ -216,16 +203,24 @@ private:
       return;
     }
 
-    double target_yaw_rad = 0.0;
-    if (!computeTargetYawRad(base_x_map, base_y_map, target_yaw_rad)) {
-      publishVyaw(0.0);
-      RCLCPP_WARN_THROTTLE(
+    if (!has_target_yaw_) {
+      if (!computeTargetYawRad(base_x_map, base_y_map, target_yaw_rad_)) {
+        publishVyaw(0.0);
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(),
+          *this->get_clock(),
+          1000,
+          "Target yaw computation failed (base too close to a?)");
+        return;
+      }
+      has_target_yaw_ = true;
+      RCLCPP_INFO(
         this->get_logger(),
-        *this->get_clock(),
-        1000,
-        "Target yaw computation failed (base too close to a?)");
-      return;
+        "Computed target yaw: %.2f deg",
+        rad2deg(target_yaw_rad_));
     }
+
+    const double target_yaw_rad = target_yaw_rad_;
 
     const double err_rad = normalizeAngleRad(target_yaw_rad - current_yaw_rad);
     const double err_deg = rad2deg(err_rad);
@@ -243,9 +238,6 @@ private:
         rad2deg(target_yaw_rad),
         err_deg);
 
-      if (stop_and_exit_on_success_) {
-        rclcpp::shutdown();
-      }
       return;
     }
 
@@ -270,10 +262,12 @@ private:
   double k_p_ = 1.2;
 
   double control_frequency_ = 30.0;
-  bool stop_and_exit_on_success_ = false;
 
   bool active_ = false;
   bool reached_once_ = false;
+
+  bool has_target_yaw_ = false;
+  double target_yaw_rad_ = 0.0;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;

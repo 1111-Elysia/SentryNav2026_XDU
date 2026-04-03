@@ -21,11 +21,7 @@
 
 ### 目标 yaw 的确定方式
 
-节点有两种方式确定目标 yaw（角度制参数名为 `target_yaw_deg`）：
-
-1) **显式目标角**：若参数 `target_yaw_deg` 被设置，则直接使用它作为目标 yaw。
-
-2) **未设置 target_yaw_deg 时自动计算**：使用参数给定的点 A 与当前 base_link 的 map 坐标点 B，构造直角三角形并计算。
+节点**不会从参数读取 target yaw**，而是在每次收到 `/yaw_controller=true` 触发后，基于参数给定的点 A 与当前 base_link 的 map 坐标点 B，构造直角三角形计算一次目标 yaw，并在本次控制过程中**缓存**该目标值。
 
 #### 几何图示（ROS 标准 map：+x 向前、+y 向左）
 
@@ -75,7 +71,6 @@ $$
 - `map_frame`（string，默认 `map`）：TF 的源坐标系
 - `base_frame`（string，默认 `base_link`）：TF 的目标坐标系
 
-- `target_yaw_deg`（double，无默认值）：显式目标 yaw（角度制）；不设置则进入“自动计算”模式
 - `yaw_tolerance_deg`（double，默认 `3.0`）：到达判定容差（角度制）
 
 - `a_x`（double，默认 `0.0`）：点 A 的 x（map 下）
@@ -87,25 +82,16 @@ $$
 - `k_p`（double，默认 `1.2`）：比例增益（输入为弧度误差）
 
 - `control_frequency`（double，默认 `30.0`）：控制频率（Hz）
-- `stop_and_exit_on_success`（bool，默认 `false`）：成功后是否 `rclcpp::shutdown()` 退出
 
 ### “首次成功后不再发布”行为（锁存）
 
-- 首次进入容差：发布一次 `angular.z=0`，将内部 `reached_once_` 置为 true，并取消定时器。
+- 首次进入容差：发布一次 `angular.z=0`，将内部 `reached_once_` 置为 true，并停止本次控制（后续定时回调直接 return，不再发布）。
 - 锁存后：回调直接 return，不再发布任何 `vyaw`（包括 0）。
 - 析构时：仅在未成功锁存时才会发布一次 `angular.z=0`。
 
 ### 运行示例
 
-1) 显式指定目标角：
-
-```bash
-ros2 run can_comm vyaw_tf_yaw_controller_node --ros-args \
-  -p target_yaw_deg:=90.0 \
-  -p yaw_tolerance_deg:=3.0
-```
-
-2) 不设置 `target_yaw_deg`，使用 A 点自动计算：
+1) 使用 A 点自动计算：
 
 ```bash
 ros2 run can_comm vyaw_tf_yaw_controller_node --ros-args \
@@ -113,6 +99,6 @@ ros2 run can_comm vyaw_tf_yaw_controller_node --ros-args \
   -p yaw_tolerance_deg:=3.0
 ```
 
-3) 通过 launch 启动：见 `launch/can_comm.launch.py`。该 launch 会为该节点加载包内 `config/vyaw_tf_yaw_controller.yaml`（如需使用请自行创建并安装到包的 share/config 下）。
+3) 通过 launch 启动：见 `launch/can_comm.launch.py`。该 launch 会为该节点加载包内 `config/vyaw_tf_yaw_controller.yaml`（可直接在包内修改该配置）。
 
 ros2 topic pub -1 /yaw_controller std_msgs/msg/Bool "{data: true}"
