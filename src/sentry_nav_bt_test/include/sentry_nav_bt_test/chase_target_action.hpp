@@ -58,7 +58,7 @@ public:
       BT::InputPort<double>("standoff", 1.2,
                             "站位距离：目标点沿方向退 standoff 米"),
       BT::InputPort<double>("stop_dist", 1.0,
-                            "进入 HOLD 的距离阈值（目标距离<=stop_dist 则停止发点并 cancel）"),
+                            "进入 HOLD 的距离阈值（目标距离<=stop_dist 则停止发点并保持近距离观察）"),
       BT::InputPort<double>("start_dist", 1.6,
                             "从 HOLD 恢复追击的距离阈值（滞回，建议 > stop_dist）"),
       BT::InputPort<double>("lost_timeout", 0.6,
@@ -73,7 +73,7 @@ public:
                             "输入跳变剔除阈值（米）：base_link 下相邻测量跳变过大则丢弃"),
 
       // -------------------- output --------------------
-      BT::OutputPort<int>("chase_status", "追击状态输出：0=IDLE 1=CHASING 2=HOLD 3=LOST 4=ERROR"),
+      BT::OutputPort<int>("chase_status", "追击状态输出：0=IDLE 1=CHASING 2=HOLD(近距离保持) 3=LOST 4=ERROR"),
       BT::OutputPort<geometry_msgs::msg::PoseStamped>("last_goal", "最近一次发布的 world 目标点（可用于调试/可视化）")
     };
   }

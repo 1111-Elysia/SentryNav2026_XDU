@@ -31,6 +31,8 @@
 #include "protocol_v164.hpp"
 #include "protocol_v170.hpp"
 #include "protocol_new_v110.hpp"
+#include "protocol_new_v120.hpp"
+#include "protocol_new_v130.hpp"
 // implement and add more revisions here
 
 #include <cstring>
@@ -90,7 +92,7 @@ class Referee : public Device {
         data_len_this_time_ |= (data << 8);
         valid_data_so_far_[valid_data_so_far_idx_++] = data;
 
-        if (data_len_this_time_ < (kRefProtocolFrameMaxLen - kRefProtocolAllMetadataLen)) {
+        if (data_len_this_time_ <= (kRefProtocolFrameMaxLen - kRefProtocolAllMetadataLen)) {
           deserialize_fsm_state_ = DeserializeFsmState::kSeq;
         } else {
           deserialize_fsm_state_ = DeserializeFsmState::kSof;

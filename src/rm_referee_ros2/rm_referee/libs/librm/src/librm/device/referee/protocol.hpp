@@ -22,7 +22,7 @@
 
 /**
  * @file  librm/device/referee/protocol.hpp
- * @brief 裁判系统串口协议
+ * @brief 裁判系统通信协议
  */
 
 #ifndef LIBRM_DEVICE_REFEREE_PROTOCOL_HPP
@@ -33,7 +33,8 @@
 namespace rm::device {
 
 constexpr u8 kRefProtocolHeaderSof = 0xa5;
-constexpr int kRefProtocolFrameMaxLen = 128;
+// 0x0310 的最大帧长为 5 + 2 + 300 + 2 = 309 字节。
+constexpr int kRefProtocolFrameMaxLen = 512;
 constexpr int kRefProtocolHeaderLen = 5;
 constexpr int kRefProtocolCmdIdLen = 2;
 constexpr int kRefProtocolCrc16Len = 2;
@@ -46,6 +47,8 @@ enum class RefereeRevision {
   kV164,     ///< V1.6.4, 2024-7-15
   kV170,     ///< V1.7.0, 2024-12-25
   kNewV110,  ///< 新通信协议V1.1.0, 2025-12-17
+  kNewV120,  ///< 新通信协议V1.2.0, 2026-2-9
+  kNewV130,  ///< 新通信协议V1.3.0, 2026-3-27
 };
 
 /**

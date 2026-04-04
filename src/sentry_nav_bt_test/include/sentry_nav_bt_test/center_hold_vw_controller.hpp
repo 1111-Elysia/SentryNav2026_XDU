@@ -8,7 +8,7 @@
 #include "behaviortree_cpp_v3/blackboard.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "sentry_msgs/msg/vw.hpp"
+#include "sentry_nav_bt_test/referee_actions.hpp"
 
 namespace sentry_nav_bt_test
 {
@@ -29,7 +29,7 @@ public:
       throw std::runtime_error("CenterHoldVwController: node or blackboard is null");
     }
 
-    vw_pub_ = node_->create_publisher<sentry_msgs::msg::Vw>("/vw", 10);
+    control_publishers_ = std::make_shared<ControlTopicPublishers>(node_);
     vw_timer_ = node_->create_wall_timer(
       std::chrono::milliseconds(100),
       [this]() { updateCenterHoldVwCommand(); });
@@ -102,25 +102,54 @@ private:
       center_ready_ok && current_center_goal_nearby;
   }
 
-  void publishVwCommand(float value)
+  bool isNearCurrentUcFortressGoal(double threshold = -1.0) const
   {
-    if (!vw_pub_) {
-      return;
+    if (threshold < 0.0) {
+      threshold = getBlackboardDouble("uc_fortress_hold_distance_threshold", 0.25);
     }
 
-    sentry_msgs::msg::Vw msg;
-    msg.vw = value;
-    vw_pub_->publish(msg);
+    std::string goal_name = "fortress";
+    blackboard_->get("uc_fortress_goal_name", goal_name);
+    return isNearWaypoint(goal_name, threshold);
+  }
+
+  bool isUcFortressHoldActive() const
+  {
+    int fortress_hold_active = 0;
+    uint16_t current_hp = 0;
+    uint8_t game_progress = 0;
+
+    const bool fortress_hold_enabled =
+      blackboard_->get("uc_fortress_hold_active", fortress_hold_active) &&
+      fortress_hold_active == 1;
+    const bool hp_ok =
+      blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
+    const bool match_started =
+      blackboard_->get("game_progress", game_progress) && game_progress > 3U;
+    const bool current_fortress_goal_nearby = isNearCurrentUcFortressGoal();
+
+    return match_started && hp_ok && fortress_hold_enabled && current_fortress_goal_nearby;
+  }
+
+  void publishVwCommand(float value)
+  {
+    if (!control_publishers_) {
+      return;
+    }
+    control_publishers_->publishVw(value);
   }
 
   void updateCenterHoldVwCommand()
   {
     const bool center_hold_active = isCenterHoldActive();
+    const bool fortress_hold_active = isUcFortressHoldActive();
+    const bool hold_vw_active = center_hold_active || fortress_hold_active;
 
     if (!vw_command_initialized_) {
-      publishVwCommand(center_hold_active ? 1.0f : 0.0f);
+      publishVwCommand(hold_vw_active ? 1.0f : 0.0f);
       vw_command_initialized_ = true;
       last_center_hold_vw_active_ = center_hold_active;
+      last_fortress_hold_vw_active_ = fortress_hold_active;
       return;
     }
 
@@ -128,19 +157,32 @@ private:
       if (!last_center_hold_vw_active_) {
         RCLCPP_INFO(node_->get_logger(), "[UL] 中心驻守激活，开始持续发布 /vw = 1");
       }
-      publishVwCommand(1.0f);
     } else if (last_center_hold_vw_active_) {
       RCLCPP_INFO(node_->get_logger(), "[UL] 退出中心驻守，停止持续发布 /vw");
     }
 
+    if (fortress_hold_active) {
+      if (!last_fortress_hold_vw_active_) {
+        RCLCPP_INFO(node_->get_logger(), "[UC] 堡垒驻守激活，开始持续发布 /vw = 1");
+      }
+    } else if (last_fortress_hold_vw_active_) {
+      RCLCPP_INFO(node_->get_logger(), "[UC] 退出堡垒驻守，停止持续发布 /vw");
+    }
+
+    if (hold_vw_active) {
+      publishVwCommand(1.0f);
+    }
+
     last_center_hold_vw_active_ = center_hold_active;
+    last_fortress_hold_vw_active_ = fortress_hold_active;
   }
 
   rclcpp::Node::SharedPtr node_;
   BT::Blackboard::Ptr blackboard_;
-  rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
+  std::shared_ptr<ControlTopicPublishers> control_publishers_;
   rclcpp::TimerBase::SharedPtr vw_timer_;
   bool last_center_hold_vw_active_{false};
+  bool last_fortress_hold_vw_active_{false};
   bool vw_command_initialized_{false};
 };
 

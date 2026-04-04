@@ -15,6 +15,7 @@
 - 从路径点配置中提取初始位姿并发布到 `/initialpose`
 - 提供一组自定义行为树节点，用于目标点选择、可靠导航、巡逻、追击、自定义条件判断和裁判系统指令发送
 - 默认 `ul.xml` 实现了赛前等待、比赛开始初始化、低血量回补、中心点/备用点切换与驻守逻辑
+- `uc.xml` 实现了高校赛对抗主流程，包括赛前等待、开赛初始化、复活、回补、小符/大符激活、前哨站点位、防御姿态切换和堡垒驻守
 
 ## 目录结构
 
@@ -114,7 +115,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
   bt_xml_filename:=$(ros2 pkg prefix sentry_nav_bt_test)/share/sentry_nav_bt_test/config/chase_bt.xml
 ```
 
-`chase_bt.xml` 会启用 `ChaseTarget` 节点，默认订阅 `/autoaim/target_bl`，并持续向 `navigate_to_pose` 发送站位追击目标。
+`chase_bt.xml` 会启用 `ChaseTarget` 节点，默认订阅 `/autoaim/target_bl`，并持续向 `navigate_to_pose` 发送站位追击目标。当前版本在接近目标后会进入 `HOLD` 保持态，不会直接触发真实开火。
 
 ## 启动参数
 
@@ -142,8 +143,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 注意：
 
-- 当前 launch 文件里把 `navigate_bt_node` 的 `use_sim_time` 写死成了 `True`
-- 如果你在真机上运行，通常需要把它改成 `False`，或者把 launch 文件改成可配置参数
+- 当前 launch 文件里把 `navigate_bt_node` 的 `use_sim_time` 写死成了 `False`
 
 ## 行为树配置说明
 
@@ -177,16 +177,88 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `center_point`
 - `fallback_point`
 
+### 高校赛对抗树 `uc.xml`
+
+`uc.xml` 不是默认启动树，但已经按高校赛对抗流程维护。它当前的主逻辑是：
+
+1. 等待裁判系统连接成功
+2. 比赛未开始时持续复位 UC 局内状态
+3. 比赛开始时执行一次 UC 黑板初始化
+4. 血量为 `0` 时持续确认免费复活
+5. 低血或低弹时回 `supply_point` 回补
+6. 其余时间按照 `stage_remain_time` 的时间带切阶段
+
+当前时间轴按“剩余时间从大到小的有序 Fallback”实现，效果上已经是严格分段：
+
+- `7:00-6:30`：前往 `small_rune_point`，尝试开局小符
+- `6:30-5:30`：前往 `outpost_point`，到点后等待阶段切换
+- `5:30-5:00`：再次前往 `small_rune_point`，补打小符
+- `5:00-4:00`：优先前往 `outpost_point`，若己方前哨站已失则退守 `fortress`
+- `4:00-3:30`：前往 `large_rune_point`，尝试激活大符
+- `3:30-2:45`：在 `fortress` 驻守
+- `2:45-2:15`：再次前往 `large_rune_point`，补打大符
+- `2:15-1:30`：继续在 `fortress` 驻守
+- `1:30-1:00`：若己方基地血量大于 `2000`，再次尝试 `large_rune_point`
+- `1:00-0:00`：回 `base_defense_point` 守家
+
+这种写法比“每个阶段同时写上下界”更鲁棒一点，原因是：
+
+- 时间带本身仍然是严格的，前面的阶段一旦不满足，才会落到后面的阶段
+- 每个时间带内部还能继续根据符是否已开、是否允许激活、前哨站是否存活等条件自动跳过不合适的任务
+- 如果改成完全刚性的固定时间片，而不保留这些条件回退，现场更容易出现“当前计划不可执行，但树还在死磕该分支”的问题
+
+所以当前实现建议保留“按剩余时间降序 + 分支内条件回退”的结构。如果后面主要诉求是可读性，我们可以再把每个阶段补成显式上下界，但不建议去掉现在这层回退鲁棒性。
+
+`uc.xml` 依赖以下命名路径点存在：
+
+- `init`
+- `supply_point`
+- `small_rune_point`
+- `large_rune_point`
+- `outpost_point`
+- `fortress`
+- `base_defense_point`
+
+为了兼容旧配置，当前路径点 JSON 里仍保留了 `tunnel_rune_point` 和 `highway_defense` 这两个旧名字作为别名。
+
+### `uc.xml` 的到点与驻守判定
+
+`uc.xml` 目前统一使用 `ReliableNavigateToPose` 做导航到点判定，只是不同类型点位的阈值不同：
+
+- 小符/大符点位默认使用 `0.10 m`
+- 前哨站、补给区、守家点位默认使用 `0.25 m`
+- 堡垒驻守分成两层
+  - 回堡垒点位的真正到点阈值：`uc_fortress_arrive_distance_threshold = 0.10 m`
+  - 已进入驻守后允许的活动半径：`uc_fortress_hold_distance_threshold = 0.25 m`
+- 堡垒驻守阶段仍然额外使用 `CheckGoalReached + ReliableNavigateToPose`
+  - 这套逻辑和 `ul.xml` 的中心驻守是同一类思路
+  - 进入堡垒驻守后，只要仍在 `0.25 m` 半径内，就继续驻守
+  - 一旦偏离这个半径，就重新回堡垒点位
+  - 在堡垒驻守激活且位于驻守半径内时，会持续发布 `/vw = 1`
+  - 离开驻守半径后，堡垒驻守 `/vw` 发布会停止
+
 ### 追击树 `chase_bt.xml`
 
 追击树当前主要使用一个 `ChaseTarget` 节点，默认参数如下：
 
 - 自瞄输入话题：`/autoaim/target_bl`
+- 自瞄输入消息：`geometry_msgs/msg/Point`
 - 导航 action：`navigate_to_pose`
 - 世界坐标系：`map`
 - 车体坐标系：`base_link`
 
-当目标丢失超时、TF 变换不可用或 Nav2 连续异常时，节点会返回失败，由外层行为树切换策略。
+当前实现的行为是：
+
+- 把 `base_link` 下的自瞄点转换成带 `standoff` 的站位导航目标
+- 当目标距离小于等于 `stop_dist` 时进入 `HOLD`
+- 当目标重新离开到 `start_dist` 之外时恢复追击，避免在阈值附近来回抖动
+- 当目标丢失超时、TF 变换不可用或 Nav2 连续异常时，节点会返回失败，由外层行为树切换策略
+
+当前限制：
+
+- 追击输入接口还是临时约定，尚未和自瞄侧固化正式消息定义
+- `AutoAimAndFire` 仍然是 mock 节点，没有接入真实火控链路
+- 追击树目前还是独立 demo，没有并入 `ul.xml` 的比赛主流程
 
 ## 路径点配置格式
 
@@ -248,7 +320,15 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `/initialpose`
   - 启动时自动发布初始位姿
 - `/vw`
-  - 在默认 UL 驻守逻辑中持续发布
+  - 在 `ul.xml` 的中心驻守和 `uc.xml` 的堡垒驻守中持续发布
+- `/scan_mod_type`
+  - 这是 topic 名，不是消息类型名
+  - 消息类型实际是 `sentry_msgs/msg/ScanMode`
+  - `EngageRune` 在打符开始时发 `false`，结束时恢复 `true`
+- `/auto_shoot_type`
+  - 打符流程检测到能量机关进入正在激活状态后发 `true`，结束时发 `false`
+- `/yaw_controller`
+  - 打符流程开始时发送一次 `true`，触发云台转向能量机关
 - `/sentry_nav_bt_test/decoded_sentry_info/*`
   - 调试用的解包结果发布
 
@@ -258,6 +338,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
   - `SetSentryPosture`
   - `RequestActivateRune`
   - `ConfirmResurrection`
+  - `EngageRune`
 
 这几个裁判系统动作节点都通过该服务发送数据。
 
@@ -275,9 +356,15 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `waypoint_now`
 - `waypoint_now_valid`
 - `ul_initialized`
+- `uc_initialized`
 - `ul_retreat_active`
 - `ul_center_ready`
 - `ul_center_goal_name`
+- `in_rune_phase`
+- `uc_fortress_hold_active`
+- `uc_fortress_goal_name`
+- `uc_fortress_arrive_distance_threshold`
+- `uc_fortress_hold_distance_threshold`
 
 如果你要扩展 XML，优先复用这些已有键，能少写很多桥接逻辑。
 
@@ -301,6 +388,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `SetSentryPosture` | Action | 通过裁判系统切换哨兵姿态 |
 | `RequestActivateRune` | Action | 请求激活能量机关 |
 | `ConfirmResurrection` | Action | 连发确认复活指令 |
+| `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
 | `AutoAimAndFire` | Action | 当前为 mock 节点，仅打印日志 |
 
 此外也注册了 Nav2 自带节点：
@@ -349,6 +437,20 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 进入驻守后，只要仍在更大的 `hold` 半径内，就允许继续驻守
 - 一旦偏离超过 `hold` 半径，就退出驻守并重新走回中流程
 
+### `ScanMode` 和 `/scan_mod_type` 的区别
+
+这两个名字描述的不是同一个层级：
+
+- `ScanMode` 是消息类型名，定义在 `sentry_msgs/msg/ScanMode.msg`
+- `/scan_mod_type` 是当前工程里实际在发布/订阅的 ROS topic 名
+
+也就是说，代码里常见的写法是：
+
+- topic: `/scan_mod_type`
+- type: `sentry_msgs::msg::ScanMode`
+
+当前 `can_comm` 和 `serial_comm` 都已经按 `/scan_mod_type` 这个 topic 名接好了，所以如果只把 BT 侧改成 `/scanmode`，整条链路会断掉。
+
 ### 3. 初始位姿没有生效
 
 检查：
@@ -372,6 +474,39 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 如果要接入新的裁判系统字段，优先在 `BlackboardManager` 中完成订阅和黑板映射
 - 如果要扩展追击逻辑，重点看 `ChaseTargetAction`
 
+## TODO
+
+### 包结构与工程化
+
+- 拆分 `BlackboardManager`，把裁判系统订阅、TF/当前位置更新、路径点加载、受击状态管理、调试发布等职责从 `topic_listener.hpp` 中分离
+- 瘦身 `sentry_nav_bt_test.cpp` 的 `main()`，把日志初始化、机器人 ID 解析、路径点加载、初始位姿发布、行为树启动拆成独立函数或类
+- 把高频使用的黑板 key、默认参数和阵营 ID 常量集中管理，减少字符串散落和 magic number
+- 抽取 `PrintNode` / `PrintBlackboardValue` 共用的日志落盘逻辑，避免重复维护
+- 将 `ul.xml` 继续拆成更清晰的子树或可复用片段，降低主树复杂度
+- 给路径点加载、`GoalSelector`、`ReliableNavigateToPose`、`ChaseTargetAction` 增加最小测试
+- 清理遗留硬编码逻辑，例如 `RandomSelector` 仍使用示例目标点，未接入实际配置
+- 统一依赖与包元数据，补全 `package.xml` 里的 license，并明确哪些依赖是主流程必需、哪些仅旧协议桥接需要
+- 减少大头文件中的实现代码，尽量把可以下沉到 `.cpp` 的逻辑移出头文件，优化增量编译体验
+- 重新梳理启动与安装后的运行路径，降低“源码已改但运行的还是旧 install 版本”这类排查成本
+
+### 行为树与运行逻辑
+
+- 把赛前等待、初始化、回补、回中、驻守这些主流程的状态切换日志继续整理成更稳定、可分析的格式
+- 明确默认行为树 `ul.xml` 中各分支的进入条件、退出条件和关键黑板值，减少隐式耦合
+- 继续收敛 `ReliableNavigateToPose` 的重发、超时、取消、结果处理语义，保证与外层行为树的状态切换一致
+- 梳理“机器人 ID 获取失败时强制回退红方”这类临时策略，改成明确可配置的启动策略
+- 为日志、回放、bag 分析整理固定流程，减少现场靠肉眼翻终端排查的问题
+
+### 追击链路
+
+- 与自瞄侧统一正式通信接口，至少明确目标点坐标系、时间戳、目标有效位、目标 ID、置信度等字段
+- 为追击链路增加一层适配节点，避免 BT 直接依赖自瞄原始话题格式
+- 把 `AutoAimAndFire` 从 mock 改成真实接口，明确“追到位后由谁负责瞄准/开火”
+- 将 `chase_bt.xml` 中验证过的追击能力按触发条件接入 `ul.xml`，而不是长期作为独立 demo
+- 明确比赛中的追击触发和退出条件，例如血量阈值、区域限制、目标稳定时间和 Nav2 连续异常次数
+- 为 `ChaseTargetAction` 增加最小测试，覆盖 `HOLD/恢复追击/目标丢失/Nav2 aborted` 等关键状态切换
+- 补充 rosbag 或日志回放调参流程，便于离线调整 `stop_dist`、`start_dist`、`lost_timeout`、`update_thresh`
+
 ## 当前默认行为的几个实现细节
 
 - 导航节点等待 `navigate_to_pose` 最长 60 秒
@@ -384,4 +519,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 每次启动都会保留自己的独立日志，同时固定路径也能看到完整运行历史
 - 默认中心到点阈值 `ul_center_arrive_distance_threshold = 0.10 m`
 - 默认中心驻守半径 `ul_center_hold_distance_threshold = 0.50 m`
+- 默认堡垒到点阈值 `uc_fortress_arrive_distance_threshold = 0.10 m`
+- 默认堡垒驻守半径 `uc_fortress_hold_distance_threshold = 0.25 m`
 - `/vw` 驻守发布逻辑已从 `topic_listener.hpp` 中拆到独立的 `center_hold_vw_controller.hpp`

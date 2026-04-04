@@ -29,8 +29,8 @@ from rm_referee_mock.publisher_pool import PublisherPool
 
 # [新增] 创建一个用于跨线程通信的桥接类
 class WorkerSignals(QObject):
-    # 定义信号：(姿态值, 是否激活)
-    update_sentry_signal = pyqtSignal(int, int)
+    # 定义信号：完整的 0x0120 sentry_cmd 解包结果
+    update_sentry_signal = pyqtSignal(object)
 
 
 class MatchControlPlugin(Plugin):
@@ -57,6 +57,8 @@ class MatchControlPlugin(Plugin):
 
         # === Service Server 初始化 ===
         self.received_sentry_mode = 0
+        self._posture_cooldown_sec = 5.0
+        self._last_posture_change_time = 0.0
         if Tx:
             self._srv = self._node.create_service(
                 Tx, 
@@ -84,38 +86,46 @@ class MatchControlPlugin(Plugin):
             response.ok = False
             return response
 
-        # --- 解析关键数据 ---
-        # 0x0120 的数据在 offset 13 开始的 4 个字节 (uint32)
-        # 我们需要解析第 3 个字节 (index 15)，因为它包含了 Bit 16-23
-        # Bit 21-22: 姿态
-        # Bit 23: 确认激活
-        
         try:
-            target_byte = raw_data[15] # 获取第16个字节 (包含 Bit 16-23)
-            
-            # 解析姿态 (Bit 21-22 -> 在该字节中是 Bit 5-6)
-            posture_val = (target_byte >> 5) & 0x03
-            
-            # 解析激活确认 (Bit 23 -> 在该字节中是 Bit 7)
-            activate_confirm = (target_byte >> 7) & 0x01
-            
-            # [调试] 解析结果
+            cmd_id = int.from_bytes(bytes(raw_data[5:7]), byteorder="little", signed=False)
+            data_cmd_id = int.from_bytes(bytes(raw_data[7:9]), byteorder="little", signed=False)
+            if cmd_id != 0x0301 or data_cmd_id != 0x0120:
+                self._node.get_logger().warn(
+                    f"[Service-Ignore] 非哨兵 0x0120 指令, cmd_id=0x{cmd_id:04X}, data_cmd_id=0x{data_cmd_id:04X}"
+                )
+                response.header.stamp = self._node.get_clock().now().to_msg()
+                response.header.frame_id = "referee_mock"
+                response.ok = False
+                return response
+
+            sentry_cmd = int.from_bytes(bytes(raw_data[13:17]), byteorder="little", signed=False)
+            parsed_cmd = {
+                "confirm_free_revive": sentry_cmd & 0x01,
+                "confirm_buy_revive": (sentry_cmd >> 1) & 0x01,
+                "exchange_projectile": (sentry_cmd >> 2) & 0x07FF,
+                "remote_projectile_exchange_count": (sentry_cmd >> 13) & 0x0F,
+                "remote_hp_exchange_count": (sentry_cmd >> 17) & 0x0F,
+                "posture": (sentry_cmd >> 21) & 0x03,
+                "activate_rune": (sentry_cmd >> 23) & 0x01,
+                "raw": sentry_cmd,
+            }
+
             self._node.get_logger().info(
-                f"[Service-Parse] 解析成功 -> 姿态: {posture_val}, 激活请求: {activate_confirm}"
+                "[Service-Parse] 解析成功 -> "
+                f"free_revive={parsed_cmd['confirm_free_revive']}, "
+                f"buy_revive={parsed_cmd['confirm_buy_revive']}, "
+                f"ammo_target={parsed_cmd['exchange_projectile']}, "
+                f"remote_ammo_req={parsed_cmd['remote_projectile_exchange_count']}, "
+                f"remote_hp_req={parsed_cmd['remote_hp_exchange_count']}, "
+                f"posture={parsed_cmd['posture']}, "
+                f"activate={parsed_cmd['activate_rune']}"
             )
 
-            # 1. 更新内部状态 (用于回显发布)
-            self.received_sentry_mode = posture_val
+            self.signals.update_sentry_signal.emit(parsed_cmd)
             
-            # 2. 发送信号给主线程 (解决 QObject::startTimer 报错的关键)
-            # 千万不要在这里直接调用 self._widget 的方法！
-            self.signals.update_sentry_signal.emit(posture_val, activate_confirm)
-            
-            # 3. 填充 Response Header (规范做法)
             response.header.stamp = self._node.get_clock().now().to_msg()
             response.header.frame_id = "referee_mock"
 
-            # 4. 返回成功 (注意字段名是 ok)
             response.ok = True 
 
         except Exception as e:
@@ -124,21 +134,54 @@ class MatchControlPlugin(Plugin):
 
         return response
 
-    def _ui_update_callback(self, posture_val, activate_confirm):
+    def _ui_update_callback(self, sentry_cmd):
         """
         [主线程] 这个函数由 Qt 信号触发，专门负责更新 UI
         """
         try:
-            # 更新 UI 显示 (Label 变色/文字改变)
-            self._widget.update_sentry_echo(posture_val)
-            
-            # 处理激活逻辑
-            if activate_confirm == 1:
+            can_continue = True
+
+            if sentry_cmd["confirm_free_revive"] == 1:
+                success, message = self._widget.confirm_free_revive()
+                if success:
+                    self._node.get_logger().info(f">>> [UI-Success] {message}")
+                else:
+                    self._node.get_logger().warn(f">>> [UI-Fail] {message}")
+                    can_continue = False
+
+            if can_continue and sentry_cmd["confirm_buy_revive"] == 1:
+                success, message = self._widget.confirm_buy_revive()
+                if success:
+                    self._node.get_logger().info(f">>> [UI-Success] {message}")
+                else:
+                    self._node.get_logger().warn(f">>> [UI-Fail] {message}")
+                    can_continue = False
+
+            if not can_continue:
+                return
+
+            posture_val = int(sentry_cmd.get("posture", 0))
+            if posture_val in (1, 2, 3):
+                now_sec = time()
+                if posture_val != self.received_sentry_mode:
+                    remaining_cooldown = self._posture_cooldown_sec - (now_sec - self._last_posture_change_time)
+                    if self.received_sentry_mode in (1, 2, 3) and remaining_cooldown > 0.0:
+                        self._node.get_logger().warn(
+                            f">>> [UI-Fail] 姿态切换冷却中，忽略 {self.received_sentry_mode} -> {posture_val}，剩余 {remaining_cooldown:.2f}s"
+                        )
+                    else:
+                        self.received_sentry_mode = posture_val
+                        self._last_posture_change_time = now_sec
+                        self._widget.update_sentry_echo(posture_val)
+                        self._node.get_logger().info(
+                            f">>> [UI-Success] 姿态切换成功: {posture_val}，进入 {self._posture_cooldown_sec:.1f}s 冷却"
+                        )
+                else:
+                    self._widget.update_sentry_echo(posture_val)
+
+            if sentry_cmd["activate_rune"] == 1:
                 self._node.get_logger().info("[UI-Logic] 收到激活请求，调用 Widget 逻辑...")
-                
-                # 调用 Widget 的逻辑 (检查 flag, 设置 timer, 取消勾选)
                 success = self._widget.confirm_activation()
-                
                 if success:
                     self._node.get_logger().info(">>> [UI-Success] 激活成功！倒计时开始")
                 else:
@@ -237,17 +280,26 @@ class MatchControlPlugin(Plugin):
         sentry_info_msg = SentryInfo()
         sentry_info_msg.header.stamp = current_time_msg
         sentry_info_msg.header.frame_id = "referee_system"
-        
-        # 获取数据: 姿态来自 Service 回调, 可激活标志来自 Widget
-        posture_bits = (self.received_sentry_mode & 0x03)  
-        
-        can_activate = 0
-        if hasattr(self._widget, 'checkBox_can_activate_rune'):
-            if self._widget.checkBox_can_activate_rune.isChecked():
-                can_activate = 1
 
-        # 位运算拼接: 姿态左移 12 位 | 打符左移 14 位
-        packed_info_2 = (posture_bits << 12) | (can_activate << 14)
+        sentry_status = status.get("sentry_info", {})
+        posture_bits = self.received_sentry_mode & 0x03
+        can_activate = int(sentry_status.get("can_activate", False))
+
+        packed_info = 0
+        packed_info |= int(sentry_status.get("exchange_projectile", 0)) & 0x07FF
+        packed_info |= (int(sentry_status.get("remote_projectile_exchange_count", 0)) & 0x0F) << 11
+        packed_info |= (int(sentry_status.get("remote_hp_exchange_count", 0)) & 0x0F) << 15
+        packed_info |= (int(bool(sentry_status.get("can_free_revive", False))) & 0x01) << 19
+        packed_info |= (int(bool(sentry_status.get("can_buy_revive", False))) & 0x01) << 20
+        packed_info |= (int(sentry_status.get("buy_revive_cost", 0)) & 0x03FF) << 21
+
+        packed_info_2 = 0
+        packed_info_2 |= int(bool(sentry_status.get("is_disengaged", False))) & 0x01
+        packed_info_2 |= (int(sentry_status.get("team_projectile_exchange_remaining", 0)) & 0x07FF) << 1
+        packed_info_2 |= (posture_bits & 0x03) << 12
+        packed_info_2 |= (can_activate & 0x01) << 14
+
+        sentry_info_msg.sentry_info = packed_info
         sentry_info_msg.sentry_info_2 = packed_info_2
         
         self._publisher_pool.publish(

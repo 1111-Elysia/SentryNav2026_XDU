@@ -168,23 +168,38 @@ BT::NodeStatus ChaseTargetAction::onRunning()
   const double x = meas->x;
   const double y = meas->y;
   const double d = hypot2d(x, y);
+  const auto current_status = static_cast<ChaseStatus>(status_.load());
+  const double resume_dist = std::max(start_dist_, stop_dist_);
 
-  // 3) 近距离 HOLD（到位）：取消 Nav2 目标并 SUCCESS（BT 可转入“近战/仅瞄准/开火”）
-  //    NOTE: 这里用 stop_dist，后期你可以按效果调
+  // 3) 近距离进入 HOLD：停止继续发导航点，但保持 RUNNING 以便持续监视目标。
+  //    当目标重新离开到 start_dist 外时，才恢复追击，形成滞回。
   if (d <= stop_dist_)
   {
-
-    RCLCPP_INFO_THROTTLE(
-      node_->get_logger(),
-      *node_->get_clock(),
-      500,
-      "[ChaseTarget] enter HOLD: target distance=%.3f <= stop_dist=%.3f",
-      d, stop_dist_);
-
-    cancelAllGoals_();
+    if (current_status != ChaseStatus::HOLD) {
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[ChaseTarget] enter HOLD: target distance=%.3f <= stop_dist=%.3f",
+        d, stop_dist_);
+      cancelAllGoals_();
+    }
     setStatus_(ChaseStatus::HOLD);
     setOutput("chase_status", static_cast<int>(status_.load()));
     return BT::NodeStatus::RUNNING;
+  }
+
+  if (current_status == ChaseStatus::HOLD && d < resume_dist)
+  {
+    setStatus_(ChaseStatus::HOLD);
+    setOutput("chase_status", static_cast<int>(status_.load()));
+    return BT::NodeStatus::RUNNING;
+  }
+
+  if (current_status == ChaseStatus::HOLD)
+  {
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "[ChaseTarget] leave HOLD: target distance=%.3f >= resume_dist=%.3f, resume chase",
+      d, resume_dist);
   }
 
   // 4) 生成 base_link 下站位目标点（不直接去装甲板点）
@@ -194,15 +209,13 @@ BT::NodeStatus ChaseTargetAction::onRunning()
   const double gd = hypot2d(goal_bl.pose.position.x, goal_bl.pose.position.y);
   if (gd < 0.05)
   {
-
-    RCLCPP_INFO_THROTTLE(
-      node_->get_logger(),
-      *node_->get_clock(),
-      500,
-      "[ChaseTarget] enter HOLD: stand-off goal too close, gd=%.3f",
-      gd);
-
-    cancelAllGoals_();
+    if (current_status != ChaseStatus::HOLD) {
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[ChaseTarget] enter HOLD: stand-off goal too close, gd=%.3f",
+        gd);
+      cancelAllGoals_();
+    }
     setStatus_(ChaseStatus::HOLD);
     setOutput("chase_status", static_cast<int>(status_.load()));
     return BT::NodeStatus::RUNNING;

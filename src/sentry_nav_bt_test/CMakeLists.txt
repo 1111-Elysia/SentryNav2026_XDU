@@ -90,6 +90,7 @@ ament_target_dependencies(navigate_bt_node
   nav2_msgs
   nav2_util
   geometry_msgs 
+  sentry_msgs
   tf2           
   tf2_ros
   tf2_geometry_msgs

@@ -3,7 +3,7 @@
   <BehaviorTree ID="MainTree">
     <Fallback name="ChaseOrFail">
 
-      <!-- 追击分支：追到近距离算成功 -->
+      <!-- 追击分支：近距离进入 HOLD，目标拉开后再恢复追击 -->
       <Sequence name="ChaseSequence">
         <ChaseTarget
           aim_topic="/autoaim/target_bl"  

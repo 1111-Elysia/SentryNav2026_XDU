@@ -154,18 +154,25 @@ namespace sentry_nav_bt_test
             // 初始化 UL 状态，避免赛前条件检查因缺键刷 warning
             blackboard_->set<bool>("last_referee_tx_ok", false);
             blackboard_->set<int>("ul_initialized", 0);
+            blackboard_->set<int>("uc_initialized", 0);
             blackboard_->set<int>("ul_retreat_active", 0);
             blackboard_->set<int>("ul_center_ready", 0);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
             blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);
             blackboard_->set<double>("ul_center_hold_distance_threshold", 0.50);
+            blackboard_->set<int>("uc_fortress_hold_active", 0);
+            blackboard_->set<std::string>("uc_fortress_goal_name", "fortress");
+            blackboard_->set<double>("uc_fortress_arrive_distance_threshold", 0.10);
+            blackboard_->set<double>("uc_fortress_hold_distance_threshold", 0.25);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
+            blackboard_->set<int>("hurt_armor", 0);
             blackboard_->set<int>("is_under_attack", 0);
+            blackboard_->set<int>("in_rune_phase", 0);
 
             // 初始化定时器
             hurt_reset_timer_ = node_->create_wall_timer(
@@ -183,6 +190,7 @@ namespace sentry_nav_bt_test
 
                     blackboard_->set("is_under_attack", 0); 
                     blackboard_->set("hurt_armor_id", -1); 
+                    blackboard_->set("hurt_armor", 0);
                 });
 
             // 订阅己方机器人血量数据
@@ -197,13 +205,6 @@ namespace sentry_nav_bt_test
                     bb->set("ally_7_robot_hp", msg->ally_7_robot_hp);
                     bb->set("ally_outpost_hp", msg->ally_outpost_hp); // 前哨站
                     bb->set("ally_base_hp", msg->ally_base_hp);       // 基地
-                    // bb->set("enemy_1_robot_hp", msg->enemy_1_robot_hp);   可以改为敌方机器人，需要从雷达获取
-                    // bb->set("enemy_2_robot_hp", msg->enemy_2_robot_hp);
-                    // bb->set("enemy_3_robot_hp", msg->enemy_3_robot_hp);
-                    // bb->set("enemy_4_robot_hp", msg->enemy_4_robot_hp);
-                    // bb->set("enemy_7_robot_hp", msg->enemy_7_robot_hp);
-                    // bb->set("enemy_outpost_hp", msg->enemy_outpost_hp);
-                    // bb->set("enemy_base_hp", msg->enemy_base_hp);
                     RCLCPP_DEBUG(
                         node_->get_logger(),
                         "黑板更新: '%s' 从话题 '%s'",
@@ -283,7 +284,7 @@ namespace sentry_nav_bt_test
                     bb->set("can_buy_resurrection", can_buy_resurrection);
                     bb->set("buy_resurrection_cost", buy_resurrection_cost);
 
-                    bb->set("current_posture", current_posture);
+                    bb->set("current_posture", static_cast<int>(current_posture));
                     bb->set("can_activate_rune", can_activate_rune);
 
                     publishDecodedSentryInfo(

@@ -8,7 +8,7 @@
 #include <rm_referee_msgs/msg/custom_robot_data.hpp>
 #include <rm_referee_msgs/msg/robot_custom_data.hpp>
 #include <rm_referee_msgs/msg/robot_custom_data2.hpp>
-#include <rm_referee_msgs/msg/remote_control.hpp>
+#include <rm_referee_msgs/msg/custom_control.hpp>
 #include <rm_referee_msgs/msg/buff.hpp>
 #include <rm_referee_msgs/msg/dart_client_cmd.hpp>
 #include <rm_referee_msgs/msg/dart_info.hpp>
@@ -76,8 +76,8 @@ class RefereeNode : public rclcpp::Node {
   std::unique_ptr<referee_node::ByteStreamRecorder> vt_recorder_;
   /** </Raw Data Recording> **/
   /** <Decoders> **/
-  rm::device::Referee<rm::device::RefereeRevision::kNewV110> normal_referee_;
-  rm::device::Referee<rm::device::RefereeRevision::kNewV110> vt_referee_;
+  rm::device::Referee<rm::device::RefereeRevision::kNewV130> normal_referee_;
+  rm::device::Referee<rm::device::RefereeRevision::kNewV130> vt_referee_;
   /** </Decoders> **/
 
  private:
@@ -104,8 +104,8 @@ class RefereeNode : public rclcpp::Node {
   rclcpp::Publisher<rm_referee_msgs::msg::CustomRobotData>::SharedPtr custom_robot_data_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::RobotCustomData>::SharedPtr robot_custom_data_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::RobotCustomData2>::SharedPtr robot_custom_data_2_pub_{nullptr};
+  rclcpp::Publisher<rm_referee_msgs::msg::CustomControl>::SharedPtr custom_control_pub_{nullptr};
   rclcpp::Publisher<rm_referee_msgs::msg::MapCommand>::SharedPtr map_command_pub_{nullptr};
-  rclcpp::Publisher<rm_referee_msgs::msg::RemoteControl>::SharedPtr remote_control_pub_{nullptr};
   /** </Publishers> **/
 
   /** <msgs> **/
@@ -131,8 +131,8 @@ class RefereeNode : public rclcpp::Node {
   rm_referee_msgs::msg::CustomRobotData custom_robot_data_msg_{};
   rm_referee_msgs::msg::RobotCustomData robot_custom_data_msg_{};
   rm_referee_msgs::msg::RobotCustomData2 robot_custom_data_2_msg_{};
+  rm_referee_msgs::msg::CustomControl custom_control_msg_{};
   rm_referee_msgs::msg::MapCommand map_command_msg_{};
-  rm_referee_msgs::msg::RemoteControl remote_control_msg_{};
   /** </msgs> **/
 
  private:

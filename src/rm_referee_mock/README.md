@@ -1,6 +1,6 @@
 # rm_referee_mock
 
-这是 `rm_referee_ros2` 所属的一个子模块，提供了一些用于测试的 Mock 组件，用来模拟裁判系统的数据发送行为，方便在没有真实裁判系统或者不便搭建环境的情况下进行开发和测试。当前文档以《RoboMaster 2026 机甲大师高校系列赛通信协议 V1.2.0（20260209）》为准。
+这是 `rm_referee_ros2` 所属的一个子模块，提供了一些用于测试的 Mock 组件，用来模拟裁判系统的数据发送行为，方便在没有真实裁判系统或者不便搭建环境的情况下进行开发和测试。当前文档以《RoboMaster 2026 机甲大师高校系列赛通信协议 V1.3.0（20260327）》为准。
 
 目前为止所有的 Mock 组件均以 rqt 插件的形式实现，编译并 source 工作空间后，在 rqt 中启动对应的插件即可使用。
 
@@ -23,7 +23,7 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 
 ![keyboard_publisher_rqt](../docs/keyboard_publisher_rqt.jpg)
 
-模拟 2026 V1.2.0 自定义客户端的键鼠控制消息。Keyboard Publisher 会读取键盘输入，并将输入的数据封装成 `rm_referee_msgs/KeyboardMouseControl` 消息发布到指定话题上，默认话题为 `/rm_referee/mock/keyboard_mouse_control`。
+模拟 2026 V1.3.0 自定义客户端的键鼠控制消息。Keyboard Publisher 会读取键盘输入，并将输入的数据封装成 `rm_referee_msgs/KeyboardMouseControl` 消息发布到指定话题上，默认话题为 `/rm_referee/mock/keyboard_mouse_control`。
 
 > TODO: 鼠标位移和按键输入
 
@@ -59,7 +59,7 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 - `0x0201` `rm_referee_msgs/RobotStatus`：本机器人状态
 - `0x0206` `rm_referee_msgs/HurtData`：扣血信息
 - `0x0208` `rm_referee_msgs/ProjectileAllowance`：允许发弹量和剩余金币
-- `0x020D` `rm_referee_msgs/SentryInfo`：哨兵兑换信息
+- `0x020D` `rm_referee_msgs/SentryInfo`：哨兵兑换、复活、姿态与能量机关激活状态
 
 可以接收并回显的发送数据：
 

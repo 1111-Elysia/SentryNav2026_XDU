@@ -13,6 +13,8 @@ PACKAGE_SHARE = get_package_share_directory("rm_referee_mock")
 
 
 class MatchControlWidget(QtWidgets.QWidget):
+    DEFAULT_MATCH_REMAIN_SECONDS = 420
+    RUNE_ACTIVATING_WINDOW_SECONDS = 20
     PRE_MATCH_STAGE_DURATIONS = {2: 15, 3: 5}
     MATCH_STAGE_INDEX = 4
     FINISHED_STAGE_INDEX = 5
@@ -29,19 +31,22 @@ class MatchControlWidget(QtWidgets.QWidget):
         self.countdown_timer = QTimer(self)
         self.countdown_timer.timeout.connect(self.update_time)
 
-        self.init_ui()
-
         self.current_hurt_armor_id = 0
         self.trigger_hurt = False
         self.sentry_can_activate_flag = False
-        self.authorized_rune_type = 0
-        self.rune_activating_timer = 0
         self.small_rune_chances = 0
         self.big_rune_chances = 0
         self.last_remain_seconds = -1
+        self.rune_window_timers = {"small": 0, "big": 0}
+        self._suppress_rune_status_change = False
+
+        self.init_ui()
 
     def init_ui(self):
         """初始化 UI 控件的默认值和选项"""
+        self.resize(1020, 620)
+        self.setMinimumSize(1020, 620)
+
         # 设置比赛类型选项 (索引0不使用，从1开始)
         self.comboBox_game_type.addItems([
             "[0] 未定义",
@@ -68,6 +73,12 @@ class MatchControlWidget(QtWidgets.QWidget):
         energy_status = ["未激活", "激活中", "已激活"]
         self.comboBox_small_rune.addItems(energy_status)  # 小能量机关
         self.comboBox_big_rune.addItems(energy_status)  # 大能量机关
+        self.comboBox_small_rune.currentIndexChanged.connect(
+            lambda index, rune_name="small": self._on_rune_status_changed(rune_name, index)
+        )
+        self.comboBox_big_rune.currentIndexChanged.connect(
+            lambda index, rune_name="big": self._on_rune_status_changed(rune_name, index)
+        )
 
         # 设置高地占领状态
         occupy_status = ["无占领", "己方占领", "敌方占领"]
@@ -81,7 +92,14 @@ class MatchControlWidget(QtWidgets.QWidget):
         self.comboBox_outpost_buff.addItems(outpost_buff_status)  # 己方前哨站增益点
 
         # 设置飞镖击中目标
-        dart_targets = ["未击中", "前哨站", "基地"]
+        dart_targets = [
+            "未击中",
+            "前哨站",
+            "基地固定目标",
+            "基地随机固定目标",
+            "基地随机移动目标",
+            "基地末端移动目标",
+        ]
         self.comboBox_dart_target.addItems(dart_targets)
 
         # 设置HP默认值
@@ -123,6 +141,13 @@ class MatchControlWidget(QtWidgets.QWidget):
         if not hasattr(self, 'spinBox_robot_id'):
             self.spinBox_robot_id = QtWidgets.QSpinBox()
         self._setup_projectile_allowance_inputs()
+        self._setup_sentry_info_inputs()
+
+        if hasattr(self, "checkBox"):
+            self.checkBox.setChecked(False)
+            self.checkBox.setEnabled(False)
+            self.checkBox.setText("资源区(协议废弃)")
+            self.checkBox.setToolTip("V1.3.0 中 event_data bit1 已保留，该控件不再参与编码")
 
         self.label_stage_countdown = QtWidgets.QLabel(self)
         self.label_stage_countdown.setObjectName("label_stage_countdown")
@@ -258,10 +283,160 @@ class MatchControlWidget(QtWidgets.QWidget):
         if hasattr(self, "groupBox_hurt"):
             self.groupBox_hurt.setGeometry(650, 340, 120, 120)
         if hasattr(self, "groupBox_service_echo"):
-            self.groupBox_service_echo.setGeometry(650, 470, 120, 120)
+            self.groupBox_service_echo.setGeometry(650, 460, 120, 160)
+
+    def _create_sentry_spinbox(self, maximum):
+        spinbox = QtWidgets.QSpinBox(self.groupBox_sentry_detail)
+        spinbox.setMaximum(maximum)
+        spinbox.setValue(0)
+        return spinbox
+
+    def _setup_sentry_info_inputs(self):
+        if not hasattr(self, "groupBox_service_echo") or not hasattr(self, "verticalLayout_echo"):
+            return
+
+        self.groupBox_service_echo.setTitle("Sentry Echo")
+        self.label_echo_title.setText("当前姿态:")
+        self.label_sentry_mode.setText("姿态: -")
+        self.checkBox_can_activate_rune.setText("手动强制可打符")
+        self.checkBox_can_activate_rune.setChecked(False)
+        self.checkBox_can_activate_rune.setToolTip("用于调试时手动将 sentry_info_2 bit14 置 1")
+
+        self.label_sentry_auto_activate = QtWidgets.QLabel(self.groupBox_service_echo)
+        self.label_sentry_auto_activate.setObjectName("label_sentry_auto_activate")
+        self.verticalLayout_echo.insertWidget(2, self.label_sentry_auto_activate)
+
+        self.label_rune_window_status = QtWidgets.QLabel(self.groupBox_service_echo)
+        self.label_rune_window_status.setObjectName("label_rune_window_status")
+        self.verticalLayout_echo.insertWidget(3, self.label_rune_window_status)
+
+        self.groupBox_sentry_detail = QtWidgets.QGroupBox(self)
+        self.groupBox_sentry_detail.setObjectName("groupBox_sentry_detail")
+        self.groupBox_sentry_detail.setTitle("SentryInfo 0x020D")
+        self.groupBox_sentry_detail.setGeometry(780, 20, 230, 330)
+
+        form_layout = QtWidgets.QFormLayout(self.groupBox_sentry_detail)
+        form_layout.setObjectName("formLayout_sentry_detail")
+
+        self.spinBox_sentry_exchange_projectile = self._create_sentry_spinbox(2047)
+        self.spinBox_sentry_remote_projectile_exchange = self._create_sentry_spinbox(15)
+        self.spinBox_sentry_remote_hp_exchange = self._create_sentry_spinbox(15)
+        self.checkBox_sentry_can_free_revive = QtWidgets.QCheckBox(self.groupBox_sentry_detail)
+        self.checkBox_sentry_can_buy_revive = QtWidgets.QCheckBox(self.groupBox_sentry_detail)
+        self.spinBox_sentry_buy_revive_cost = self._create_sentry_spinbox(1023)
+        self.checkBox_sentry_is_disengaged = QtWidgets.QCheckBox(self.groupBox_sentry_detail)
+        self.spinBox_sentry_team_projectile_exchange = self._create_sentry_spinbox(2047)
+
+        form_layout.addRow("成功补弹", self.spinBox_sentry_exchange_projectile)
+        form_layout.addRow("远程补弹次数", self.spinBox_sentry_remote_projectile_exchange)
+        form_layout.addRow("远程回血次数", self.spinBox_sentry_remote_hp_exchange)
+        form_layout.addRow("可免费复活", self.checkBox_sentry_can_free_revive)
+        form_layout.addRow("可金币复活", self.checkBox_sentry_can_buy_revive)
+        form_layout.addRow("金币复活花费", self.spinBox_sentry_buy_revive_cost)
+        form_layout.addRow("当前脱战", self.checkBox_sentry_is_disengaged)
+        form_layout.addRow("队伍剩余可兑17mm", self.spinBox_sentry_team_projectile_exchange)
+
+        self._update_sentry_auto_activate_label()
+        self._update_rune_window_label()
+
+    def _get_rune_combo(self, rune_name):
+        return self.comboBox_small_rune if rune_name == "small" else self.comboBox_big_rune
+
+    def _get_rune_label(self, rune_name):
+        return "小能量机关" if rune_name == "small" else "大能量机关"
+
+    def _update_rune_combo_text(self, rune_name):
+        combo = self._get_rune_combo(rune_name)
+        remaining = self.rune_window_timers[rune_name]
+        active_text = f"激活中({remaining}s)" if remaining > 0 else "激活中"
+        combo.setItemText(0, "未激活")
+        combo.setItemText(1, active_text)
+        combo.setItemText(2, "已激活")
+
+    def _set_rune_status(self, rune_name, ui_index):
+        combo = self._get_rune_combo(rune_name)
+        changed = combo.currentIndex() != ui_index
+        self._suppress_rune_status_change = True
+        try:
+            if changed:
+                combo.setCurrentIndex(ui_index)
+        finally:
+            self._suppress_rune_status_change = False
+
+        self._apply_rune_status_change(rune_name, ui_index, initiated_by_user=False)
+
+    def _apply_rune_status_change(self, rune_name, ui_index, initiated_by_user):
+        if ui_index == 1:
+            if self.rune_window_timers[rune_name] <= 0:
+                self.rune_window_timers[rune_name] = self.RUNE_ACTIVATING_WINDOW_SECONDS
+                print(
+                    f"[Rune] {self._get_rune_label(rune_name)}进入正在激活状态，"
+                    f"开启{self.RUNE_ACTIVATING_WINDOW_SECONDS}s打符窗口"
+                )
+        else:
+            had_timer = self.rune_window_timers[rune_name] > 0
+            self.rune_window_timers[rune_name] = 0
+            if ui_index == 2 and had_timer:
+                print(f"[Rune] {self._get_rune_label(rune_name)}已被成功激活")
+            elif ui_index == 0 and initiated_by_user and had_timer:
+                print(f"[Rune] {self._get_rune_label(rune_name)}被手动重置为未激活")
+
+        self._refresh_sentry_activate_flag()
+        self._update_rune_combo_text(rune_name)
+        self._update_rune_window_label()
+
+    def _on_rune_status_changed(self, rune_name, ui_index):
+        if self._suppress_rune_status_change:
+            return
+        self._apply_rune_status_change(rune_name, ui_index, initiated_by_user=True)
+
+    def _update_rune_window_label(self):
+        if not hasattr(self, "label_rune_window_status"):
+            return
+
+        parts = []
+        for rune_name in ("small", "big"):
+            combo = self._get_rune_combo(rune_name)
+            remaining = self.rune_window_timers[rune_name]
+            self._update_rune_combo_text(rune_name)
+            if combo.currentIndex() == 1 and remaining > 0:
+                parts.append(f"{'小' if rune_name == 'small' else '大'}{remaining}s")
+
+        text = "打符窗: " + " ".join(parts) if parts else "打符窗: -"
+        self.label_rune_window_status.setText(text)
 
     def _is_rmul_game_type(self):
         return self.comboBox_game_type.currentIndex() in self.RMUL_GAME_TYPES
+
+    def _reset_match_timer(self):
+        self.lineEdit_time.set_confirmed_text(self._format_seconds(self.DEFAULT_MATCH_REMAIN_SECONDS))
+        self.stage_countdown_remaining = 0
+        self._update_stage_countdown_display()
+
+    def _reset_match_runtime_state(self):
+        self.sentry_can_activate_flag = False
+        self.small_rune_chances = 0
+        self.big_rune_chances = 0
+        self.last_remain_seconds = -1
+        self.rune_window_timers = {"small": 0, "big": 0}
+        if hasattr(self, "checkBox_can_activate_rune"):
+            self.checkBox_can_activate_rune.setChecked(False)
+        self._update_sentry_auto_activate_label()
+        self._update_rune_window_label()
+
+    def _refresh_sentry_activate_flag(self):
+        current_small_status = self.comboBox_small_rune.currentIndex()
+        current_big_status = self.comboBox_big_rune.currentIndex()
+        self.sentry_can_activate_flag = (
+            (self.small_rune_chances > 0 and current_small_status == 0)
+            or (self.big_rune_chances > 0 and current_big_status == 0)
+        )
+        self._update_sentry_auto_activate_label()
+
+    def _update_sentry_auto_activate_label(self):
+        if hasattr(self, "label_sentry_auto_activate"):
+            text = "是" if self.sentry_can_activate_flag else "否"
+            self.label_sentry_auto_activate.setText(f"自动可打符: {text}")
 
     def _on_game_stage_changed(self, stage_index):
         if stage_index in self.PRE_MATCH_STAGE_DURATIONS:
@@ -272,7 +447,18 @@ class MatchControlWidget(QtWidgets.QWidget):
 
         self.stage_countdown_remaining = 0
         self._update_stage_countdown_display()
-        if stage_index in (0, 1, self.FINISHED_STAGE_INDEX):
+        if stage_index in (0, 1):
+            self._reset_match_timer()
+            self._reset_match_runtime_state()
+            self._set_countdown_running(False)
+            return
+
+        if stage_index == self.MATCH_STAGE_INDEX:
+            self._check_rune_refresh(self._parse_time_to_seconds())
+            self._set_countdown_running(True)
+            return
+
+        if stage_index == self.FINISHED_STAGE_INDEX:
             self._set_countdown_running(False)
 
     def _update_stage_countdown_display(self):
@@ -340,6 +526,8 @@ class MatchControlWidget(QtWidgets.QWidget):
             if stage_index in self.PRE_MATCH_STAGE_DURATIONS and self.stage_countdown_remaining <= 0:
                 self.stage_countdown_remaining = self.PRE_MATCH_STAGE_DURATIONS[stage_index]
                 self._update_stage_countdown_display()
+            if stage_index == self.MATCH_STAGE_INDEX:
+                self._check_rune_refresh(self._parse_time_to_seconds())
             self._set_countdown_running(True)
         else:
             self._set_countdown_running(False)
@@ -359,7 +547,30 @@ class MatchControlWidget(QtWidgets.QWidget):
             self._tick_stage_countdown()
             return
 
+        self._tick_rune_windows()
         self._tick_match_countdown()
+
+    def _tick_rune_windows(self):
+        for rune_name in ("small", "big"):
+            combo = self._get_rune_combo(rune_name)
+            if combo.currentIndex() != 1:
+                continue
+
+            remaining = self.rune_window_timers[rune_name]
+            if remaining <= 0:
+                continue
+
+            remaining -= 1
+            self.rune_window_timers[rune_name] = remaining
+            if remaining == 0:
+                print(
+                    f"[Timeout] {self._get_rune_label(rune_name)}20s打符窗口结束，"
+                    "仍未成功激活，恢复为未激活"
+                )
+                self._set_rune_status(rune_name, 0)
+                continue
+
+        self._update_rune_window_label()
 
     def _parse_time_to_seconds(self, time_str=None):
         """解析时间字符串 MM:SS 转换为秒数"""
@@ -388,7 +599,7 @@ class MatchControlWidget(QtWidgets.QWidget):
     
     def get_event_data_value(self):
         """
-            按 2026 V1.2.0 协议计算 EventData 位图值。
+            按 2026 V1.3.0 协议计算 EventData 位图值。
         """
         def map_rune_status(ui_index):
             if ui_index == 0:
@@ -402,7 +613,6 @@ class MatchControlWidget(QtWidgets.QWidget):
         event_val = 0
 
         event_val |= int(self.checkBox_2.isChecked()) << 0
-        event_val |= int(self.checkBox.isChecked()) << 1
         if self._is_rmul_game_type():
             event_val |= int(self.checkBox_3.isChecked()) << 2
 
@@ -425,6 +635,7 @@ class MatchControlWidget(QtWidgets.QWidget):
 
     def get_game_status(self):
         """获取当前比赛状态"""
+        sentry_info_status = self.get_sentry_info_status()
         status = {
             "game_type": self.comboBox_game_type.currentIndex(),
             "game_progress": self.comboBox_game_stage.currentIndex(),
@@ -442,7 +653,7 @@ class MatchControlWidget(QtWidgets.QWidget):
             "robot_status": {
                 "id": self.spinBox_robot_id.value(),
                 "current_hp": self.spinBox_hp_7.value(), # 复用哨兵血量
-                "max_hp": 600,
+                "max_hp": self.spinBox_hp_7.maximum(),
                 "ammo": self.spinBox_ammo.value()
             },
             "projectile_allowance": {
@@ -460,13 +671,31 @@ class MatchControlWidget(QtWidgets.QWidget):
                 # 如果 trigger 为 false, 发 0 或者不发(plugin处理)
                 "trigger": self.trigger_hurt 
             },
-            # === 新增：传出可激活标志，用于 sentry_info Bit 14 ===
-            "sentry_can_activate": self.sentry_can_activate_flag
+            "sentry_can_activate": sentry_info_status["can_activate"],
+            "sentry_info": sentry_info_status,
         }
         if self.trigger_hurt:
             self.trigger_hurt = False
 
         return status
+
+    def get_sentry_info_status(self):
+        manual_can_activate = (
+            self.checkBox_can_activate_rune.isChecked()
+            if hasattr(self, "checkBox_can_activate_rune")
+            else False
+        )
+        return {
+            "exchange_projectile": self.spinBox_sentry_exchange_projectile.value(),
+            "remote_projectile_exchange_count": self.spinBox_sentry_remote_projectile_exchange.value(),
+            "remote_hp_exchange_count": self.spinBox_sentry_remote_hp_exchange.value(),
+            "can_free_revive": self.checkBox_sentry_can_free_revive.isChecked(),
+            "can_buy_revive": self.checkBox_sentry_can_buy_revive.isChecked(),
+            "buy_revive_cost": self.spinBox_sentry_buy_revive_cost.value(),
+            "is_disengaged": self.checkBox_sentry_is_disengaged.isChecked(),
+            "team_projectile_exchange_remaining": self.spinBox_sentry_team_projectile_exchange.value(),
+            "can_activate": self.sentry_can_activate_flag or manual_can_activate,
+        }
 
     def update_sentry_echo(self, mode):
         """更新 UI 显示收到的指令"""
@@ -474,10 +703,42 @@ class MatchControlWidget(QtWidgets.QWidget):
             # 简单映射模式名
             names = {0: "无效", 1: "进攻", 2: "防御", 3: "移动"}
             txt = names.get(mode, str(mode))
-            self.label_sentry_mode.setText(f"Mode: {txt}")
+            self.label_sentry_mode.setText(f"姿态: {txt}")
             # 可以变个色提示更新
             self.label_sentry_mode.setStyleSheet("color: red; font-weight: bold;")
             QTimer.singleShot(500, lambda: self.label_sentry_mode.setStyleSheet("color: blue; font-weight: bold;"))    
+
+    def _restore_sentry_hp(self):
+        self.spinBox_hp_7.setValue(self.spinBox_hp_7.maximum())
+
+    def confirm_free_revive(self):
+        if self.spinBox_hp_7.value() > 0:
+            return False, "哨兵未战亡，免费复活无效"
+        if not self.checkBox_sentry_can_free_revive.isChecked():
+            return False, "当前不可免费复活"
+
+        self._restore_sentry_hp()
+        self.checkBox_sentry_can_free_revive.setChecked(False)
+        self.checkBox_sentry_is_disengaged.setChecked(False)
+        return True, "免费复活成功，哨兵血量已恢复"
+
+    def confirm_buy_revive(self):
+        if self.spinBox_hp_7.value() > 0:
+            return False, "哨兵未战亡，金币复活无效"
+        if not self.checkBox_sentry_can_buy_revive.isChecked():
+            return False, "当前不可金币复活"
+
+        revive_cost = self.spinBox_sentry_buy_revive_cost.value()
+        remaining_gold_coin = self.spinBox_gold_coin.value() if self.spinBox_gold_coin else 0
+        if remaining_gold_coin < revive_cost:
+            return False, f"剩余金币不足，当前 {remaining_gold_coin}，需要 {revive_cost}"
+
+        if self.spinBox_gold_coin:
+            self.spinBox_gold_coin.setValue(max(0, remaining_gold_coin - revive_cost))
+        self._restore_sentry_hp()
+        self.checkBox_sentry_can_buy_revive.setChecked(False)
+        self.checkBox_sentry_is_disengaged.setChecked(False)
+        return True, "金币复活成功，哨兵血量已恢复"
 
     def _check_rune_refresh(self, remain_seconds):
         """
@@ -503,39 +764,7 @@ class MatchControlWidget(QtWidgets.QWidget):
             print(f"[Rule] 时间 {remain_seconds}s: 获得1次大能量机关激活机会 (当前累积: {self.big_rune_chances})")
 
         # === 2. 更新 sentry_info 的权限位 (Bit 14) ===
-
-        current_small_status = self.comboBox_small_rune.currentIndex() # 0:未激活
-        current_big_status = self.comboBox_big_rune.currentIndex()     # 0:未激活
-        
-        can_activate = False
-        
-        # 有小符机会 且 小符未激活
-        if self.small_rune_chances > 0 and current_small_status == 0:
-            can_activate = True
-            
-        # 有大符机会 且 大符未激活
-        if self.big_rune_chances > 0 and current_big_status == 0:
-            can_activate = True
-            
-        # 同步给 flag，用于发布给机器人
-        self.sentry_can_activate_flag = can_activate
-        
-        # 同步 UI 勾选框 (视觉反馈)
-        if hasattr(self, 'checkBox_can_activate_rune'):
-            # 如果人工没介入，自动更新
-            if self.sentry_can_activate_flag:
-                self.checkBox_can_activate_rune.setChecked(True)
-
-        # === 3. 倒计时逻辑  ===
-        # 如果处于"正在激活"(Index=1)，处理20s倒计时
-        if current_small_status == 1 or current_big_status == 1:
-            if self.rune_activating_timer > 0:
-                self.rune_activating_timer -= 1
-                if self.rune_activating_timer == 0:
-                    print("[Timeout] 激活时间窗口结束，重置状态")
-                    if current_small_status == 1: self.comboBox_small_rune.setCurrentIndex(0)
-                    if current_big_status == 1: self.comboBox_big_rune.setCurrentIndex(0)
-
+        self._refresh_sentry_activate_flag()
 
     def confirm_activation(self):
         """
@@ -559,8 +788,25 @@ class MatchControlWidget(QtWidgets.QWidget):
             current_small_status = self.comboBox_small_rune.currentIndex()
             current_big_status = self.comboBox_big_rune.currentIndex()
 
+            if current_small_status == 1 or current_big_status == 1:
+                active_rune_name = "small" if current_small_status == 1 else "big"
+                print(
+                    f">>> [Ignore] {self._get_rune_label(active_rune_name)}已处于正在激活窗口内，"
+                    "忽略重复激活请求"
+                )
+                return True
+
+            remain_seconds = self._get_stage_remain_time()
+            prefer_big_rune = remain_seconds <= 240
+
+            # 大符时间窗内优先消耗大符次数，避免 90s / 165s / 240s 仍然误打小符
+            if prefer_big_rune and self.big_rune_chances > 0 and current_big_status == 0:
+                activated_type = 2
+                self.big_rune_chances -= 1
+                print(f">>> [Success] 消耗1次大符机会 (剩余: {self.big_rune_chances})")
+
             # 逻辑：如果小符有次数且没激活 -> 激活小符
-            if self.small_rune_chances > 0 and current_small_status == 0:
+            elif self.small_rune_chances > 0 and current_small_status == 0:
                 activated_type = 1
                 self.small_rune_chances -= 1 # 扣除次数
                 print(f">>> [Success] 消耗1次小符机会 (剩余: {self.small_rune_chances})")
@@ -579,21 +825,12 @@ class MatchControlWidget(QtWidgets.QWidget):
 
             # === 执行激活 ===
             if activated_type > 0:
-                self.rune_activating_timer = 20 # 开启20秒窗口
-                
                 if activated_type == 1:
-                    self.comboBox_small_rune.setCurrentIndex(1) # 设为: 正在激活
+                    self._set_rune_status("small", 1)
                 elif activated_type == 2:
-                    self.comboBox_big_rune.setCurrentIndex(1) # 设为: 正在激活
-                
-                # 激活成功后，如果手里没有剩余次数了，就把勾选框取消
-                # 如果还有次数（比如累积了2次），就保持勾选，允许机器人接着打
-                total_left = self.small_rune_chances + self.big_rune_chances
-                if total_left == 0:
-                    self.sentry_can_activate_flag = False
-                    if hasattr(self, 'checkBox_can_activate_rune'):
-                        self.checkBox_can_activate_rune.setChecked(False)
-                
+                    self._set_rune_status("big", 1)
+
+                self._refresh_sentry_activate_flag()
                 return True
             else:
                 print(">>> [Fail] 虽然有权限，但没有可激活的目标 (可能都已激活)")

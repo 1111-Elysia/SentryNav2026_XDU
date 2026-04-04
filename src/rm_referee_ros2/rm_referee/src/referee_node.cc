@@ -214,11 +214,11 @@ void RefereeNode::SpawnPublishers() {
   robot_custom_data_2_pub_ = create_publisher<rm_referee_msgs::msg::RobotCustomData2>(  //
       "/rm_referee/robot_custom_data_2",                                                //
       rclcpp::SensorDataQoS());
+  custom_control_pub_ = create_publisher<rm_referee_msgs::msg::CustomControl>(  //
+      "/rm_referee/custom_control",                                               //
+      rclcpp::SensorDataQoS());
   map_command_pub_ = create_publisher<rm_referee_msgs::msg::MapCommand>(  //
       "/rm_referee/map_command",                                          //
-      rclcpp::SensorDataQoS());
-  remote_control_pub_ = create_publisher<rm_referee_msgs::msg::RemoteControl>(  //
-      "/rm_referee/remote_control",                                             //
       rclcpp::SensorDataQoS());
   RCLCPP_INFO(get_logger(), "Publishers spawned");
 }
@@ -348,6 +348,7 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       buff_msg_.defence_buff = referee_data.buff.defence_buff;
       buff_msg_.vulnerability_buff = referee_data.buff.vulnerability_buff;
       buff_msg_.attack_buff = referee_data.buff.attack_buff;
+      buff_msg_.remaining_energy = referee_data.buff.remaining_energy;
       buff_pub_->publish(buff_msg_);
       break;
     }
@@ -441,8 +442,14 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
     }
     case CmdEnum::kRobotCustomData2: {
       robot_custom_data_2_msg_.header.stamp = get_clock()->now();
-      memcpy(&robot_custom_data_2_msg_.data, referee_data.robot_custom_data_2.data, 150);
+      memcpy(&robot_custom_data_2_msg_.data, referee_data.robot_custom_data_2.data, 300);
       robot_custom_data_2_pub_->publish(robot_custom_data_2_msg_);
+      break;
+    }
+    case CmdEnum::kCustomControl: {
+      custom_control_msg_.header.stamp = get_clock()->now();
+      memcpy(&custom_control_msg_.data, referee_data.custom_control.data, 30);
+      custom_control_pub_->publish(custom_control_msg_);
       break;
     }
     case CmdEnum::kMapCommand: {
@@ -453,18 +460,6 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       map_command_msg_.target_robot_id = referee_data.map_command.target_robot_id;
       map_command_msg_.cmd_source = referee_data.map_command.cmd_source;
       map_command_pub_->publish(map_command_msg_);
-      break;
-    }
-    case CmdEnum::kRemoteControl: {
-      remote_control_msg_.header.stamp = get_clock()->now();
-      remote_control_msg_.mouse_x = referee_data.remote_control.mouse_x;
-      remote_control_msg_.mouse_y = referee_data.remote_control.mouse_y;
-      remote_control_msg_.mouse_z = referee_data.remote_control.mouse_z;
-      remote_control_msg_.left_button_down = referee_data.remote_control.left_button_down;
-      remote_control_msg_.right_button_down = referee_data.remote_control.right_button_down;
-      remote_control_msg_.keyboard_value = referee_data.remote_control.keyboard_value;
-      remote_control_msg_.reserved = referee_data.remote_control.reserved;
-      remote_control_pub_->publish(remote_control_msg_);
       break;
     }
   }

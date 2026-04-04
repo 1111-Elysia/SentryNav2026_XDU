@@ -25,16 +25,40 @@
       "yaw": 0.0
     },
     {
-      "name": "point1",
+      "name": "small_rune_point",
       "x": 2.0,
-      "y": 0.0,
-      "yaw": 0.0
+      "y": 1.1,
+      "yaw": -0.1
     },
     {
-      "name": "point2",
-      "x": 0.0,
-      "y": 0.0,
-      "yaw": 0.0
+      "name": "large_rune_point",
+      "x": -2.0,
+      "y": -1.1,
+      "yaw": -0.1
+    },
+    {
+      "name": "highway_defense",
+      "x": 1.5,
+      "y": -0.5,
+      "yaw": -0.5
+    },
+    {
+      "name": "outpost_point",
+      "x": -1.5,
+      "y": 0.5,
+      "yaw": -0.5
+    },
+    {
+      "name": "fortress",
+      "x": 0.5,
+      "y": 0.5,
+      "yaw": 1.4
+    },
+    {
+      "name": "base_defense_point",
+      "x": 1.0,
+      "y": -0.5,
+      "yaw": 0.1
     }
   ]
 }
