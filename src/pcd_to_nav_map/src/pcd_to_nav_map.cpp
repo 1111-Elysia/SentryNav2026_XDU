@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <filesystem>
+#include <algorithm>
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -35,13 +36,16 @@ inline bool worldToMap(double wx, double wy, double origin_x, double origin_y,
 }
 
 void bresenham(int x0, int y0, int x1, int y1, std::vector<unsigned char>& map,
-               int width, int height, unsigned char free_val) {
+               int width, int height, unsigned char free_val, unsigned char occ_val) {
     int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     int err = dx + dy, x = x0, y = y0;
     while (true) {
         int idx = x + (height - 1 - y) * width;
-        if (idx >= 0 && idx < map.size()) map[idx] = free_val;
+        if (idx >= 0 && idx < static_cast<int>(map.size())) {
+            // 不允许“自由空间射线”覆盖已确认的占据格，否则点多时会把障碍洗掉
+            if (map[idx] != occ_val) map[idx] = free_val;
+        }
         if (x == x1 && y == y1) break;
         int e2 = 2 * err;
         if (e2 >= dy) { err += dy; x += sx; }
@@ -66,6 +70,9 @@ int main(int argc, char** argv) {
     double voxel_size = config["voxel_leaf_size"];
     int occ_val = config.value("occupied_value", 0);
     int free_val = config.value("free_value", 255);
+    int unknown_val = config.value("unknown_value", free_val);
+    double occupied_thresh = config.value("occupied_thresh", 0.65);
+    double free_thresh = config.value("free_thresh", 0.196);
     double map_pad = config["map_padding"];
     double roll = config.value("lidar_roll_deg", 0.0) * M_PI/180.0;
     double pitch = config.value("lidar_pitch_deg", 0.0) * M_PI/180.0;
@@ -103,17 +110,25 @@ int main(int argc, char** argv) {
     int width = static_cast<int>(std::ceil((max_pt.x + map_pad - origin_x)/resolution));
     int height = static_cast<int>(std::ceil((max_pt.y + map_pad - origin_y)/resolution));
 
-    std::vector<unsigned char> map_data(width*height, free_val);
+    std::vector<unsigned char> map_data(width * height, static_cast<unsigned char>(unknown_val));
 
     // --- 雷达 origin 像素 ---
     int lx, ly;
-    worldToMap(lidar_x, lidar_y, origin_x, origin_y, resolution, width, height, lx, ly);
+    if (!worldToMap(lidar_x, lidar_y, origin_x, origin_y, resolution, width, height, lx, ly)) {
+        // 防御性处理：若配置的雷达原点不在地图内，则将其夹紧到地图边界内
+        lx = static_cast<int>(std::floor((lidar_x - origin_x) / resolution));
+        ly = static_cast<int>(std::floor((lidar_y - origin_y) / resolution));
+        lx = std::max(0, std::min(width - 1, lx));
+        ly = std::max(0, std::min(height - 1, ly));
+        std::cerr << "[WARN] lidar_origin 不在地图边界内，已夹紧到 (" << lx << "," << ly << ")\n";
+    }
 
     // --- 投射 + 占据 ---
     for (auto& pt : cloud_voxel->points) {
         int px, py;
         if (!worldToMap(pt.x, pt.y, origin_x, origin_y, resolution, width, height, px, py)) continue;
-        bresenham(lx, ly, px, py, map_data, width, height, free_val);
+        bresenham(lx, ly, px, py, map_data, width, height,
+                  static_cast<unsigned char>(free_val), static_cast<unsigned char>(occ_val));
         int idx = px + (height-1 - py)*width;
         if (idx >=0 && idx < map_data.size()) map_data[idx] = occ_val;
     }
@@ -131,8 +146,8 @@ int main(int argc, char** argv) {
     yaml << "resolution: " << resolution << "\n";
     yaml << "origin: [" << origin_x << ", " << origin_y << ", 0.0]\n";
     yaml << "negate: 0\n";
-    yaml << "occupied_thresh: 0.65\n";
-    yaml << "free_thresh: 0.196\n";
+    yaml << "occupied_thresh: " << occupied_thresh << "\n";
+    yaml << "free_thresh: " << free_thresh << "\n";
     yaml.close();
 
     return 0;
