@@ -107,3 +107,9 @@ sequential_nodes:
     ]
     wait_after: 0
 
+  - label: Rosbag-Record
+    type: execute
+    cmd: [
+      "ros2", "launch", "rosbag_record", "rosbag_record.launch.py"
+    ]
+    wait_after: 0
