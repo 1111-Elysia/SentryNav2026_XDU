@@ -207,6 +207,7 @@ namespace sentry_nav_bt_test
         rm_protocol::SentryPosture resolvePostureEnum() const;
         const char *runeTypeName() const;
         const char *runeStatusKey() const;
+        void setRuneOutcome(bool success, const std::string &result) const;
 
         rclcpp::Node::SharedPtr node_;
         rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedPtr client_;

@@ -2,7 +2,7 @@
 
 `sentry_nav_bt_test` 是一个基于 `BehaviorTree.CPP + Nav2 + ROS 2` 的哨兵导航包。它把裁判系统状态、TF 位姿、路径点配置和自定义行为树节点组织到同一个执行入口里，用来驱动哨兵在比赛中的导航与局内决策。
 
-当前默认启动入口为 `launch/sentry_nav_bt_test.launch.py`，默认加载的行为树为 `config/ul.xml`。
+当前默认启动入口为 `launch/sentry_nav_bt_test.launch.py`，默认加载的行为树为 `config/uc.xml`。
 
 ## 功能概览
 
@@ -14,8 +14,8 @@
   - 如果 10 秒内没有收到机器人 ID，会退回到默认红方 ID `7`
 - 从路径点配置中提取初始位姿并发布到 `/initialpose`
 - 提供一组自定义行为树节点，用于目标点选择、可靠导航、巡逻、追击、自定义条件判断和裁判系统指令发送
-- 默认 `ul.xml` 实现了赛前等待、比赛开始初始化、低血量回补、中心点/备用点切换与驻守逻辑
-- `uc.xml` 实现了高校赛对抗主流程，包括赛前等待、开赛初始化、复活、回补、小符/大符激活、前哨站点位、防御姿态切换和堡垒驻守
+- 默认 `uc.xml` 实现了高校赛对抗主流程，包括赛前等待、开赛初始化、复活、回补、小符/大符激活、前哨站点位、防御姿态切换和堡垒驻守
+- `ul.xml` 仍然保留了赛前等待、比赛开始初始化、低血量回补、中心点/备用点切换与驻守逻辑
 
 ## 目录结构
 
@@ -25,8 +25,6 @@ src/sentry_nav_bt_test
 │   ├── ul.xml
 │   ├── chase_bt.xml
 │   ├── uc.xml
-│   ├── uc_demo.xml
-│   ├── ul_test.xml
 │   ├── ul_3.21.xml
 │   ├── waypoints_red.json
 │   └── waypoints_blue.json
@@ -91,10 +89,10 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py
 
 默认行为：
 
-- 加载 `config/ul.xml`
+- 加载 `config/uc.xml`
 - 红方路径点文件使用 `config/waypoints_red.json`
 - 蓝方路径点文件使用 `config/waypoints_blue.json`
-- 节点参数中固定设置了 `use_sim_time=True`
+- 节点参数中固定设置了 `use_sim_time=False`
 
 ### 2. 使用旧协议桥接
 
@@ -123,7 +121,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 - `bt_xml_filename`
   - 行为树 XML 完整路径
-  - 默认值：安装目录下的 `config/ul.xml`
+  - 默认值：安装目录下的 `config/uc.xml`
 - `waypoints_red_file`
   - 红方路径点 JSON
 - `waypoints_blue_file`
@@ -147,7 +145,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 ## 行为树配置说明
 
-### 默认 `ul.xml`
+### 可选树 `ul.xml`
 
 默认树大致分为四段：
 
@@ -177,9 +175,9 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `center_point`
 - `fallback_point`
 
-### 高校赛对抗树 `uc.xml`
+### 默认高校赛树 `uc.xml`
 
-`uc.xml` 不是默认启动树，但已经按高校赛对抗流程维护。它当前的主逻辑是：
+`uc.xml` 是当前 launch 的默认树，按高校赛对抗流程维护。它当前的主逻辑是：
 
 1. 等待裁判系统连接成功
 2. 比赛未开始时持续复位 UC 局内状态
@@ -219,7 +217,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `fortress`
 - `base_defense_point`
 
-为了兼容旧配置，当前路径点 JSON 里仍保留了 `tunnel_rune_point` 和 `highway_defense` 这两个旧名字作为别名。
+当前路径点 JSON 里仍保留了 `highway_defense` 这个旧点位名，便于和历史配置对照；UC 主流程本身不依赖它。
 
 ### `uc.xml` 的到点与驻守判定
 
@@ -236,6 +234,36 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
   - 一旦偏离这个半径，就重新回堡垒点位
   - 在堡垒驻守激活且位于驻守半径内时，会持续发布 `/vw = 1`
   - 离开驻守半径后，堡垒驻守 `/vw` 发布会停止
+
+## UC 当前说明
+
+最近一轮已经处理了两个容易在 UC 联调里触发的问题：
+
+1. `复活机制` / `回补模式` 不再在“条件尚未命中”时提前清掉 `in_rune_phase` 和 `uc_fortress_hold_active`。
+   - 这样可以避免堡垒驻守 `/vw` 状态在同一个主循环里被反复抖掉
+   - 也避免了“受击姿态辅助”每 tick 都把打符态误读成非打符态
+
+2. `EngageRune` 现在会区分几种结束语义。
+   - `activated`：观察到能量机关最终进入“已激活”
+   - `already_activated`：节点启动时目标符已经处于已激活
+   - `window_expired`：看到“正在激活”后又回到未激活，说明窗口结束但未成功激活
+   - `timeout` / `halted`：流程超时或被树打断
+
+当前如果需要在 XML、日志或调试工具里判断打符结果，可以直接看：
+
+- `last_rune_activation_success`
+- `last_rune_activation_result`
+- `last_rune_type`
+
+剩余需要注意的点：
+
+1. `SetSentryPosture` 的超时设置默认仍然偏短，强依赖外部较快回显姿态。
+   - UC 树里大量姿态切换节点都把 `timeout_ms` 设成了 `300`
+   - 如果接的是带额外延迟或冷却策略的 mock，很容易把链路延迟误判成策略失败
+
+2. 联调时仍然建议把姿态链路单独验证。
+   - 先单独确认 `SetSentryPosture -> /rm_referee/tx -> /rm_referee/sentry_info.current_posture` 闭环
+   - 再评估 UC 树阶段切换和受击姿态是否正常
 
 ### 追击树 `chase_bt.xml`
 
@@ -365,6 +393,9 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `uc_fortress_goal_name`
 - `uc_fortress_arrive_distance_threshold`
 - `uc_fortress_hold_distance_threshold`
+- `last_rune_activation_success`
+- `last_rune_activation_result`
+- `last_rune_type`
 
 如果你要扩展 XML，优先复用这些已有键，能少写很多桥接逻辑。
 
@@ -492,7 +523,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 ### 行为树与运行逻辑
 
 - 把赛前等待、初始化、回补、回中、驻守这些主流程的状态切换日志继续整理成更稳定、可分析的格式
-- 明确默认行为树 `ul.xml` 中各分支的进入条件、退出条件和关键黑板值，减少隐式耦合
+- 明确 `ul.xml` 中各分支的进入条件、退出条件和关键黑板值，减少隐式耦合
 - 继续收敛 `ReliableNavigateToPose` 的重发、超时、取消、结果处理语义，保证与外层行为树的状态切换一致
 - 梳理“机器人 ID 获取失败时强制回退红方”这类临时策略，改成明确可配置的启动策略
 - 为日志、回放、bag 分析整理固定流程，减少现场靠肉眼翻终端排查的问题

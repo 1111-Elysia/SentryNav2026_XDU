@@ -447,6 +447,19 @@ void EngageRune::cleanupOutputs()
     }
 }
 
+void EngageRune::setRuneOutcome(bool success, const std::string &result) const
+{
+    if (!config().blackboard) {
+        return;
+    }
+
+    config().blackboard->set("last_rune_activation_success", success);
+    config().blackboard->set("last_rune_activation_result", result);
+    config().blackboard->set(
+        "last_rune_type",
+        std::string(rune_type_ == RuneType::SMALL ? "small" : "large"));
+}
+
 bool EngageRune::tryGetRuneStatus(int &status) const
 {
     return getBlackboardIntLike(config().blackboard, runeStatusKey(), status);
@@ -519,6 +532,7 @@ BT::NodeStatus EngageRune::onStart()
     last_request_time_ = std::chrono::steady_clock::time_point{};
     saw_activating_state_ = false;
     auto_shoot_enabled_ = false;
+    setRuneOutcome(false, "running");
     if (config().blackboard) {
         config().blackboard->set("in_rune_phase", 1);
     }
@@ -548,6 +562,7 @@ BT::NodeStatus EngageRune::onRunning()
         std::chrono::duration_cast<std::chrono::milliseconds>(now_tp - start_time_).count();
     if (elapsed_ms > timeout_ms_) {
         RCLCPP_WARN(node_->get_logger(), "EngageRune: %s流程超时", runeTypeName());
+        setRuneOutcome(false, "timeout");
         cleanupOutputs();
         return BT::NodeStatus::FAILURE;
     }
@@ -576,14 +591,24 @@ BT::NodeStatus EngageRune::onRunning()
         return BT::NodeStatus::RUNNING;
     }
 
-    if (saw_activating_state_ && (rune_status == 0 || rune_status == 1)) {
+    if (saw_activating_state_ && rune_status == 1) {
         RCLCPP_INFO(
             node_->get_logger(),
-            "EngageRune: %s流程结束，当前状态=%d，恢复 scan mode 并关闭 autoshoot",
-            runeTypeName(),
-            rune_status);
+            "EngageRune: %s已确认激活成功，恢复 scan mode 并关闭 autoshoot",
+            runeTypeName());
+        setRuneOutcome(true, "activated");
         cleanupOutputs();
         return BT::NodeStatus::SUCCESS;
+    }
+
+    if (saw_activating_state_ && rune_status == 0) {
+        RCLCPP_WARN(
+            node_->get_logger(),
+            "EngageRune: %s激活窗口结束但未激活成功，恢复 scan mode 并关闭 autoshoot",
+            runeTypeName());
+        setRuneOutcome(false, "window_expired");
+        cleanupOutputs();
+        return BT::NodeStatus::FAILURE;
     }
 
     if (rune_status == 1) {
@@ -591,6 +616,7 @@ BT::NodeStatus EngageRune::onRunning()
             node_->get_logger(),
             "EngageRune: %s已处于已激活状态，无需继续请求激活",
             runeTypeName());
+        setRuneOutcome(true, "already_activated");
         cleanupOutputs();
         return BT::NodeStatus::SUCCESS;
     }
@@ -622,6 +648,7 @@ BT::NodeStatus EngageRune::onRunning()
 
 void EngageRune::onHalted()
 {
+    setRuneOutcome(false, "halted");
     cleanupOutputs();
 }
 
