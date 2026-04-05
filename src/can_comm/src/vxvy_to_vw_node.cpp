@@ -26,8 +26,9 @@ public:
       [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
         if (!msg) return;
 
-        const double x = msg->linear.x;
-        const double y = msg->linear.y;
+        // vx/vy 的绝对值可能大于 1：按 [-1, 1] 进行限幅后再带入计算
+        const double x = std::clamp(static_cast<double>(msg->linear.x), -1.0, 1.0);
+        const double y = std::clamp(static_cast<double>(msg->linear.y), -1.0, 1.0);
 
         // w = sqrt(1 - (x^2 + y^2)/2)
         double inside = 1.0 - (x * x + y * y) / 2.0;
