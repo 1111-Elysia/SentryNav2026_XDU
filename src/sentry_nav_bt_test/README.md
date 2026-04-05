@@ -117,7 +117,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 ## 启动参数
 
-`launch/sentry_nav_bt_test.launch.py` 当前暴露了以下启动参数：
+`launch/sentry_nav_bt_test.launch.py` 当前包含以下启动参数：
 
 - `bt_xml_filename`
   - 行为树 XML 完整路径
@@ -166,7 +166,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - “中心驻守”分支使用更大的 `hold` 半径判定是否还允许继续驻守
 - 一旦偏离超过驻守半径，行为树会先把 `ul_center_ready` 置回 `0`，再重新走“前往中心相关点位”分支
 
-这样做的目的，是把“是否需要重新回中”和“回中到什么程度才算真正到点”拆成两套语义。
 
 `ul.xml` 依赖以下命名路径点存在：
 
@@ -199,13 +198,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `1:30-1:00`：若己方基地血量大于 `2000`，再次尝试 `large_rune_point`
 - `1:00-0:00`：回 `base_defense_point` 守家
 
-这种写法比“每个阶段同时写上下界”更鲁棒一点，原因是：
-
-- 时间带本身仍然是严格的，前面的阶段一旦不满足，才会落到后面的阶段
-- 每个时间带内部还能继续根据符是否已开、是否允许激活、前哨站是否存活等条件自动跳过不合适的任务
-- 如果改成完全刚性的固定时间片，而不保留这些条件回退，现场更容易出现“当前计划不可执行，但树还在死磕该分支”的问题
-
-所以当前实现建议保留“按剩余时间降序 + 分支内条件回退”的结构。如果后面主要诉求是可读性，我们可以再把每个阶段补成显式上下界，但不建议去掉现在这层回退鲁棒性。
 
 `uc.xml` 依赖以下命名路径点存在：
 
@@ -217,14 +209,16 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `fortress`
 - `base_defense_point`
 
-当前路径点 JSON 里仍保留了 `highway_defense` 这个旧点位名，便于和历史配置对照；UC 主流程本身不依赖它。
 
 ### `uc.xml` 的到点与驻守判定
 
 `uc.xml` 目前统一使用 `ReliableNavigateToPose` 做导航到点判定，只是不同类型点位的阈值不同：
 
-- 小符/大符点位默认使用 `0.10 m`
-- 前哨站、补给区、守家点位默认使用 `0.25 m`
+- `supply_point`：`0.25 m`
+- `small_rune_point`：`0.10 m`
+- `outpost_point`：`0.25 m`
+- `large_rune_point`：`0.10 m`
+- `base_defense_point`：`0.25 m`
 - 堡垒驻守分成两层
   - 回堡垒点位的真正到点阈值：`uc_fortress_arrive_distance_threshold = 0.10 m`
   - 已进入驻守后允许的活动半径：`uc_fortress_hold_distance_threshold = 0.25 m`
@@ -235,15 +229,23 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
   - 在堡垒驻守激活且位于驻守半径内时，会持续发布 `/vw = 1`
   - 离开驻守半径后，堡垒驻守 `/vw` 发布会停止
 
+当前 `ReliableNavigateToPose` 本身在本地到点后会直接返回 `SUCCESS`，不会因为 Nav2 的异步回调稍晚一点到达就再次主动重发同一目标。联调里如果看到“已经到点但又重新开始发点”，更常见的原因不是导航节点内部死循环，而是外层行为树分支被重新进入。
+
 ## UC 当前说明
 
-最近一轮已经处理了两个容易在 UC 联调里触发的问题：
+最近一轮已经处理了三个容易在 UC 联调里触发的问题：
 
 1. `复活机制` / `回补模式` 不再在“条件尚未命中”时提前清掉 `in_rune_phase` 和 `uc_fortress_hold_active`。
    - 这样可以避免堡垒驻守 `/vw` 状态在同一个主循环里被反复抖掉
    - 也避免了“受击姿态辅助”每 tick 都把打符态误读成非打符态
 
-2. `EngageRune` 现在会区分几种结束语义。
+2. `SetSentryPosture` 现在优先读取 `current_posture`，并结合共享黑板里的最近一次姿态请求状态做去重。
+   - 如果当前姿态已经是目标姿态，就直接跳过，不再重复发同样的切姿态请求
+   - 如果上一次姿态请求还在全局冷却窗口内，也不会因为 UC 中另一个节点被 tick 到就再次重发
+   - 默认全局冷却时间是 `posture_switch_cooldown_ms = 5000`
+   - 这解决了“姿态链路有 5 秒冷却，但树里多个 `SetSentryPosture` 节点持续反复发送”的问题
+
+3. `EngageRune` 现在会区分几种结束语义。
    - `activated`：观察到能量机关最终进入“已激活”
    - `already_activated`：节点启动时目标符已经处于已激活
    - `window_expired`：看到“正在激活”后又回到未激活，说明窗口结束但未成功激活
@@ -255,15 +257,14 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `last_rune_activation_result`
 - `last_rune_type`
 
-剩余需要注意的点：
+当前如果要看姿态切换链路，也建议一起关注：
 
-1. `SetSentryPosture` 的超时设置默认仍然偏短，强依赖外部较快回显姿态。
-   - UC 树里大量姿态切换节点都把 `timeout_ms` 设成了 `300`
-   - 如果接的是带额外延迟或冷却策略的 mock，很容易把链路延迟误判成策略失败
+- `current_posture`
+- `last_posture_request_target`
+- `last_posture_request_pending`
+- `last_posture_request_confirmed`
+- `last_posture_request_result`
 
-2. 联调时仍然建议把姿态链路单独验证。
-   - 先单独确认 `SetSentryPosture -> /rm_referee/tx -> /rm_referee/sentry_info.current_posture` 闭环
-   - 再评估 UC 树阶段切换和受击姿态是否正常
 
 ### 追击树 `chase_bt.xml`
 
@@ -352,11 +353,14 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `/scan_mod_type`
   - 这是 topic 名，不是消息类型名
   - 消息类型实际是 `sentry_msgs/msg/ScanMode`
-  - `EngageRune` 在打符开始时发 `false`，结束时恢复 `true`
+  - `EngageRune` 在满足 `can_activate_rune == 1` 且到达请求发送时机后，按顺序发送 `false`
+  - `EngageRune` 成功、失败、超时或被外层打断时，会恢复 `true`
 - `/auto_shoot_type`
-  - 打符流程检测到能量机关进入正在激活状态后发 `true`，结束时发 `false`
+  - `EngageRune` 在准备发送激活请求时会先发一次 `true`
+  - 若后续观察到能量机关进入“正在激活”状态，会继续保持该状态
+  - 流程结束时会恢复 `false`
 - `/yaw_controller`
-  - 打符流程开始时发送一次 `true`，触发云台转向能量机关
+  - `EngageRune` 在准备发送激活请求时发送一次 `true`，触发云台转向能量机关
 - `/sentry_nav_bt_test/decoded_sentry_info/*`
   - 调试用的解包结果发布
 
@@ -393,11 +397,15 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `uc_fortress_goal_name`
 - `uc_fortress_arrive_distance_threshold`
 - `uc_fortress_hold_distance_threshold`
+- `posture_switch_cooldown_ms`
+- `last_posture_request_target`
+- `last_posture_request_pending`
+- `last_posture_request_confirmed`
+- `last_posture_request_result`
 - `last_rune_activation_success`
 - `last_rune_activation_result`
 - `last_rune_type`
 
-如果你要扩展 XML，优先复用这些已有键，能少写很多桥接逻辑。
 
 ## 自定义行为树节点
 
@@ -416,7 +424,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `PrintNode` | Action | 输出日志 |
 | `PrintBlackboardValue` | Action | 打印某个黑板键值 |
 | `RandomSelector` | Action | 从路径点列表里随机选点 |
-| `SetSentryPosture` | Action | 通过裁判系统切换哨兵姿态 |
+| `SetSentryPosture` | Action | 通过裁判系统切换哨兵姿态，优先读当前姿态并结合全局冷却去重 |
 | `RequestActivateRune` | Action | 请求激活能量机关 |
 | `ConfirmResurrection` | Action | 连发确认复活指令 |
 | `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
@@ -436,74 +444,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 来观察行为树执行过程。
 
-## 常见问题
 
-### 1. 节点启动后一直不进入主逻辑
-
-优先检查：
-
-- `navigate_to_pose` action server 是否已经就绪
-- `/rm_referee/game_status` 是否有数据
-- `/rm_referee/robot_status` 是否能收到 `robot_id`
-
-### 2. 一直报当前位置不可用
-
-说明 `map -> base_link` 的 TF 还没有建立，或者定位链路没有正常工作。此时：
-
-- `waypoint_now_valid` 会变成 `false`
-- `CheckGoalReached` 和 `ReliableNavigateToPose` 的到点判定会退化
-- 默认 UL 驻守时的 `/vw` 保持逻辑也会暂停
-
-### 2.1. 中心驻守的回中/驻守边界怎么理解
-
-优先检查：
-
-- `ul_center_arrive_distance_threshold` 当前默认值是否为 `0.10`
-- `ul_center_hold_distance_threshold` 当前默认值是否为 `0.50`
-- 是否希望“偏离超过驻守半径后，必须重新回到中心点附近”这一行为
-
-当前默认树的语义是：
-
-- 进入驻守前，要先回到更小的 `arrive` 阈值内
-- 进入驻守后，只要仍在更大的 `hold` 半径内，就允许继续驻守
-- 一旦偏离超过 `hold` 半径，就退出驻守并重新走回中流程
-
-### `ScanMode` 和 `/scan_mod_type` 的区别
-
-这两个名字描述的不是同一个层级：
-
-- `ScanMode` 是消息类型名，定义在 `sentry_msgs/msg/ScanMode.msg`
-- `/scan_mod_type` 是当前工程里实际在发布/订阅的 ROS topic 名
-
-也就是说，代码里常见的写法是：
-
-- topic: `/scan_mod_type`
-- type: `sentry_msgs::msg::ScanMode`
-
-当前 `can_comm` 和 `serial_comm` 都已经按 `/scan_mod_type` 这个 topic 名接好了，所以如果只把 BT 侧改成 `/scanmode`，整条链路会断掉。
-
-### 3. 初始位姿没有生效
-
-检查：
-
-- 路径点 JSON 中是否包含 `init`
-- `init` 是否处于 `map` 坐标系语义下的正确位置
-- 定位模块是否在监听 `/initialpose`
-
-### 4. 旧协议模式下没有数据
-
-检查：
-
-- 是否开启了 `use_old_protocol:=true`
-- `team_color` 是否与当前阵营一致
-- `/rm2_referee/*` 原始话题是否确实存在
-
-## 开发建议
-
-- 如果只是改战术逻辑，优先改 `config/*.xml` 和路径点 JSON
-- 如果需要增强稳定性，重点看 `ReliableNavigateToPose` 和 `topic_listener.hpp`
-- 如果要接入新的裁判系统字段，优先在 `BlackboardManager` 中完成订阅和黑板映射
-- 如果要扩展追击逻辑，重点看 `ChaseTargetAction`
 
 ## TODO
 

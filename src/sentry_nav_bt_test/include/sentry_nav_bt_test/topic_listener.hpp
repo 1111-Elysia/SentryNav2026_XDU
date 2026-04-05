@@ -151,20 +151,31 @@ namespace sentry_nav_bt_test
             blackboard_->set<bool>("game_status_received", false);
             blackboard_->set<int>("game_status_connected_logged", 0);
 
-            // 初始化 UL 状态，避免赛前条件检查因缺键刷 warning
+            // 初始化 UL/UC 状态，避免赛前条件检查因缺键刷 warning
             blackboard_->set<bool>("last_referee_tx_ok", false);
+            blackboard_->set<int>("last_posture_request_target", -1);
+            blackboard_->set<bool>("last_posture_request_sent", false);
+            blackboard_->set<bool>("last_posture_request_tx_ok", false);
+            blackboard_->set<bool>("last_posture_request_confirmed", false);
+            blackboard_->set<bool>("last_posture_request_pending", false);
+            blackboard_->set<std::string>("last_posture_request_result", "idle");
+            blackboard_->set<double>("last_posture_request_time_s", -1.0);
+            blackboard_->set<int>("posture_switch_cooldown_ms", 5000);
             blackboard_->set<int>("ul_initialized", 0);
             blackboard_->set<int>("uc_initialized", 0);
             blackboard_->set<int>("ul_retreat_active", 0);
             blackboard_->set<int>("ul_center_ready", 0);
+            blackboard_->set<int>("uc_supply_active", 0);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
             blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);
             blackboard_->set<double>("ul_center_hold_distance_threshold", 0.50);
+            blackboard_->set<double>("ul_center_hold_exit_distance_threshold", 0.55);
             blackboard_->set<int>("uc_fortress_hold_active", 0);
             blackboard_->set<std::string>("uc_fortress_goal_name", "fortress");
             blackboard_->set<double>("uc_fortress_arrive_distance_threshold", 0.10);
             blackboard_->set<double>("uc_fortress_hold_distance_threshold", 0.25);
+            blackboard_->set<double>("uc_fortress_hold_exit_distance_threshold", 0.30);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
 
@@ -637,9 +648,9 @@ namespace sentry_nav_bt_test
             }
 
             if (pose_valid) {
-                RCLCPP_INFO(node_->get_logger(), "[UL] 当前位姿恢复，重新启用中心相关点位判定");
+                RCLCPP_INFO(node_->get_logger(), "当前位姿恢复，重新启用中心相关点位判定");
             } else {
-                RCLCPP_WARN(node_->get_logger(), "[UL] 当前位姿已过期，暂停中心相关点位判定与 /vw 驻守");
+                RCLCPP_WARN(node_->get_logger(), "当前位姿已过期，暂停中心相关点位判定与 /vw 驻守");
             }
             last_waypoint_now_valid_ = pose_valid;
         }

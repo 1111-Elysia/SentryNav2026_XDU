@@ -215,6 +215,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
 
     // 注册裁判系统交互节点
     factory.registerNodeType<sentry_nav_bt_test::SetSentryPosture>("SetSentryPosture");
+    factory.registerNodeType<sentry_nav_bt_test::MaintainSentryPosture>("MaintainSentryPosture");
     factory.registerNodeType<sentry_nav_bt_test::RequestActivateRune>("RequestActivateRune");
     factory.registerNodeType<sentry_nav_bt_test::ConfirmResurrection>("ConfirmResurrection");
     factory.registerNodeType<sentry_nav_bt_test::EngageRune>("EngageRune");

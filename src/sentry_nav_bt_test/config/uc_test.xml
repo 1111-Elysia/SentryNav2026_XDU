@@ -26,12 +26,14 @@
             <Sequence name="赛前状态已复位">
               <CheckCondition key_name="uc_initialized" comparison="eq" threshold="0"/>
               <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
+              <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
               <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
             </Sequence>
             <Sequence name="执行赛前复位">
               <PrintNode message="[UC] 比赛未开始，重置局内状态"/>
               <Action ID="SetBlackboardValue" key="uc_initialized" value="0" type="int"/>
               <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
+              <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
               <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
               <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
             </Sequence>
@@ -44,6 +46,7 @@
           <Sequence name="初始化状态">
             <PrintNode message="[UC] 比赛开始，初始化局内状态"/>
             <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
+            <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
             <Action ID="SetBlackboardValue" key="uc_initialized" value="1" type="int"/>
@@ -59,23 +62,30 @@
           <Sequence name="复活机制">
             <CheckCondition key_name="current_hp" comparison="eq" threshold="0"/>
             <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
+            <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
             <AlwaysSuccess/>
             <Action ID="SetBlackboardValue" key="current_hp" value="400" type="int"/>
           </Sequence>
           <Sequence name="回补模式">
-            <Fallback name="回补触发">
-              <Inverter>
-                <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
-              </Inverter>
-              <Sequence>
-                <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
-                <CheckCondition key_name="projectile_allowance_17mm" comparison="lte" threshold="50"/>
+            <Fallback name="回补触发或保持">
+              <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="1"/>
+              <Sequence name="触发回补模式">
+                <Fallback name="回补触发">
+                  <Inverter>
+                    <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
+                  </Inverter>
+                  <Sequence>
+                    <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
+                    <CheckCondition key_name="projectile_allowance_17mm" comparison="lte" threshold="50"/>
+                  </Sequence>
+                </Fallback>
+                <Action ID="SetBlackboardValue" key="uc_supply_active" value="1" type="int"/>
+                <PrintNode message="[回补] 低血或没弹，回补给区休整"/>
               </Sequence>
             </Fallback>
             <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-            <PrintNode message="[回补] 低血或没弹，回补给区休整"/>
             <AlwaysSuccess/>
             <GoalSelector goal_name="supply_point" goal="{goal}"/>
             <RetryUntilSuccessful num_attempts="100">
@@ -84,11 +94,25 @@
             <AlwaysSuccess/>
             <PrintNode message="[回补] 到达补给区，原地防御，等待血量和弹量恢复"/>
             <Wait wait_duration="2.0"/>
-            <Action ID="SetBlackboardValue" key="current_hp" value="400" type="int"/>
-            <Action ID="SetBlackboardValue" key="projectile_allowance_17mm" value="200" type="int"/>
+            <Inverter>
+              <KeepRunningUntilFailure>
+                <Sequence name="等待血量和弹量恢复">
+                  <Fallback name="回补未完成">
+                    <Inverter>
+                      <CheckCondition key_name="current_hp" comparison="gte" threshold="400"/>
+                    </Inverter>
+                    <Inverter>
+                      <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="100"/>
+                    </Inverter>
+                  </Fallback>
+                </Sequence>
+              </KeepRunningUntilFailure>
+            </Inverter>
             <PrintNode message="[回补] 血量和弹量已恢复，重返战场"/>
+            <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
           </Sequence>
           <Sequence name="作战模式">
+            <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
             <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
             <Parallel success_threshold="-1" failure_threshold="1">
               <Fallback name="受击姿态辅助">
@@ -356,7 +380,7 @@
                 <Sequence name="后期_守家_Phase10">
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-                  <PrintNode message="[Phase 10 | 1:00-0:00] 后期，守护基地"/>
+                  <PrintNode message="[Phase 10 | 1:00-0:00] 后期，守护基地" throttle_ms="10000"/>
                   <GoalSelector goal_name="base_defense_point" goal="{goal}"/>
                   <Fallback name="Phase10_守家维持">
                     <Sequence name="Phase10_已在守家点位半径内">
@@ -395,6 +419,11 @@
     <Action ID="SetSentryPosture" editable="true">
       <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
       <input_port name="timeout_ms" type="int">姿态切换等待超时</input_port>
+      <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
+    </Action>
+    <Action ID="MaintainSentryPosture" editable="true">
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
     </Action>
     <Action ID="RequestActivateRune" editable="true">
       <input_port name="posture" type="int">请求时保持的姿态</input_port>
@@ -438,6 +467,7 @@
     </Condition>
     <Action ID="PrintNode" editable="true">
       <input_port name="message"/>
+      <input_port name="throttle_ms"/>
     </Action>
     <Action ID="SetBlackboardValue" editable="true">
       <input_port name="key"/>
@@ -461,6 +491,7 @@
       <input_port name="success_threshold"/>
       <input_port name="failure_threshold"/>
     </Control>
+    <Control ID="ReactiveSequence"/>
     <Control ID="ReactiveFallback"/>
   </TreeNodesModel>
 </root>

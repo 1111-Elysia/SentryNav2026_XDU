@@ -58,6 +58,7 @@ private:
   rclcpp::Time last_log_time_{0, 0, RCL_ROS_TIME};
   bool result_ready_{false};
   bool result_success_{false};
+  bool cancel_requested_{false};
   uint64_t active_goal_id_{0};
   uint64_t active_send_id_{0};
   uint64_t canceled_goal_id_{0};
@@ -66,6 +67,7 @@ private:
   int send_attempts_{0};
   int retry_count_{0};
   mutable bool last_pose_invalid_logged_{false};
+  std::string pending_cancel_reason_;
   rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle_;
 };
 

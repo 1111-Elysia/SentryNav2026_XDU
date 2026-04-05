@@ -74,12 +74,14 @@ void ReliableNavigateToPose::resetRuntimeState_()
   state_ = InternalState::IDLE;
   result_ready_ = false;
   result_success_ = false;
+  cancel_requested_ = false;
   goal_handle_.reset();
   send_attempts_ = 0;
   retry_count_ = 0;
   canceled_goal_id_ = 0;
   active_goal_id_ = ++seq_;
   active_send_id_ = 0;
+  pending_cancel_reason_.clear();
   const auto clock_type = node_->get_clock()->get_clock_type();
   last_send_time_ = rclcpp::Time(0, 0, clock_type);
   last_log_time_ = rclcpp::Time(0, 0, clock_type);
@@ -225,6 +227,19 @@ void ReliableNavigateToPose::sendGoal_()
         return;
       }
 
+      if (cancel_requested_) {
+        canceled_goal_id_ = goal_id;
+        client_->async_cancel_goal(handle);
+        RCLCPP_INFO(
+          node_->get_logger(),
+          "[ReliableNavigate] 目标已接收但当前请求已取消%s%s%s, reason=%s",
+          goal_name_.empty() ? "" : "[",
+          goal_name_.empty() ? "" : goal_name_.c_str(),
+          goal_name_.empty() ? "" : "]",
+          pending_cancel_reason_.empty() ? "cancel_requested" : pending_cancel_reason_.c_str());
+        return;
+      }
+
       goal_handle_ = handle;
       state_ = InternalState::ACCEPTED;
       RCLCPP_INFO(
@@ -289,14 +304,18 @@ void ReliableNavigateToPose::sendGoal_()
 
         case rclcpp_action::ResultCode::CANCELED:
           if (goal_id == canceled_goal_id_) {
+            cancel_requested_ = false;
+            goal_handle_.reset();
+            state_ = InternalState::IDLE;
             result_ready_ = true;
             result_success_ = false;
             RCLCPP_INFO(
               node_->get_logger(),
-              "[ReliableNavigate] 目标被本节点取消%s%s%s",
+              "[ReliableNavigate] 目标被本节点取消%s%s%s, reason=%s",
               goal_name_.empty() ? "" : "[",
               goal_name_.empty() ? "" : goal_name_.c_str(),
-              goal_name_.empty() ? "" : "]");
+              goal_name_.empty() ? "" : "]",
+              pending_cancel_reason_.empty() ? "cancel_requested" : pending_cancel_reason_.c_str());
           } else {
             ++retry_count_;
             state_ = InternalState::IDLE;
@@ -348,12 +367,23 @@ void ReliableNavigateToPose::sendGoal_()
 
 void ReliableNavigateToPose::cancelGoal_(const char *reason)
 {
+  canceled_goal_id_ = active_goal_id_;
+  cancel_requested_ = true;
+  pending_cancel_reason_ = reason ? reason : "";
+
   if (client_ && goal_handle_) {
-    canceled_goal_id_ = active_goal_id_;
     client_->async_cancel_goal(goal_handle_);
     RCLCPP_WARN(
       node_->get_logger(),
       "[ReliableNavigate] 取消当前目标%s%s%s, reason=%s",
+      goal_name_.empty() ? "" : "[",
+      goal_name_.empty() ? "" : goal_name_.c_str(),
+      goal_name_.empty() ? "" : "]",
+      reason);
+  } else if (reason && *reason != '\0') {
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "[ReliableNavigate] 标记当前目标取消%s%s%s, 等待后续回调处理, reason=%s",
       goal_name_.empty() ? "" : "[",
       goal_name_.empty() ? "" : goal_name_.c_str(),
       goal_name_.empty() ? "" : "]",
@@ -388,6 +418,9 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
   }
 
   if (isGoalReached_()) {
+    if (goal_handle_ || state_ != InternalState::IDLE || last_send_time_.nanoseconds() != 0) {
+      cancelGoal_("goal_reached_locally");
+    }
     return BT::NodeStatus::SUCCESS;
   }
 

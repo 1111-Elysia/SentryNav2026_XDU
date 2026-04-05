@@ -31,7 +31,7 @@ public:
 
     control_publishers_ = std::make_shared<ControlTopicPublishers>(node_);
     vw_timer_ = node_->create_wall_timer(
-      std::chrono::milliseconds(100),
+      std::chrono::milliseconds(50),
       [this]() { updateCenterHoldVwCommand(); });
   }
 
@@ -67,18 +67,18 @@ private:
     return std::hypot(dx, dy) <= threshold;
   }
 
-  bool isNearCurrentCenterGoal(double threshold = -1.0) const
+  bool isNearCurrentCenterGoal(bool currently_active) const
   {
-    if (threshold < 0.0) {
-      threshold = getBlackboardDouble("ul_center_hold_distance_threshold", 0.50);
-    }
+    const double threshold = currently_active ?
+      getBlackboardDouble("ul_center_hold_exit_distance_threshold", 0.55) :
+      getBlackboardDouble("ul_center_hold_distance_threshold", 0.50);
 
     std::string goal_name = "center_point";
     blackboard_->get("ul_center_goal_name", goal_name);
     return isNearWaypoint(goal_name, threshold);
   }
 
-  bool isCenterHoldActive() const
+  bool isCenterHoldActive(bool currently_active) const
   {
     int center_ready = 0;
     int retreat_active = 0;
@@ -96,24 +96,24 @@ private:
       blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
     const bool match_started =
       blackboard_->get("game_progress", game_progress) && game_progress > 3U;
-    const bool current_center_goal_nearby = isNearCurrentCenterGoal();
+    const bool current_center_goal_nearby = isNearCurrentCenterGoal(currently_active);
 
     return match_started && initialized && retreat_inactive && hp_ok &&
       center_ready_ok && current_center_goal_nearby;
   }
 
-  bool isNearCurrentUcFortressGoal(double threshold = -1.0) const
+  bool isNearCurrentUcFortressGoal(bool currently_active) const
   {
-    if (threshold < 0.0) {
-      threshold = getBlackboardDouble("uc_fortress_hold_distance_threshold", 0.25);
-    }
+    const double threshold = currently_active ?
+      getBlackboardDouble("uc_fortress_hold_exit_distance_threshold", 0.30) :
+      getBlackboardDouble("uc_fortress_hold_distance_threshold", 0.25);
 
     std::string goal_name = "fortress";
     blackboard_->get("uc_fortress_goal_name", goal_name);
     return isNearWaypoint(goal_name, threshold);
   }
 
-  bool isUcFortressHoldActive() const
+  bool isUcFortressHoldActive(bool currently_active) const
   {
     int fortress_hold_active = 0;
     uint16_t current_hp = 0;
@@ -126,7 +126,7 @@ private:
       blackboard_->get("current_hp", current_hp) && current_hp >= 150U;
     const bool match_started =
       blackboard_->get("game_progress", game_progress) && game_progress > 3U;
-    const bool current_fortress_goal_nearby = isNearCurrentUcFortressGoal();
+    const bool current_fortress_goal_nearby = isNearCurrentUcFortressGoal(currently_active);
 
     return match_started && hp_ok && fortress_hold_enabled && current_fortress_goal_nearby;
   }
@@ -141,8 +141,8 @@ private:
 
   void updateCenterHoldVwCommand()
   {
-    const bool center_hold_active = isCenterHoldActive();
-    const bool fortress_hold_active = isUcFortressHoldActive();
+    const bool center_hold_active = isCenterHoldActive(last_center_hold_vw_active_);
+    const bool fortress_hold_active = isUcFortressHoldActive(last_fortress_hold_vw_active_);
     const bool hold_vw_active = center_hold_active || fortress_hold_active;
 
     if (!vw_command_initialized_) {

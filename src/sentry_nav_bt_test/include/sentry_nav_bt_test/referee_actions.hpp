@@ -145,10 +145,34 @@ namespace sentry_nav_bt_test
         BT::NodeStatus tick() override;
 
     private:
+        void updateRequestStatus(
+            int target_mode,
+            bool sent,
+            bool tx_ok,
+            bool confirmed,
+            bool pending,
+            const std::string &result,
+            double request_time_s) const;
+
         int last_confirmed_mode_{-1};
     };
 
-    // 动作 2: RequestActivateRune 
+    // 动作 2: MaintainSentryPosture
+    // XML: <Action ID="MaintainSentryPosture" mode="3"/>
+    class MaintainSentryPosture : public RefereeActionBase
+    {
+    public:
+        MaintainSentryPosture(const std::string &name, const BT::NodeConfiguration &config);
+
+        static BT::PortsList providedPorts();
+
+        BT::NodeStatus tick() override;
+
+    private:
+        int last_confirmed_mode_{-1};
+    };
+
+    // 动作 3: RequestActivateRune 
     // XML: <Action ID="RequestActivateRune" posture="0"/>
     class RequestActivateRune : public RefereeActionBase
     {
@@ -160,7 +184,7 @@ namespace sentry_nav_bt_test
         BT::NodeStatus tick() override;
     };
 
-    // 动作 3: ConfirmResurrection
+    // 动作 4: ConfirmResurrection
     // XML: <Action ID="ConfirmResurrection" posture="0" burst_count="3" burst_interval_ms="20"/>
     class ConfirmResurrection : public RefereeActionBase
     {
