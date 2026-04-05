@@ -14,11 +14,25 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='can_comm',
+            executable='hurt_spin_vw_node',
+            name='hurt_spin_vw_node',
+            output='screen',
+            parameters=[config_file, topics_file]
+        ),
+        Node(
+            package='can_comm',
             executable='can_comm_node',
             name='can_comm_node',
             output='screen',
             parameters=[config_file, topics_file]  
         ),
+        # Node(
+        #     package='can_comm',
+        #     executable='vxvy_to_vw_node',
+        #     name='vxvy_to_vw_node',
+        #     output='screen',
+        #     parameters=[config_file, topics_file]
+        # ),
         Node(
             package='can_comm',
             executable='vyaw_tf_yaw_controller_node',

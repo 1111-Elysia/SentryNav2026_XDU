@@ -18,8 +18,16 @@ add_executable(can_comm_node
   src/can_comm.cpp
 )
 
+add_executable(hurt_spin_vw_node
+  src/hurt_spin_vw_node.cpp
+)
+
 add_executable(vyaw_tf_yaw_controller_node
   src/vyaw_tf_yaw_controller_node.cpp
+)
+
+add_executable(vxvy_to_vw_node
+  src/vxvy_to_vw_node.cpp
 )
 
 target_include_directories(can_comm_node PRIVATE
@@ -36,11 +44,23 @@ ament_target_dependencies(can_comm_node
   tf2_ros
 )
 
+ament_target_dependencies(hurt_spin_vw_node
+  rclcpp
+  sentry_msgs
+  rm_referee_msgs
+)
+
 ament_target_dependencies(vyaw_tf_yaw_controller_node
   rclcpp
   geometry_msgs
   tf2
   tf2_ros
+)
+
+ament_target_dependencies(vxvy_to_vw_node
+  rclcpp
+  geometry_msgs
+  sentry_msgs
 )
 
 add_subdirectory(librm)
@@ -50,7 +70,15 @@ install(TARGETS can_comm_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(TARGETS hurt_spin_vw_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(TARGETS vyaw_tf_yaw_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS vxvy_to_vw_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

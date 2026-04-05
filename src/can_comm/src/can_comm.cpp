@@ -4,7 +4,6 @@
 #include <sentry_msgs/msg/armor_presence.hpp>
 #include <sentry_msgs/msg/scan_mode.hpp>
 #include <std_msgs/msg/bool.hpp>
-#include "rm_referee_msgs/msg/hurt_data.hpp"
 #include "rm_referee_msgs/msg/game_status.hpp"
 #include <rclcpp/qos.hpp>
 
@@ -37,7 +36,6 @@ public:
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
         this->declare_parameter<std::string>("auto_shoot_type_topic", "/auto_shoot_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
-        this->declare_parameter<std::string>("hurt_data_topic", "/rm_referee/hurt_data");
         this->declare_parameter<std::string>("game_status_topic", "/rm_referee/game_status");
         this->declare_parameter<double>("cmd_vel_timeout_s", 0.1);
         this->declare_parameter<double>("vw_timeout_s", 0.1);
@@ -55,7 +53,6 @@ public:
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
         std::string auto_shoot_type_topic = this->get_parameter("auto_shoot_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
-        std::string hurt_data_topic     = this->get_parameter("hurt_data_topic").as_string();
         std::string game_status_topic   = this->get_parameter("game_status_topic").as_string();
         cmd_vel_timeout_s_ = this->get_parameter("cmd_vel_timeout_s").as_double();
         vw_timeout_s_ = this->get_parameter("vw_timeout_s").as_double();
@@ -85,8 +82,6 @@ public:
                 }
                 vw_ = m->vw;
                 last_vw_msg_time_ = this->now();
-                // 新的 /vw 指令到达后，退出默认值覆盖模式
-                vw_default_override_active_ = false;
             });
 
         scan_mod_sub_ = this->create_subscription<sentry_msgs::msg::ScanMode>(
@@ -117,11 +112,6 @@ public:
                 armor_behind_ = m->behind;
                 armor_right_  = m->right;
             });
-
-        hurt_sub_ = this->create_subscription<rm_referee_msgs::msg::HurtData>(
-            hurt_data_topic,
-            rclcpp::SensorDataQoS(),   // BestEffort + small queue
-            std::bind(&CanCommNode::hurtCallback, this, std::placeholders::_1));
     
         // 定时发送 CAN 帧
         if (send_freq <= 0) send_freq = 1;
@@ -148,18 +138,6 @@ private:
         vyaw_ = static_cast<float>(msg->angular.z);
         cmd_vel_received_once_ = true;
         last_cmd_vel_msg_time_ = this->now();
-    }
-
-    void hurtCallback(const rm_referee_msgs::msg::HurtData::SharedPtr msg)
-    {
-        if (!msg) return;
-        if (msg->hp_deduction_reason == 0) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            hurt_active_ = true;
-            hurt_start_time_ = this->now();
-
-            vw_ = 1.0f;
-        }
     }
 
     void gamestatusCallback(const rm_referee_msgs::msg::GameStatus::SharedPtr msg)
@@ -204,30 +182,11 @@ private:
                 vyaw = 0.0f;
             }
 
-            if (hurt_active_) {
-                double dt = (now - hurt_start_time_).seconds();
-                if (dt < 5.0) {
-                    vw = 1.0f;
-                    vw_ = vw;
-                } else {
-                    hurt_active_ = false;
-                    vw = vw_received_once_ ? vw_default_after_first_msg_ : vw_default_before_first_msg_;
-                    vw_ = vw;
-                    // 受击结束后切到 0.3 的默认值时，其优先级高于 vw 超时置零
-                    vw_default_override_active_ = vw_received_once_;
-                }
-            } else {
-                if (vw_default_override_active_) {
-                    vw = vw_default_after_first_msg_;
-                    vw_ = vw;
-                } else {
-                    const bool vw_fresh =
-                        vw_received_once_ &&
-                        (now - last_vw_msg_time_).seconds() <= vw_timeout_s_;
-                    if (!vw_fresh) {
-                        vw = 0.0f;
-                    }
-                }
+            const bool vw_fresh =
+                vw_received_once_ &&
+                (now - last_vw_msg_time_).seconds() <= vw_timeout_s_;
+            if (!vw_fresh) {
+                vw = 0.0f;
             }
 
             // 运动和装甲检测位门控直接依据 game_status 话题内容
@@ -303,28 +262,24 @@ private:
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr             auto_shoot_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::GameStatus>::SharedPtr game_status_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
-    rclcpp::Subscription<rm_referee_msgs::msg::HurtData>::SharedPtr hurt_sub_;
+    // 受击旋转逻辑已迁移至 hurt_spin_vw_node；此处不再订阅 hurt_data
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
-    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;float vw_ = 0.0f;
-    float vw_default_before_first_msg_ = 0.0f;
-    float vw_default_after_first_msg_ = 0.3f;
+    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
+    float vw_ = 0.0f;
     bool vw_received_once_ = false;
     uint8_t game_progress_ = 0;
     bool scan_mod_type_ = false;
     bool scan_mod_type_topic_received_ = false;
     bool auto_shoot_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
-    bool hurt_active_ = false;
-    rclcpp::Time hurt_start_time_;
 
     bool cmd_vel_received_once_ = false;
     rclcpp::Time last_cmd_vel_msg_time_;
     rclcpp::Time last_vw_msg_time_;
     double cmd_vel_timeout_s_ = 0.5;
     double vw_timeout_s_ = 0.5;
-    bool vw_default_override_active_ = false;
 
     uint32_t id_xyz_  = 0x180;
     uint32_t id_scan_ = 0x190;
