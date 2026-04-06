@@ -178,6 +178,9 @@ namespace sentry_nav_bt_test
             blackboard_->set<double>("uc_fortress_hold_exit_distance_threshold", 0.30);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
+            blackboard_->set<uint32_t>("rfid_status", 0U);
+            blackboard_->set<uint8_t>("rfid_status_2", 0U);
+            blackboard_->set<int>("rfid_ally_fortress_detected", 0);
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
@@ -380,19 +383,26 @@ namespace sentry_nav_bt_test
                         "/rm_referee/projectile_allowance");
                 });
 
-            // // 订阅RFID状态 （地形增益点位置，需要分字节解析，暂时不用）
-            // this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::RFIDStatus>(
-            //     "/rm_referee/rfid_status",
-            //     [this](const rm_referee_msgs::msg::RFIDStatus::SharedPtr msg, BT::Blackboard::Ptr bb)
-            //     {
-            //         bb->set("rfid_status", msg->rfid_status);
-            //         bb->set("rfid_status_2", msg->rfid_status_2);
-            //         RCLCPP_DEBUG(
-            //             node_->get_logger(),
-            //             "黑板更新: '%s' 从话题 '%s'",
-            //             "rfid_status",
-            //             "/rm_referee/rfid_status");
-            //     });
+            // 订阅 RFID 状态（0x0209），用于读取己方堡垒增益点 RFID（bit17）
+            this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::RFIDStatus>(
+                "/rm_referee/rfid_status",
+                [this](const rm_referee_msgs::msg::RFIDStatus::SharedPtr msg, BT::Blackboard::Ptr bb)
+                {
+                    const uint32_t rfid_status = msg->rfid_status;
+                    const uint8_t rfid_status_2 = msg->rfid_status_2;
+                    const int ally_fortress_rfid_detected = static_cast<int>((rfid_status >> 17U) & 0x01U);
+
+                    bb->set("rfid_status", rfid_status);
+                    bb->set("rfid_status_2", rfid_status_2);
+                    bb->set("rfid_ally_fortress_detected", ally_fortress_rfid_detected);
+
+                    RCLCPP_DEBUG(
+                        node_->get_logger(),
+                        "黑板更新: rfid_status=0x%08X, rfid_status_2=0x%02X, ally_fortress_rfid(bit17)=%d",
+                        static_cast<unsigned int>(rfid_status),
+                        static_cast<unsigned int>(rfid_status_2),
+                        ally_fortress_rfid_detected);
+                });
 
             // // 订阅自瞄目标信息（从自瞄系统获得）               ——还没沟通好
             // this->subscribeWithProcessorBestEffort<rmos_interfaces::msg::Target>(

@@ -131,6 +131,34 @@ private:
     return match_started && hp_ok && fortress_hold_enabled && current_fortress_goal_nearby;
   }
 
+  bool applyFortressDeactivateDebounce(bool raw_active, bool currently_active)
+  {
+    if (raw_active) {
+      fortress_deactivate_false_ticks_ = 0;
+      return true;
+    }
+
+    if (!currently_active) {
+      fortress_deactivate_false_ticks_ = 0;
+      return false;
+    }
+
+    ++fortress_deactivate_false_ticks_;
+    if (fortress_deactivate_false_ticks_ < kFortressDeactivateDebounceTicks) {
+      return true;
+    }
+
+    fortress_deactivate_false_ticks_ = 0;
+    return false;
+  }
+
+  bool isAllyFortressRfidDetected() const
+  {
+    int ally_fortress_rfid_detected = 0;
+    return blackboard_->get("rfid_ally_fortress_detected", ally_fortress_rfid_detected) &&
+      ally_fortress_rfid_detected == 1;
+  }
+
   void publishVwCommand(float value)
   {
     if (!control_publishers_) {
@@ -141,15 +169,22 @@ private:
 
   void updateCenterHoldVwCommand()
   {
+    const bool last_hold_vw_active =
+      last_center_hold_vw_active_ || last_fortress_hold_vw_active_ ||
+      last_rfid_fortress_vw_active_;
     const bool center_hold_active = isCenterHoldActive(last_center_hold_vw_active_);
-    const bool fortress_hold_active = isUcFortressHoldActive(last_fortress_hold_vw_active_);
-    const bool hold_vw_active = center_hold_active || fortress_hold_active;
+    const bool fortress_hold_raw_active = isUcFortressHoldActive(last_fortress_hold_vw_active_);
+    const bool fortress_hold_active =
+      applyFortressDeactivateDebounce(fortress_hold_raw_active, last_fortress_hold_vw_active_);
+    const bool rfid_fortress_active = isAllyFortressRfidDetected();
+    const bool hold_vw_active = center_hold_active || fortress_hold_active || rfid_fortress_active;
 
     if (!vw_command_initialized_) {
       publishVwCommand(hold_vw_active ? 1.0f : 0.0f);
       vw_command_initialized_ = true;
       last_center_hold_vw_active_ = center_hold_active;
       last_fortress_hold_vw_active_ = fortress_hold_active;
+      last_rfid_fortress_vw_active_ = rfid_fortress_active;
       return;
     }
 
@@ -169,12 +204,31 @@ private:
       RCLCPP_INFO(node_->get_logger(), "[UC] 退出堡垒驻守，停止持续发布 /vw");
     }
 
+    if (rfid_fortress_active) {
+      if (!last_rfid_fortress_vw_active_) {
+        RCLCPP_INFO(node_->get_logger(), "[RFID] 检测到己方堡垒增益点(bit17)，开始持续发布 /vw = 1");
+      }
+    } else if (last_rfid_fortress_vw_active_) {
+      RCLCPP_INFO(node_->get_logger(), "[RFID] 己方堡垒增益点(bit17)丢失，停止 RFID 触发的 /vw 持续发布");
+    }
+
+    if (!last_hold_vw_active && hold_vw_active) {
+      RCLCPP_INFO(node_->get_logger(), "[VW] 触发持续发布 /vw = 1");
+    } else if (last_hold_vw_active && !hold_vw_active) {
+      RCLCPP_INFO(node_->get_logger(), "[VW] 所有触发条件失效，停止持续发布 /vw = 1");
+    }
+
     if (hold_vw_active) {
       publishVwCommand(1.0f);
     }
 
+    // if (last_hold_vw_active && !hold_vw_active) {
+    //   publishVwCommand(0.0f);
+    // }
+
     last_center_hold_vw_active_ = center_hold_active;
     last_fortress_hold_vw_active_ = fortress_hold_active;
+    last_rfid_fortress_vw_active_ = rfid_fortress_active;
   }
 
   rclcpp::Node::SharedPtr node_;
@@ -183,7 +237,11 @@ private:
   rclcpp::TimerBase::SharedPtr vw_timer_;
   bool last_center_hold_vw_active_{false};
   bool last_fortress_hold_vw_active_{false};
+  bool last_rfid_fortress_vw_active_{false};
   bool vw_command_initialized_{false};
+  int fortress_deactivate_false_ticks_{0};
+
+  static constexpr int kFortressDeactivateDebounceTicks = 3;
 };
 
 }  // namespace sentry_nav_bt_test

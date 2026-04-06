@@ -250,7 +250,7 @@
                     <GoalSelector goal_name="fortress" goal="{goal}"/>
                     <Fallback name="Phase4_堡垒驻守维持">
                       <ReactiveSequence name="Phase4_已在堡垒驻守半径内">
-                        <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_distance_threshold}"/>
+                        <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_exit_distance_threshold}"/>
                         <Action ID="MaintainSentryPosture" mode="1"/>
                         <Wait wait_duration="0.5"/>
                       </ReactiveSequence>
@@ -337,7 +337,7 @@
                   <GoalSelector goal_name="fortress" goal="{goal}"/>
                   <Fallback name="Phase6_堡垒驻守维持">
                     <ReactiveSequence name="Phase6_已在堡垒驻守半径内">
-                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_distance_threshold}"/>
+                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_exit_distance_threshold}"/>
                       <Action ID="MaintainSentryPosture" mode="1"/>
                       <Wait wait_duration="0.5"/>
                     </ReactiveSequence>
@@ -402,7 +402,7 @@
                   <GoalSelector goal_name="fortress" goal="{goal}"/>
                   <Fallback name="Phase8_堡垒驻守维持">
                     <ReactiveSequence name="Phase8_已在堡垒驻守半径内">
-                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_distance_threshold}"/>
+                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_exit_distance_threshold}"/>
                       <Action ID="MaintainSentryPosture" mode="1"/>
                       <Wait wait_duration="0.5"/>
                     </ReactiveSequence>
