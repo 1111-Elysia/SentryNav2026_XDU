@@ -875,7 +875,7 @@ BT::NodeStatus EngageRune::onStart()
 
     RCLCPP_INFO(
         node_->get_logger(),
-        "EngageRune: 进入%s流程，等待按顺序发送 autoshoot=true -> scan_mode=false -> yaw_controller=true -> 激活请求",
+        "EngageRune: 进入%s流程，等待按顺序发送 scan_mode=false -> yaw_controller=true -> autoshoot=true -> 激活请求",
         runeTypeName());
 
     return BT::NodeStatus::RUNNING;
@@ -962,11 +962,6 @@ BT::NodeStatus EngageRune::onRunning()
         return BT::NodeStatus::RUNNING;
     }
 
-    if (!auto_shoot_enabled_ && publishAutoShoot(true)) {
-        auto_shoot_enabled_ = true;
-        RCLCPP_INFO(node_->get_logger(), "EngageRune: 已按顺序先向 autoshoot 发送 true");
-    }
-
     if (!scan_mode_disabled_ && publishScanMode(false)) {
         scan_mode_disabled_ = true;
         RCLCPP_INFO(node_->get_logger(), "EngageRune: 已按顺序向 scan mode 发送 false");
@@ -974,6 +969,11 @@ BT::NodeStatus EngageRune::onRunning()
 
     if (triggerYawController()) {
         RCLCPP_INFO(node_->get_logger(), "EngageRune: 已按顺序向 /yaw_controller 发送 true");
+    }
+
+    if (!auto_shoot_enabled_ && publishAutoShoot(true)) {
+        auto_shoot_enabled_ = true;
+        RCLCPP_INFO(node_->get_logger(), "EngageRune: 已按顺序向 autoshoot 发送 true");
     }
 
     auto packet = utils_->buildSentryCmdPacket(resolvePostureEnum(), true);
