@@ -19,22 +19,6 @@ ros2 run rm_referee_mock rqt_clean_start dart_client
 ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 ```
 
-## 与 `sentry_nav_bt_test` / `uc.xml` 联调
-
-如果目标是联调 `sentry_nav_bt_test` 当前默认的 `uc.xml`，建议按下面的方式使用：
-
-1. `MatchControl`
-   - 话题前缀保持默认 `/rm_referee`
-   - `Robot ID` 设成 `7` 或 `107`
-   - 比赛阶段切到 `[4] 比赛中`
-   - 按需发布 `GameStatus`、`GameRobotHP`、`EventData`、`RobotStatus`、`ProjectileAllowance`、`SentryInfo`
-2. `FakeLocation`
-   - 必须把话题前缀从默认的 `/rm_referee/mock` 改成 `/rm_referee`
-   - 否则 `sentry_nav_bt_test` 收不到 `/rm_referee/robot_pos`
-3. 如果要验证打符流程
-   - 主要观察 `/rm_referee/event_data` 里的大小符状态
-   - `Tx.srv` 的 `ok` 更接近“包已解析”而不是“行为一定生效”
-
 ## 已知问题与解决方案
 
 ### 1. `FakeLocation` 默认命名空间和行为树输入不一致

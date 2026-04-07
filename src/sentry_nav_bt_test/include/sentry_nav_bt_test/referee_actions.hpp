@@ -133,31 +133,7 @@ namespace sentry_nav_bt_test
         std::shared_ptr<SentryRefereeUtils> utils_;
     };
 
-    // 动作 1: SetSentryPosture (切换姿态 - 闭环控制)
-    // XML: <Action ID="SetSentryPosture" mode="1" timeout_ms="1000"/>
-    class SetSentryPosture : public RefereeActionBase
-    {
-    public:
-        SetSentryPosture(const std::string &name, const BT::NodeConfiguration &config);
-
-        static BT::PortsList providedPorts();
-
-        BT::NodeStatus tick() override;
-
-    private:
-        void updateRequestStatus(
-            int target_mode,
-            bool sent,
-            bool tx_ok,
-            bool confirmed,
-            bool pending,
-            const std::string &result,
-            double request_time_s) const;
-
-        int last_confirmed_mode_{-1};
-    };
-
-    // 动作 2: MaintainSentryPosture
+    // 动作 1: MaintainSentryPosture
     // XML: <Action ID="MaintainSentryPosture" mode="3"/>
     class MaintainSentryPosture : public RefereeActionBase
     {
@@ -172,19 +148,7 @@ namespace sentry_nav_bt_test
         int last_confirmed_mode_{-1};
     };
 
-    // 动作 3: RequestActivateRune 
-    // XML: <Action ID="RequestActivateRune" posture="0"/>
-    class RequestActivateRune : public RefereeActionBase
-    {
-    public:
-        RequestActivateRune(const std::string &name, const BT::NodeConfiguration &config);
-
-        static BT::PortsList providedPorts();
-
-        BT::NodeStatus tick() override;
-    };
-
-    // 动作 4: ConfirmResurrection
+    // 动作 2: ConfirmResurrection
     // XML: <Action ID="ConfirmResurrection" posture="0" burst_count="3" burst_interval_ms="20"/>
     class ConfirmResurrection : public RefereeActionBase
     {

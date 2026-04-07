@@ -239,11 +239,11 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
    - 这样可以避免堡垒驻守 `/vw` 状态在同一个主循环里被反复抖掉
    - 也避免了“受击姿态辅助”每 tick 都把打符态误读成非打符态
 
-2. `SetSentryPosture` 现在优先读取 `current_posture`，并结合共享黑板里的最近一次姿态请求状态做去重。
+2. `MaintainSentryPosture` 现在优先读取 `current_posture`，并结合共享黑板里的最近一次姿态请求状态做去重。
    - 如果当前姿态已经是目标姿态，就直接跳过，不再重复发同样的切姿态请求
    - 如果上一次姿态请求还在全局冷却窗口内，也不会因为 UC 中另一个节点被 tick 到就再次重发
    - 默认全局冷却时间是 `posture_switch_cooldown_ms = 5000`
-   - 这解决了“姿态链路有 5 秒冷却，但树里多个 `SetSentryPosture` 节点持续反复发送”的问题
+   - 这解决了“姿态链路有 5 秒冷却，但树里多个姿态维护节点持续反复发送”的问题
 
 3. `EngageRune` 现在会区分几种结束语义。
    - `activated`：观察到能量机关最终进入“已激活”
@@ -367,8 +367,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 ### 服务调用
 
 - `/rm_referee/tx`
-  - `SetSentryPosture`
-  - `RequestActivateRune`
+  - `MaintainSentryPosture`
   - `ConfirmResurrection`
   - `EngageRune`
 
@@ -424,8 +423,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `PrintNode` | Action | 输出日志 |
 | `PrintBlackboardValue` | Action | 打印某个黑板键值 |
 | `RandomSelector` | Action | 从路径点列表里随机选点 |
-| `SetSentryPosture` | Action | 通过裁判系统切换哨兵姿态，优先读当前姿态并结合全局冷却去重 |
-| `RequestActivateRune` | Action | 请求激活能量机关 |
+| `MaintainSentryPosture` | Action | 通过裁判系统维持哨兵姿态，优先读当前姿态并结合全局冷却去重 |
 | `ConfirmResurrection` | Action | 连发确认复活指令 |
 | `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
 | `AutoAimAndFire` | Action | 当前为 mock 节点，仅打印日志 |

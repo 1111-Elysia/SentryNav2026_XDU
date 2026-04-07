@@ -26,8 +26,9 @@ def generate_launch_description():
     
     # 行为树XML文件路径
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'ul_3.21.xml')
-    bt_xml_path = os.path.join(pkg_dir, 'config', 'uc.xml')
-    
+    # bt_xml_path = os.path.join(pkg_dir, 'config', 'uc.xml')
+    bt_xml_path = os.path.join(pkg_dir, 'config', 'uc_test.xml')
+
     # 红方路径点 JSON
     waypoints_red_path = os.path.join(pkg_dir, 'config', 'waypoints_red.json')
     # 蓝方路径点 JSON

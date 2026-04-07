@@ -64,8 +64,7 @@
             <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-            <AlwaysSuccess/>
-            <Action ID="SetBlackboardValue" key="current_hp" value="400" type="int"/>
+            <Action ID="ConfirmResurrection" posture="0" burst_count="3" burst_interval_ms="20" min_interval_ms="100"/>
           </Sequence>
           <Sequence name="回补模式">
             <Fallback name="回补触发或保持">
@@ -86,29 +85,35 @@
             </Fallback>
             <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
             <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-            <AlwaysSuccess/>
             <GoalSelector goal_name="supply_point" goal="{goal}"/>
             <RetryUntilSuccessful num_attempts="100">
-              <ReliableNavigateToPose goal="{goal}" goal_name="supply_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+              <ReactiveSequence name="回补_前往补给区并维持移动姿态">
+                <Action ID="MaintainSentryPosture" mode="3"/>
+                <ReliableNavigateToPose goal="{goal}" goal_name="supply_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+              </ReactiveSequence>
             </RetryUntilSuccessful>
-            <AlwaysSuccess/>
             <PrintNode message="[回补] 到达补给区，原地防御，等待血量和弹量恢复"/>
-            <Wait wait_duration="2.0"/>
-            <Inverter>
-              <KeepRunningUntilFailure>
-                <Sequence name="等待血量和弹量恢复">
-                  <Fallback name="回补未完成">
-                    <Inverter>
-                      <CheckCondition key_name="current_hp" comparison="gte" threshold="400"/>
-                    </Inverter>
-                    <Inverter>
-                      <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="100"/>
-                    </Inverter>
-                  </Fallback>
-                </Sequence>
-              </KeepRunningUntilFailure>
-            </Inverter>
-            <PrintNode message="[回补] 血量和弹量已恢复，重返战场"/>
+            <ReactiveSequence name="回补_原地防御并等待恢复">
+              <Action ID="MaintainSentryPosture" mode="2"/>
+              <Sequence name="回补_恢复等待流程">
+                <Wait wait_duration="2.0"/>
+                <Inverter>
+                  <KeepRunningUntilFailure>
+                    <Sequence name="等待血量和弹量恢复">
+                      <Fallback name="回补未完成">
+                        <Inverter>
+                          <CheckCondition key_name="current_hp" comparison="gte" threshold="400"/>
+                        </Inverter>
+                        <Inverter>
+                          <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="100"/>
+                        </Inverter>
+                      </Fallback>
+                    </Sequence>
+                  </KeepRunningUntilFailure>
+                </Inverter>
+              </Sequence>
+            </ReactiveSequence>
+            <PrintNode message="[回补] 血量和弹量已恢复"/>
             <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
           </Sequence>
           <Sequence name="作战模式">
@@ -119,18 +124,12 @@
                 <Sequence name="打符阶段受击切防御">
                   <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
                   <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="1"/>
-                  <Fallback name="受击_若已防御则跳过">
-                    <CheckCondition key_name="current_posture" comparison="eq" threshold="2"/>
-                    <AlwaysSuccess/>
-                  </Fallback>
+                  <Action ID="MaintainSentryPosture" mode="2"/>
                 </Sequence>
                 <Sequence name="非打符阶段受击切进攻">
                   <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
                   <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
-                  <Fallback name="受击_若已进攻则跳过">
-                    <CheckCondition key_name="current_posture" comparison="eq" threshold="1"/>
-                    <AlwaysSuccess/>
-                  </Fallback>
+                  <Action ID="MaintainSentryPosture" mode="1"/>
                 </Sequence>
                 <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
               </Fallback>
@@ -138,62 +137,108 @@
                 <Sequence name="前期_小符_Phase1">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="390"/>
                   <Fallback name="Phase1_小符任务允许">
-                    <AlwaysSuccess/>
+                    <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+                    <Sequence>
+                      <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+                      <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+                    </Sequence>
                   </Fallback>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
                   <PrintNode message="[Phase 1 | 7:00-6:30] 前往小符点位，准备激活小能量机关"/>
-                  <AlwaysSuccess/>
                   <GoalSelector goal_name="small_rune_point" goal="{goal}"/>
-                  <ReliableNavigateToPose goal="{goal}" goal_name="small_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  <ReactiveSequence name="Phase1_前往小符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="small_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
                   <PrintNode message="[Phase 1 | 7:00-6:30] 到达小符点位，关闭 scan mode，准备请求小能量机关"/>
-                  <AlwaysSuccess/>
+                  <Action ID="EngageRune" rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
                   <PrintNode message="[Phase 1 | 7:00-6:30] 小能量机关流程结束"/>
+                </Sequence>
+                <Sequence name="前期_小符补打优先_Phase1Carry">
+                  <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
+                  <Fallback name="Phase1Carry_小符任务允许">
+                    <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+                    <Sequence>
+                      <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+                      <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+                    </Sequence>
+                  </Fallback>
+                  <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
+                  <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
+                  <PrintNode message="[Phase 1 Carry | 6:30-5:30] 若小符仍可进入激活窗口，优先补打小能量机关"/>
+                  <GoalSelector goal_name="small_rune_point" goal="{goal}"/>
+                  <ReactiveSequence name="Phase1Carry_前往小符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="small_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
+                  <PrintNode message="[Phase 1 Carry | 6:30-5:30] 到达小符点位，准备继续激活小能量机关"/>
+                  <Action ID="EngageRune" rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
+                  <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
+                  <PrintNode message="[Phase 1 Carry | 6:30-5:30] 小能量机关补打流程结束"/>
                 </Sequence>
                 <Sequence name="前期_前哨站_Phase2">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
                   <PrintNode message="[Phase 2 | 6:30-5:30] 开局小符结束，前往前哨站点位等待阶段切换"/>
-                  <Fallback name="Phase2_移动姿态请求">
-                    <CheckCondition key_name="current_posture" comparison="eq" threshold="3"/>
-                    <Sequence>
-                      <AlwaysSuccess/>
-                      <Wait wait_duration="0.2"/>
-                    </Sequence>
-                    <Wait wait_duration="0.5"/>
-                  </Fallback>
                   <GoalSelector goal_name="outpost_point" goal="{goal}"/>
-                  <ReliableNavigateToPose goal="{goal}" goal_name="outpost_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
-                  <Fallback name="Phase2_前哨到点姿态请求">
-                    <CheckCondition key_name="current_posture" comparison="eq" threshold="1"/>
-                    <Sequence>
-                      <AlwaysSuccess/>
-                      <Wait wait_duration="0.2"/>
-                    </Sequence>
-                    <Wait wait_duration="0.5"/>
-                  </Fallback>
+                  <ReactiveSequence name="Phase2_前往前哨并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="outpost_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
                   <PrintNode message="[Phase 2 | 6:30-5:30] 已到达前哨站点位，等待阶段切换"/>
-                  <KeepRunningUntilFailure>
-                    <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
-                  </KeepRunningUntilFailure>
+                  <ReactiveSequence name="Phase2_等待阶段切换并维持进攻姿态">
+                    <Action ID="MaintainSentryPosture" mode="1"/>
+                    <KeepRunningUntilFailure>
+                      <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
+                    </KeepRunningUntilFailure>
+                  </ReactiveSequence>
                 </Sequence>
                 <Sequence name="前期_小符_Phase3">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="300"/>
                   <Fallback name="Phase3_小符任务允许">
-                    <AlwaysSuccess/>
+                    <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+                    <Sequence>
+                      <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+                      <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+                    </Sequence>
                   </Fallback>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
                   <PrintNode message="[Phase 3 | 5:30-5:00] 再次前往小符点位，尝试激活小能量机关"/>
-                  <AlwaysSuccess/>
                   <GoalSelector goal_name="small_rune_point" goal="{goal}"/>
-                  <ReliableNavigateToPose goal="{goal}" goal_name="small_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  <ReactiveSequence name="Phase3_前往小符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="small_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
                   <PrintNode message="[Phase 3 | 5:30-5:00] 到达小符点位，关闭 scan mode，准备请求小能量机关"/>
-                  <AlwaysSuccess/>
+                  <Action ID="EngageRune" rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
                   <PrintNode message="[Phase 3 | 5:30-5:00] 小能量机关流程结束"/>
+                </Sequence>
+                <Sequence name="前期_小符补打优先_Phase3Carry">
+                  <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
+                  <Fallback name="Phase3Carry_小符任务允许">
+                    <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+                    <Sequence>
+                      <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+                      <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+                    </Sequence>
+                  </Fallback>
+                  <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
+                  <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
+                  <PrintNode message="[Phase 3 Carry | 5:00-4:00] 若小符仍可进入激活窗口，优先补打小能量机关"/>
+                  <GoalSelector goal_name="small_rune_point" goal="{goal}"/>
+                  <ReactiveSequence name="Phase3Carry_前往小符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="small_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
+                  <PrintNode message="[Phase 3 Carry | 5:00-4:00] 到达小符点位，准备继续激活小能量机关"/>
+                  <Action ID="EngageRune" rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
+                  <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
+                  <PrintNode message="[Phase 3 Carry | 5:00-4:00] 小能量机关补打流程结束"/>
                 </Sequence>
                 <Fallback name="中期_前哨站_Phase4">
                   <Sequence name="Phase4_退守堡垒驻守">
@@ -204,29 +249,17 @@
                     <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
                     <GoalSelector goal_name="fortress" goal="{goal}"/>
                     <Fallback name="Phase4_堡垒驻守维持">
-                      <Sequence name="Phase4_已在堡垒驻守半径内">
-                        <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_distance_threshold}"/>
-                        <Fallback name="Phase4_堡垒驻守姿态请求">
-                          <CheckCondition key_name="current_posture" comparison="eq" threshold="1"/>
-                          <Sequence>
-                            <AlwaysSuccess/>
-                            <Wait wait_duration="0.2"/>
-                          </Sequence>
-                          <Wait wait_duration="0.5"/>
-                        </Fallback>
+                      <ReactiveSequence name="Phase4_已在堡垒驻守半径内">
+                        <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_exit_distance_threshold}"/>
+                        <Action ID="MaintainSentryPosture" mode="1"/>
                         <Wait wait_duration="0.5"/>
-                      </Sequence>
+                      </ReactiveSequence>
                       <Sequence name="Phase4_回堡垒点位">
                         <PrintNode message="[Phase 4 | 5:00-4:00] 前哨站已失，退守堡垒点位并驻守"/>
-                        <Fallback name="Phase4_堡垒移动姿态请求">
-                          <CheckCondition key_name="current_posture" comparison="eq" threshold="3"/>
-                          <Sequence>
-                            <AlwaysSuccess/>
-                            <Wait wait_duration="0.2"/>
-                          </Sequence>
-                          <Wait wait_duration="0.5"/>
-                        </Fallback>
-                        <ReliableNavigateToPose goal="{goal}" goal_name="fortress" reach_threshold="{uc_fortress_hold_distance_threshold}" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                        <ReactiveSequence name="Phase4_回堡垒并维持移动姿态">
+                          <Action ID="MaintainSentryPosture" mode="3"/>
+                          <ReliableNavigateToPose goal="{goal}" goal_name="fortress" reach_threshold="{uc_fortress_hold_distance_threshold}" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                        </ReactiveSequence>
                       </Sequence>
                     </Fallback>
                   </Sequence>
@@ -235,48 +268,44 @@
                     <CheckCondition key_name="ally_outpost_hp" comparison="gt" threshold="0"/>
                     <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
                     <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-                    <PrintNode message="[Phase 4 | 5:00-4:00] 优先前往前哨站点位，若前哨站仍存活则原地等待阶段切换"/>
-                    <Fallback name="Phase4_前哨移动姿态请求">
-                      <CheckCondition key_name="current_posture" comparison="eq" threshold="3"/>
-                      <Sequence>
-                        <AlwaysSuccess/>
-                        <Wait wait_duration="0.2"/>
-                      </Sequence>
-                      <Wait wait_duration="0.5"/>
-                    </Fallback>
+                    <PrintNode message="[Phase 4 | 5:00-4:00] 若前哨站仍存活，前往前哨站点位"/>
                     <GoalSelector goal_name="outpost_point" goal="{goal}"/>
-                    <ReliableNavigateToPose goal="{goal}" goal_name="outpost_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
-                    <Fallback name="Phase4_前哨到点姿态请求">
-                      <CheckCondition key_name="current_posture" comparison="eq" threshold="1"/>
-                      <Sequence>
-                        <AlwaysSuccess/>
-                        <Wait wait_duration="0.2"/>
-                      </Sequence>
-                      <Wait wait_duration="0.5"/>
-                    </Fallback>
-                    <KeepRunningUntilFailure>
-                      <Sequence name="Phase4_前哨阶段持续条件">
-                        <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                        <CheckCondition key_name="ally_outpost_hp" comparison="gt" threshold="0"/>
-                      </Sequence>
-                    </KeepRunningUntilFailure>
+                    <ReactiveSequence name="Phase4_前往前哨并维持移动姿态">
+                      <Action ID="MaintainSentryPosture" mode="3"/>
+                      <ReliableNavigateToPose goal="{goal}" goal_name="outpost_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                    </ReactiveSequence>
+                    <ReactiveSequence name="Phase4_前哨等待并维持进攻姿态">
+                      <Action ID="MaintainSentryPosture" mode="1"/>
+                      <KeepRunningUntilFailure>
+                        <Sequence name="Phase4_前哨阶段持续条件">
+                          <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
+                          <CheckCondition key_name="ally_outpost_hp" comparison="gt" threshold="0"/>
+                        </Sequence>
+                      </KeepRunningUntilFailure>
+                    </ReactiveSequence>
                   </Sequence>
                 </Fallback>
                 <Sequence name="中期_大符_Phase5">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="210"/>
                   <Fallback name="Phase5_大符任务允许">
-                    <AlwaysSuccess/>
+                    <CheckCondition key_name="large_rune_status" comparison="neq" threshold="1"/>
                   </Fallback>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-                  <PrintNode message="[Phase 5 | 4:00-3:30] 前往大符点位，准备激活大能量机关"/>
-                  <AlwaysSuccess/>
+                  <PrintNode message="[Phase 5 | 4:00-3:30] 前往大符点位，到点即视为完成"/>
                   <GoalSelector goal_name="large_rune_point" goal="{goal}"/>
-                  <ReliableNavigateToPose goal="{goal}" goal_name="large_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
-                  <PrintNode message="[Phase 5 | 4:00-3:30] 到达大符点位，关闭 scan mode，准备请求大能量机关"/>
-                  <AlwaysSuccess/>
+                  <ReactiveSequence name="Phase5_前往大符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="large_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
-                  <PrintNode message="[Phase 5 | 4:00-3:30] 大能量机关流程结束"/>
+                  <PrintNode message="[Phase 5 | 4:00-3:30] 已到达大符点位，原地等待阶段切换"/>
+                  <ReactiveSequence name="Phase5_等待阶段切换并维持进攻姿态">
+                    <Action ID="MaintainSentryPosture" mode="1"/>
+                    <KeepRunningUntilFailure>
+                      <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="210"/>
+                    </KeepRunningUntilFailure>
+                  </ReactiveSequence>
                 </Sequence>
                 <Sequence name="中期_堡垒_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
@@ -285,47 +314,41 @@
                   <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
                   <GoalSelector goal_name="fortress" goal="{goal}"/>
                   <Fallback name="Phase6_堡垒驻守维持">
-                    <Sequence name="Phase6_已在堡垒驻守半径内">
-                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_distance_threshold}"/>
-                      <Fallback name="Phase6_驻守姿态请求">
-                        <CheckCondition key_name="current_posture" comparison="eq" threshold="1"/>
-                        <Sequence>
-                          <AlwaysSuccess/>
-                          <Wait wait_duration="0.2"/>
-                        </Sequence>
-                        <Wait wait_duration="0.5"/>
-                      </Fallback>
+                    <ReactiveSequence name="Phase6_已在堡垒驻守半径内">
+                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_exit_distance_threshold}"/>
+                      <Action ID="MaintainSentryPosture" mode="1"/>
                       <Wait wait_duration="0.5"/>
-                    </Sequence>
+                    </ReactiveSequence>
                     <Sequence name="Phase6_回堡垒点位">
                       <PrintNode message="[Phase 6 | 3:30-2:45] 前往堡垒点位并进入驻守"/>
-                      <Fallback name="Phase6_移动姿态请求">
-                        <CheckCondition key_name="current_posture" comparison="eq" threshold="3"/>
-                        <Sequence>
-                          <AlwaysSuccess/>
-                          <Wait wait_duration="0.2"/>
-                        </Sequence>
-                        <Wait wait_duration="0.5"/>
-                      </Fallback>
-                      <ReliableNavigateToPose goal="{goal}" goal_name="fortress" reach_threshold="{uc_fortress_hold_distance_threshold}" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                      <ReactiveSequence name="Phase6_回堡垒并维持移动姿态">
+                        <Action ID="MaintainSentryPosture" mode="3"/>
+                        <ReliableNavigateToPose goal="{goal}" goal_name="fortress" reach_threshold="{uc_fortress_hold_distance_threshold}" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                      </ReactiveSequence>
                     </Sequence>
                   </Fallback>
                 </Sequence>
                 <Sequence name="中期_大符_Phase7">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="135"/>
                   <Fallback name="Phase7_大符任务允许">
-                    <AlwaysSuccess/>
+                    <CheckCondition key_name="large_rune_status" comparison="neq" threshold="1"/>
                   </Fallback>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-                  <PrintNode message="[Phase 7 | 2:45-2:15] 再次前往大符点位，尝试激活大能量机关"/>
-                  <AlwaysSuccess/>
+                  <PrintNode message="[Phase 7 | 2:45-2:15] 再次前往大符点位，到点即视为完成"/>
                   <GoalSelector goal_name="large_rune_point" goal="{goal}"/>
-                  <ReliableNavigateToPose goal="{goal}" goal_name="large_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
-                  <PrintNode message="[Phase 7 | 2:45-2:15] 到达大符点位，关闭 scan mode，准备请求大能量机关"/>
-                  <AlwaysSuccess/>
+                  <ReactiveSequence name="Phase7_前往大符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="large_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
-                  <PrintNode message="[Phase 7 | 2:45-2:15] 大能量机关流程结束"/>
+                  <PrintNode message="[Phase 7 | 2:45-2:15] 已到达大符点位，原地等待阶段切换"/>
+                  <ReactiveSequence name="Phase7_等待阶段切换并维持进攻姿态">
+                    <Action ID="MaintainSentryPosture" mode="1"/>
+                    <KeepRunningUntilFailure>
+                      <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="135"/>
+                    </KeepRunningUntilFailure>
+                  </ReactiveSequence>
                 </Sequence>
                 <Sequence name="后期_堡垒_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
@@ -334,29 +357,17 @@
                   <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
                   <GoalSelector goal_name="fortress" goal="{goal}"/>
                   <Fallback name="Phase8_堡垒驻守维持">
-                    <Sequence name="Phase8_已在堡垒驻守半径内">
-                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_distance_threshold}"/>
-                      <Fallback name="Phase8_驻守姿态请求">
-                        <CheckCondition key_name="current_posture" comparison="eq" threshold="1"/>
-                        <Sequence>
-                          <AlwaysSuccess/>
-                          <Wait wait_duration="0.2"/>
-                        </Sequence>
-                        <Wait wait_duration="0.5"/>
-                      </Fallback>
+                    <ReactiveSequence name="Phase8_已在堡垒驻守半径内">
+                      <CheckGoalReached goal="{goal}" threshold="{uc_fortress_hold_exit_distance_threshold}"/>
+                      <Action ID="MaintainSentryPosture" mode="1"/>
                       <Wait wait_duration="0.5"/>
-                    </Sequence>
+                    </ReactiveSequence>
                     <Sequence name="Phase8_回堡垒点位">
                       <PrintNode message="[Phase 8 | 2:15-1:30] 后期回到堡垒点位持续驻守"/>
-                      <Fallback name="Phase8_移动姿态请求">
-                        <CheckCondition key_name="current_posture" comparison="eq" threshold="3"/>
-                        <Sequence>
-                          <AlwaysSuccess/>
-                          <Wait wait_duration="0.2"/>
-                        </Sequence>
-                        <Wait wait_duration="0.5"/>
-                      </Fallback>
-                      <ReliableNavigateToPose goal="{goal}" goal_name="fortress" reach_threshold="{uc_fortress_hold_distance_threshold}" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                      <ReactiveSequence name="Phase8_回堡垒并维持移动姿态">
+                        <Action ID="MaintainSentryPosture" mode="3"/>
+                        <ReliableNavigateToPose goal="{goal}" goal_name="fortress" reach_threshold="{uc_fortress_hold_distance_threshold}" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                      </ReactiveSequence>
                     </Sequence>
                   </Fallback>
                 </Sequence>
@@ -364,18 +375,24 @@
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="60"/>
                   <CheckCondition key_name="ally_base_hp" comparison="gte" threshold="2000"/>
                   <Fallback name="Phase9_大符任务允许">
-                    <AlwaysSuccess/>
+                    <CheckCondition key_name="large_rune_status" comparison="neq" threshold="1"/>
                   </Fallback>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="1" type="int"/>
                   <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-                  <PrintNode message="[Phase 9 | 1:30-1:00] 基地血量健康，尝试激活大能量机关"/>
-                  <AlwaysSuccess/>
+                  <PrintNode message="[Phase 9 | 1:30-1:00] 基地血量不低于2000，前往大符点位到点即可"/>
                   <GoalSelector goal_name="large_rune_point" goal="{goal}"/>
-                  <ReliableNavigateToPose goal="{goal}" goal_name="large_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
-                  <PrintNode message="[Phase 9 | 1:30-1:00] 到达大符点位，关闭 scan mode，准备请求大能量机关"/>
-                  <AlwaysSuccess/>
+                  <ReactiveSequence name="Phase9_前往大符并维持移动姿态">
+                    <Action ID="MaintainSentryPosture" mode="3"/>
+                    <ReliableNavigateToPose goal="{goal}" goal_name="large_rune_point" reach_threshold="0.10" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                  </ReactiveSequence>
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
-                  <PrintNode message="[Phase 9 | 1:30-1:00] 大能量机关流程结束"/>
+                  <PrintNode message="[Phase 9 | 1:30-1:00] 已到达大符点位，原地等待阶段切换"/>
+                  <ReactiveSequence name="Phase9_等待阶段切换并维持进攻姿态">
+                    <Action ID="MaintainSentryPosture" mode="1"/>
+                    <KeepRunningUntilFailure>
+                      <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="60"/>
+                    </KeepRunningUntilFailure>
+                  </ReactiveSequence>
                 </Sequence>
                 <Sequence name="后期_守家_Phase10">
                   <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
@@ -383,24 +400,20 @@
                   <PrintNode message="[Phase 10 | 1:00-0:00] 后期，守护基地" throttle_ms="10000"/>
                   <GoalSelector goal_name="base_defense_point" goal="{goal}"/>
                   <Fallback name="Phase10_守家维持">
-                    <Sequence name="Phase10_已在守家点位半径内">
+                    <ReactiveSequence name="Phase10_已在守家点位半径内">
                       <CheckGoalReached goal="{goal}" threshold="0.25"/>
-                      <Fallback name="Phase10_若已防御则跳过">
-                        <CheckCondition key_name="current_posture" comparison="eq" threshold="2"/>
-                        <AlwaysSuccess/>
-                      </Fallback>
+                      <Action ID="MaintainSentryPosture" mode="2"/>
                       <Wait wait_duration="0.5"/>
-                    </Sequence>
+                    </ReactiveSequence>
                     <Sequence name="Phase10_回守家点位">
-                      <Fallback name="Phase10_若已移动则跳过">
-                        <CheckCondition key_name="current_posture" comparison="eq" threshold="3"/>
-                        <AlwaysSuccess/>
-                      </Fallback>
                       <RetryUntilSuccessful num_attempts="100">
-                        <Sequence name="Phase10_回守家直到进驻守半径">
-                          <ReliableNavigateToPose goal="{goal}" goal_name="base_defense_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
-                          <CheckGoalReached goal="{goal}" threshold="0.25"/>
-                        </Sequence>
+                        <ReactiveSequence name="Phase10_回守家直到进驻守半径">
+                          <Action ID="MaintainSentryPosture" mode="3"/>
+                          <Sequence name="Phase10_导航并检查到点">
+                            <ReliableNavigateToPose goal="{goal}" goal_name="base_defense_point" reach_threshold="0.25" resend_interval="0.30" response_timeout="0.80" result_retry_delay="0.30"/>
+                            <CheckGoalReached goal="{goal}" threshold="0.25"/>
+                          </Sequence>
+                        </ReactiveSequence>
                       </RetryUntilSuccessful>
                     </Sequence>
                   </Fallback>
