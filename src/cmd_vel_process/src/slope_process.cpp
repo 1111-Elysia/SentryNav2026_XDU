@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
+#include "sentry_msgs/msg/vw.hpp"
 #include "tf2/LinearMath/Vector3.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
@@ -39,6 +40,11 @@ public:
     declare_parameter<std::string>("input_cmd_topic", "/cmd_vel");
     declare_parameter<std::string>("output_cmd_topic", "/cmd_vel_good");
     declare_parameter<std::string>("imu_topic", "/livox/imu");
+
+    // 当检测到坡度时，同时发布 vw（sentry_msgs/msg/Vw）
+    declare_parameter<std::string>("vw_topic", "/vw_slope");
+    declare_parameter<double>("uphill_vw", 0.0);
+
     declare_parameter<double>("uphill_speed", 0.2);
 
     declare_parameter<double>("slope_threshold_deg", 8.0);
@@ -56,7 +62,9 @@ public:
     input_cmd_topic_ = get_parameter("input_cmd_topic").as_string();
     output_cmd_topic_ = get_parameter("output_cmd_topic").as_string();
     imu_topic_ = get_parameter("imu_topic").as_string();
+    vw_topic_ = get_parameter("vw_topic").as_string();
 
+    uphill_vw_ = get_parameter("uphill_vw").as_double();
     uphill_speed_ = get_parameter("uphill_speed").as_double();
     slope_threshold_deg_ = get_parameter("slope_threshold_deg").as_double();
     const int64_t init_samples = get_parameter("init_sample_count").as_int();
@@ -80,6 +88,10 @@ public:
       std::bind(&SlopeProcessNode::onImu, this, std::placeholders::_1));
 
     cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(output_cmd_topic_, 10);
+
+    if (!vw_topic_.empty()) {
+      vw_pub_ = create_publisher<sentry_msgs::msg::Vw>(vw_topic_, 10);
+    }
 
     const auto period = std::chrono::duration<double>(1.0 / publish_rate_);
     timer_ = create_wall_timer(
@@ -210,12 +222,28 @@ private:
       cmd_out = last_cmd_;
     }
 
-    if (gravity_inited_ && slope_detected_) {
+    const bool uphill_active = gravity_inited_ && slope_detected_;
+    if (uphill_active) {
       cmd_out.linear.x += uphill_speed_ * uphill_dir_x_;
       cmd_out.linear.y += uphill_speed_ * uphill_dir_y_;
     }
 
     cmd_pub_->publish(cmd_out);
+
+    // 上坡辅助生效时，同步发布 vw；退出上坡时发布一次 0 清零
+    if (vw_pub_) {
+      if (uphill_active) {
+        sentry_msgs::msg::Vw vw_msg;
+        vw_msg.vw = static_cast<float>(uphill_vw_);
+        vw_pub_->publish(vw_msg);
+        vw_nonzero_published_ = (std::abs(uphill_vw_) > 1e-6);
+      } else if (vw_nonzero_published_) {
+        sentry_msgs::msg::Vw vw_msg;
+        vw_msg.vw = 0.0f;
+        vw_pub_->publish(vw_msg);
+        vw_nonzero_published_ = false;
+      }
+    }
   }
 
 private:
@@ -223,9 +251,11 @@ private:
   std::string input_cmd_topic_;
   std::string output_cmd_topic_;
   std::string imu_topic_;
+  std::string vw_topic_;
   std::string base_frame_;
 
   double uphill_speed_ = 0.2;
+  double uphill_vw_ = 0.0;
   double slope_threshold_deg_ = 8.0;
   int init_sample_count_ = 200;
 
@@ -240,6 +270,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   // TF
@@ -262,6 +293,8 @@ private:
   bool slope_detected_ = false;
   double uphill_dir_x_ = 0.0;
   double uphill_dir_y_ = 0.0;
+
+  bool vw_nonzero_published_ = false;
 };
 
 int main(int argc, char ** argv)
