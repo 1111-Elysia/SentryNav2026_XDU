@@ -80,6 +80,11 @@ sequential_nodes:
   #   cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
   #   wait_after: 0
 
+  - label: CmdVel-Process
+    type: execute
+    cmd: ["ros2", "launch", "cmd_vel_process", "cmd_vel_process.launch.py"]
+    wait_after: 0
+
   - label: Can-Comm
     type: execute
     cmd: ["ros2", "launch", "can_comm", "can_comm.launch.py"]
@@ -89,7 +94,7 @@ sequential_nodes:
     type: execute
     cmd: [
       "ros2", "launch", "sentry_navigation", "navigation_launch.py",
-      "map:=/home/nuc/Desktop/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
+      "map:=/home/pgd/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
     ]
     wait_after: 0
 
