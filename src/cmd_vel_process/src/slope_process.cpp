@@ -52,7 +52,16 @@ public:
 
     declare_parameter<double>("uphill_speed", 0.2);
 
+    // 进入/退出坡度阈值（带回差，避免在阈值附近抖动）
+    declare_parameter<double>("slope_enter_threshold_deg", 8.0);
+    declare_parameter<double>("slope_exit_threshold_deg", 6.0);
+    // 兼容旧参数名（不建议继续使用）
     declare_parameter<double>("slope_threshold_deg", 8.0);
+
+    // 坡度进入/退出确认计数（IMU 回调连续满足条件才切换状态）
+    declare_parameter<int>("slope_on_confirm", 5);
+    declare_parameter<int>("slope_off_confirm", 15);
+
     declare_parameter<int>("init_sample_count", 200);
 
     declare_parameter<double>("publish_rate", 50.0);
@@ -64,6 +73,9 @@ public:
     declare_parameter<double>("acc_lpf_alpha", 0.1);
     declare_parameter<double>("min_xy_acc_norm", 0.15);
 
+    // 上坡方向低通，避免方向在两个象限间来回跳
+    declare_parameter<double>("uphill_dir_lpf_alpha", 0.2);
+
     input_cmd_topic_ = get_parameter("input_cmd_topic").as_string();
     output_cmd_topic_ = get_parameter("output_cmd_topic").as_string();
     imu_topic_ = get_parameter("imu_topic").as_string();
@@ -72,7 +84,35 @@ public:
 
     uphill_vw_ = get_parameter("uphill_vw").as_double();
     uphill_speed_ = get_parameter("uphill_speed").as_double();
-    slope_threshold_deg_ = get_parameter("slope_threshold_deg").as_double();
+
+    slope_enter_threshold_deg_ = get_parameter("slope_enter_threshold_deg").as_double();
+    slope_exit_threshold_deg_ = get_parameter("slope_exit_threshold_deg").as_double();
+
+    // 兼容旧参数 slope_threshold_deg：如果新参数没被改过但旧参数被改过，则用旧参数推导
+    {
+      constexpr double kDefaultEnter = 8.0;
+      constexpr double kDefaultExit = 6.0;
+      constexpr double kDefaultLegacy = 8.0;
+      const double legacy = get_parameter("slope_threshold_deg").as_double();
+      const bool new_is_default = (std::abs(slope_enter_threshold_deg_ - kDefaultEnter) < 1e-9) &&
+        (std::abs(slope_exit_threshold_deg_ - kDefaultExit) < 1e-9);
+      const bool legacy_changed = (std::abs(legacy - kDefaultLegacy) >= 1e-9);
+      if (new_is_default && legacy_changed) {
+        slope_enter_threshold_deg_ = legacy;
+        slope_exit_threshold_deg_ = legacy - 2.0;
+      }
+    }
+
+    // 确保回差方向正确
+    if (slope_exit_threshold_deg_ > slope_enter_threshold_deg_) {
+      std::swap(slope_exit_threshold_deg_, slope_enter_threshold_deg_);
+    }
+
+    const int64_t on_c = get_parameter("slope_on_confirm").as_int();
+    const int64_t off_c = get_parameter("slope_off_confirm").as_int();
+    slope_on_confirm_ = static_cast<int>(std::max<int64_t>(1, on_c));
+    slope_off_confirm_ = static_cast<int>(std::max<int64_t>(1, off_c));
+
     const int64_t init_samples = get_parameter("init_sample_count").as_int();
     init_sample_count_ = static_cast<int>(std::max<int64_t>(1, init_samples));
 
@@ -84,6 +124,7 @@ public:
 
     acc_lpf_alpha_ = clamp(get_parameter("acc_lpf_alpha").as_double(), 0.0, 1.0);
     min_xy_acc_norm_ = std::max(0.0, get_parameter("min_xy_acc_norm").as_double());
+    uphill_dir_lpf_alpha_ = clamp(get_parameter("uphill_dir_lpf_alpha").as_double(), 0.0, 1.0);
 
     cmd_sub_ = create_subscription<geometry_msgs::msg::Twist>(
       input_cmd_topic_, 10,
@@ -207,22 +248,66 @@ private:
 
     // Uphill direction in base frame: use xy projection of current gravity direction.
     const double xy_norm = std::hypot(g_dir.x(), g_dir.y());
-    bool slope_now = (tilt_deg >= slope_threshold_deg_) && (xy_norm >= min_xy_acc_norm_);
 
-    if (slope_now) {
-      uphill_dir_x_ = g_dir.x() / xy_norm;
-      uphill_dir_y_ = g_dir.y() / xy_norm;
+    const bool raw_slope = (tilt_deg >= slope_enter_threshold_deg_) && (xy_norm >= min_xy_acc_norm_);
+    const bool raw_flat = (tilt_deg <= slope_exit_threshold_deg_) || (xy_norm < min_xy_acc_norm_);
+
+    // 方向只在“认为在坡上/可能在坡上”时更新，避免平地噪声把方向翻来覆去
+    if (raw_slope && xy_norm > 1e-6) {
+      const double ux = g_dir.x() / xy_norm;
+      const double uy = g_dir.y() / xy_norm;
+
+      if (!have_uphill_dir_) {
+        uphill_dir_x_ = ux;
+        uphill_dir_y_ = uy;
+        have_uphill_dir_ = true;
+      } else {
+        // 简单低通平滑方向
+        uphill_dir_x_ = uphill_dir_x_ * (1.0 - uphill_dir_lpf_alpha_) + ux * uphill_dir_lpf_alpha_;
+        uphill_dir_y_ = uphill_dir_y_ * (1.0 - uphill_dir_lpf_alpha_) + uy * uphill_dir_lpf_alpha_;
+        const double n = std::hypot(uphill_dir_x_, uphill_dir_y_);
+        if (n > 1e-6) {
+          uphill_dir_x_ /= n;
+          uphill_dir_y_ /= n;
+        }
+      }
     }
 
-    if (slope_now != slope_detected_) {
+    // 状态去抖：连续满足条件才切换，避免退出坡后在阈值附近来回触发
+    bool slope_next = slope_detected_;
+    if (!slope_detected_) {
+      if (raw_slope) {
+        slope_on_count_++;
+      } else {
+        slope_on_count_ = 0;
+      }
+      if (slope_on_count_ >= slope_on_confirm_) {
+        slope_next = true;
+        slope_on_count_ = 0;
+        slope_off_count_ = 0;
+      }
+    } else {
+      if (raw_flat) {
+        slope_off_count_++;
+      } else {
+        slope_off_count_ = 0;
+      }
+      if (slope_off_count_ >= slope_off_confirm_) {
+        slope_next = false;
+        slope_on_count_ = 0;
+        slope_off_count_ = 0;
+      }
+    }
+
+    if (slope_next != slope_detected_) {
       if (scan_mode_pub_) {
         sentry_msgs::msg::ScanMode m;
         // 有坡度 -> false；无坡度 -> true
-        m.scan_mod_type = !slope_now;
+        m.scan_mod_type = !slope_next;
         scan_mode_pub_->publish(m);
       }
 
-      slope_detected_ = slope_now;
+      slope_detected_ = slope_next;
       RCLCPP_INFO(get_logger(),
         "slope_detected=%s tilt=%.2fdeg uphill_dir=[%.2f, %.2f]", 
         slope_detected_ ? "true" : "false", tilt_deg, uphill_dir_x_, uphill_dir_y_);
@@ -274,7 +359,12 @@ private:
 
   double uphill_speed_ = 0.2;
   double uphill_vw_ = 0.0;
-  double slope_threshold_deg_ = 8.0;
+
+  double slope_enter_threshold_deg_ = 8.0;
+  double slope_exit_threshold_deg_ = 6.0;
+  int slope_on_confirm_ = 5;
+  int slope_off_confirm_ = 15;
+
   int init_sample_count_ = 200;
 
   double publish_rate_ = 50.0;
@@ -283,6 +373,7 @@ private:
   bool use_tf_ = true;
   double acc_lpf_alpha_ = 0.1;
   double min_xy_acc_norm_ = 0.15;
+  double uphill_dir_lpf_alpha_ = 0.2;
 
   // IO
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
@@ -310,6 +401,10 @@ private:
   int init_count_ = 0;
 
   bool slope_detected_ = false;
+  int slope_on_count_ = 0;
+  int slope_off_count_ = 0;
+
+  bool have_uphill_dir_ = false;
   double uphill_dir_x_ = 0.0;
   double uphill_dir_y_ = 0.0;
 
