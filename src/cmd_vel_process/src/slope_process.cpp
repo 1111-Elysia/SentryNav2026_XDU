@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
+#include "sentry_msgs/msg/scan_mode.hpp"
 #include "sentry_msgs/msg/vw.hpp"
 #include "tf2/LinearMath/Vector3.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -45,6 +46,10 @@ public:
     declare_parameter<std::string>("vw_topic", "/vw_slope");
     declare_parameter<double>("uphill_vw", 0.0);
 
+    // 坡度触发时，向 scan_mod_type 发送一次 false；退出坡度后再发送一次 true
+    // 话题类型：sentry_msgs/msg/ScanMode（字段名 scan_mod_type）
+    declare_parameter<std::string>("scan_mode_topic", "/scan_mod_type");
+
     declare_parameter<double>("uphill_speed", 0.2);
 
     declare_parameter<double>("slope_threshold_deg", 8.0);
@@ -63,6 +68,7 @@ public:
     output_cmd_topic_ = get_parameter("output_cmd_topic").as_string();
     imu_topic_ = get_parameter("imu_topic").as_string();
     vw_topic_ = get_parameter("vw_topic").as_string();
+    scan_mode_topic_ = get_parameter("scan_mode_topic").as_string();
 
     uphill_vw_ = get_parameter("uphill_vw").as_double();
     uphill_speed_ = get_parameter("uphill_speed").as_double();
@@ -91,6 +97,10 @@ public:
 
     if (!vw_topic_.empty()) {
       vw_pub_ = create_publisher<sentry_msgs::msg::Vw>(vw_topic_, 10);
+    }
+
+    if (!scan_mode_topic_.empty()) {
+      scan_mode_pub_ = create_publisher<sentry_msgs::msg::ScanMode>(scan_mode_topic_, 10);
     }
 
     const auto period = std::chrono::duration<double>(1.0 / publish_rate_);
@@ -205,6 +215,13 @@ private:
     }
 
     if (slope_now != slope_detected_) {
+      if (scan_mode_pub_) {
+        sentry_msgs::msg::ScanMode m;
+        // 有坡度 -> false；无坡度 -> true
+        m.scan_mod_type = !slope_now;
+        scan_mode_pub_->publish(m);
+      }
+
       slope_detected_ = slope_now;
       RCLCPP_INFO(get_logger(),
         "slope_detected=%s tilt=%.2fdeg uphill_dir=[%.2f, %.2f]", 
@@ -252,6 +269,7 @@ private:
   std::string output_cmd_topic_;
   std::string imu_topic_;
   std::string vw_topic_;
+  std::string scan_mode_topic_;
   std::string base_frame_;
 
   double uphill_speed_ = 0.2;
@@ -271,6 +289,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
+  rclcpp::Publisher<sentry_msgs::msg::ScanMode>::SharedPtr scan_mode_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   // TF

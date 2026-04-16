@@ -6,7 +6,8 @@ slope_process:
     input_cmd_topic: "/cmd_vel"        # 输入速度话题：接收上游（如导航）输出的原始速度
     output_cmd_topic: "/cmd_vel_good"  # 输出速度话题：发布处理后的速度（供底盘/下游使用）
     imu_topic: "/livox/imu"            # IMU 话题：用于检测坡度与上坡方向
-    vw_topic: "/vw"              # VW 输出话题：坡度辅助生效时同步发布 sentry_msgs/msg/Vw（避免与其它 vw 发布者冲突可改名）
+    vw_topic: "/vw"                     # VW 输出话题：坡度辅助生效时同步发布 sentry_msgs/msg/Vw（避免与其它 vw 发布者冲突可改名）
+    scan_mode_topic: "/scan_mod_type"   # 扫描模式话题：有坡度时发送一次 false；无坡度后发送一次 true（sentry_msgs/msg/ScanMode）
 
     # =============================
     # 上坡辅助（Uphill Assist）
