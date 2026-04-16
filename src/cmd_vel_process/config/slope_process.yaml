@@ -5,21 +5,31 @@ slope_process:
     # =============================
     input_cmd_topic: "/cmd_vel"        # 输入速度话题：接收上游（如导航）输出的原始速度
     output_cmd_topic: "/cmd_vel_good"  # 输出速度话题：发布处理后的速度（供底盘/下游使用）
-    imu_topic: "/livox/imu"            # IMU 话题：用于检测坡度与上坡方向
-    vw_topic: "/vw"                     # VW 输出话题：坡度辅助生效时同步发布 sentry_msgs/msg/Vw（避免与其它 vw 发布者冲突可改名）
-    scan_mode_topic: "/scan_mod_type"   # 扫描模式话题：有坡度时发送一次 false；无坡度后发送一次 true（sentry_msgs/msg/ScanMode）
+    vw_topic: "/vw"                    # VW 输出话题：坡度辅助生效时同步发布 sentry_msgs/msg/Vw（避免与其它 vw 发布者冲突可改名）
+    scan_mode_topic: "/scan_mod_type"  # 扫描模式话题：有坡度时发送一次 false；无坡度后发送一次 true（sentry_msgs/msg/ScanMode）
+
+    # =============================
+    # TF / 坐标系（Frames）
+    # =============================
+    map_frame: "map"                   # 地图坐标系（世界坐标系，Z 轴向上）
+    base_frame: "base_link"            # 底盘坐标系
+    use_tf: true                        # 是否启用 TF 读取坡度（本节点不再使用 IMU）
+    tf_timeout_sec: 0.05                # TF 查询超时（秒）
 
     # =============================
     # 上坡辅助（Uphill Assist）
     # =============================
-    uphill_speed: 0.2                   # 检测到坡度时，沿上坡方向叠加的速度大小（m/s）
-    uphill_vw: 0.0                       # 检测到坡度时，同时发布的 vw 值（单位同 sentry_msgs/Vw；默认 0 表示不额外影响）
+    uphill_speed: 2.0                   # 检测到坡度时，沿上坡方向叠加的速度大小（m/s）
+    uphill_vw: 0.0                      # 检测到坡度时，同时发布的 vw 值（单位同 sentry_msgs/Vw；默认 0 表示不额外影响）
 
     # =============================
     # 坡度检测（Slope Detection）
     # =============================
-    slope_threshold_deg: 8.0            # 坡度触发阈值（度）：重力方向相对初始化重力方向的倾角超过该值认为“在坡上”
-    init_sample_count: 200              # 重力方向初始化采样数：启动后累计多少帧 IMU 来估计静止重力方向
+    slope_enter_threshold_deg: 8.0      # 进入坡度阈值（度）
+    slope_exit_threshold_deg: 6.0       # 退出坡度阈值（度，需小于 enter，形成回差）
+    slope_on_confirm: 5                 # 连续满足进入条件多少次才认为“上坡”
+    slope_off_confirm: 15               # 连续满足退出条件多少次才认为“离开坡”
+    init_sample_count: 200              # 启动后用 TF 采样多少帧初始化“平地参考上方向”
 
     # =============================
     # 时序与超时（Timing）
@@ -28,13 +38,10 @@ slope_process:
     cmd_timeout_sec: 0.2                # 输入速度超时（秒）：超过该时间未收到 /cmd_vel 则输出速度置零（仍可叠加上坡辅助）
 
     # =============================
-    # TF / 坐标系（Frames）
-    # =============================
-    use_tf: true                        # 是否使用 TF 将 IMU 加速度变换到 base_frame（建议 true，确保上坡方向在底盘坐标系下）
-    base_frame: "base_link"            # 基准坐标系：上坡方向输出所在坐标系（通常为 base_link）
-
-    # =============================
     # 滤波与鲁棒性（Filtering）
     # =============================
-    acc_lpf_alpha: 0.1                  # 加速度低通滤波系数（0~1）：越大越灵敏、越小越平滑
-    min_xy_acc_norm: 0.15               # XY 投影最小阈值：重力方向在 XY 平面投影太小（接近平地）时不判定上坡方向（避免噪声抖动）
+    up_lpf_alpha: 0.2                   # TF 上方向低通滤波系数（0~1）：越大越灵敏、越小越平滑
+    min_xy_up_norm: 0.15                # XY 投影最小阈值：接近平地时不更新上坡方向（避免噪声抖动）
+    uphill_dir_lpf_alpha: 0.2           # 上坡方向自身低通
+
+    # 兼容旧参数：slope_threshold_deg、min_xy_acc_norm（如需可保留在此文件中）

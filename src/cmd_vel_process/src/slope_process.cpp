@@ -5,13 +5,11 @@
 #include <string>
 
 #include "geometry_msgs/msg/twist.hpp"
-#include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/imu.hpp"
 #include "sentry_msgs/msg/scan_mode.hpp"
 #include "sentry_msgs/msg/vw.hpp"
+#include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Vector3.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 
@@ -40,7 +38,9 @@ public:
   {
     declare_parameter<std::string>("input_cmd_topic", "/cmd_vel");
     declare_parameter<std::string>("output_cmd_topic", "/cmd_vel_good");
-    declare_parameter<std::string>("imu_topic", "/livox/imu");
+
+    // 从 TF 读取 map -> base_frame 来计算坡度（完全不依赖 IMU）
+    declare_parameter<std::string>("map_frame", "map");
 
     // 当检测到坡度时，同时发布 vw（sentry_msgs/msg/Vw）
     declare_parameter<std::string>("vw_topic", "/vw_slope");
@@ -58,7 +58,7 @@ public:
     // 兼容旧参数名（不建议继续使用）
     declare_parameter<double>("slope_threshold_deg", 8.0);
 
-    // 坡度进入/退出确认计数（IMU 回调连续满足条件才切换状态）
+    // 坡度进入/退出确认计数（连续满足条件才切换状态）
     declare_parameter<int>("slope_on_confirm", 5);
     declare_parameter<int>("slope_off_confirm", 15);
 
@@ -70,7 +70,15 @@ public:
     declare_parameter<bool>("use_tf", true);
     declare_parameter<std::string>("base_frame", "base_link");
 
-    declare_parameter<double>("acc_lpf_alpha", 0.1);
+    // TF 查询超时（秒）
+    declare_parameter<double>("tf_timeout_sec", 0.05);
+
+    // TF 上方向（map 的 +Z 在 base_frame 下的方向）低通
+    declare_parameter<double>("up_lpf_alpha", 0.2);
+
+    // XY 投影最小阈值：接近平地时不更新上坡方向（避免噪声抖动）
+    declare_parameter<double>("min_xy_up_norm", 0.15);
+    // 兼容旧参数名（不建议继续使用）
     declare_parameter<double>("min_xy_acc_norm", 0.15);
 
     // 上坡方向低通，避免方向在两个象限间来回跳
@@ -78,7 +86,7 @@ public:
 
     input_cmd_topic_ = get_parameter("input_cmd_topic").as_string();
     output_cmd_topic_ = get_parameter("output_cmd_topic").as_string();
-    imu_topic_ = get_parameter("imu_topic").as_string();
+    map_frame_ = get_parameter("map_frame").as_string();
     vw_topic_ = get_parameter("vw_topic").as_string();
     scan_mode_topic_ = get_parameter("scan_mode_topic").as_string();
 
@@ -121,18 +129,27 @@ public:
 
     use_tf_ = get_parameter("use_tf").as_bool();
     base_frame_ = get_parameter("base_frame").as_string();
+    tf_timeout_sec_ = std::max(0.0, get_parameter("tf_timeout_sec").as_double());
 
-    acc_lpf_alpha_ = clamp(get_parameter("acc_lpf_alpha").as_double(), 0.0, 1.0);
-    min_xy_acc_norm_ = std::max(0.0, get_parameter("min_xy_acc_norm").as_double());
+    up_lpf_alpha_ = clamp(get_parameter("up_lpf_alpha").as_double(), 0.0, 1.0);
+    min_xy_up_norm_ = std::max(0.0, get_parameter("min_xy_up_norm").as_double());
+    // 兼容旧参数 min_xy_acc_norm
+    {
+      constexpr double kDefaultNew = 0.15;
+      constexpr double kDefaultLegacy = 0.15;
+      const double legacy = get_parameter("min_xy_acc_norm").as_double();
+      const bool new_is_default = (std::abs(min_xy_up_norm_ - kDefaultNew) < 1e-9);
+      const bool legacy_changed = (std::abs(legacy - kDefaultLegacy) >= 1e-9);
+      if (new_is_default && legacy_changed) {
+        min_xy_up_norm_ = legacy;
+      }
+    }
+
     uphill_dir_lpf_alpha_ = clamp(get_parameter("uphill_dir_lpf_alpha").as_double(), 0.0, 1.0);
 
     cmd_sub_ = create_subscription<geometry_msgs::msg::Twist>(
       input_cmd_topic_, 10,
       std::bind(&SlopeProcessNode::onCmdVel, this, std::placeholders::_1));
-
-    imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
-      imu_topic_, rclcpp::SensorDataQoS(),
-      std::bind(&SlopeProcessNode::onImu, this, std::placeholders::_1));
 
     cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(output_cmd_topic_, 10);
 
@@ -150,8 +167,8 @@ public:
       std::bind(&SlopeProcessNode::onTimer, this));
 
     RCLCPP_INFO(get_logger(),
-      "slope_process started | cmd_in=%s cmd_out=%s imu=%s uphill_speed=%.3f",
-      input_cmd_topic_.c_str(), output_cmd_topic_.c_str(), imu_topic_.c_str(), uphill_speed_);
+      "slope_process started | cmd_in=%s cmd_out=%s map=%s base=%s uphill_speed=%.3f",
+      input_cmd_topic_.c_str(), output_cmd_topic_.c_str(), map_frame_.c_str(), base_frame_.c_str(), uphill_speed_);
   }
 
 private:
@@ -162,64 +179,60 @@ private:
     have_cmd_ = true;
   }
 
-  bool toBaseFrame(const sensor_msgs::msg::Imu & imu_msg, tf2::Vector3 & acc_out)
+  bool getUpDirFromTf(tf2::Vector3 & up_dir_out)
   {
-    const auto & a = imu_msg.linear_acceleration;
-    geometry_msgs::msg::Vector3Stamped a_in;
-    a_in.header = imu_msg.header;
-    a_in.vector.x = a.x;
-    a_in.vector.y = a.y;
-    a_in.vector.z = a.z;
-
     if (!use_tf_) {
-      acc_out = tf2::Vector3(a.x, a.y, a.z);
-      return true;
-    }
-
-    const std::string src_frame = imu_msg.header.frame_id;
-    if (src_frame.empty() || src_frame == base_frame_) {
-      acc_out = tf2::Vector3(a.x, a.y, a.z);
-      return true;
+      return false;
     }
 
     try {
-      // Use the latest transform if timestamps are not valid.
-      const rclcpp::Time stamp = imu_msg.header.stamp.sec == 0 && imu_msg.header.stamp.nanosec == 0
-        ? rclcpp::Time(0, 0, get_clock()->get_clock_type())
-        : rclcpp::Time(imu_msg.header.stamp, get_clock()->get_clock_type());
+      const rclcpp::Time stamp(0, 0, get_clock()->get_clock_type());
+      auto tf = tf_buffer_.lookupTransform(
+        map_frame_, base_frame_, stamp, rclcpp::Duration::from_seconds(tf_timeout_sec_));
 
-      auto tf = tf_buffer_.lookupTransform(base_frame_, src_frame, stamp, rclcpp::Duration::from_seconds(0.05));
-      geometry_msgs::msg::Vector3Stamped a_out;
-      tf2::doTransform(a_in, a_out, tf);
-      acc_out = tf2::Vector3(a_out.vector.x, a_out.vector.y, a_out.vector.z);
+      const auto & r = tf.transform.rotation;
+      tf2::Quaternion q(r.x, r.y, r.z, r.w);
+      if (q.length2() < 1e-12) {
+        return false;
+      }
+      q.normalize();
+
+      const tf2::Vector3 up_map(0.0, 0.0, 1.0);
+      tf2::Vector3 up_base = tf2::quatRotate(q.inverse(), up_map);
+
+      const double n = up_base.length();
+      if (n < 1e-6) {
+        return false;
+      }
+
+      up_dir_out = up_base / n;
       return true;
     } catch (const tf2::TransformException & ex) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-        "TF failed (%s -> %s): %s", src_frame.c_str(), base_frame_.c_str(), ex.what());
+        "TF failed (%s -> %s): %s", base_frame_.c_str(), map_frame_.c_str(), ex.what());
       return false;
     }
   }
 
-  void onImu(const sensor_msgs::msg::Imu::SharedPtr msg)
+  void updateSlopeStateFromTf()
   {
-    tf2::Vector3 acc;
-    if (!toBaseFrame(*msg, acc)) {
+    tf2::Vector3 up_dir;
+    if (!getUpDirFromTf(up_dir)) {
       return;
     }
 
-    if (!have_filtered_acc_) {
-      filtered_acc_ = acc;
-      have_filtered_acc_ = true;
+    if (!have_filtered_up_) {
+      filtered_up_dir_ = up_dir;
+      have_filtered_up_ = true;
     } else {
-      filtered_acc_ = lpf(filtered_acc_, acc, acc_lpf_alpha_);
+      filtered_up_dir_ = lpf(filtered_up_dir_, up_dir, up_lpf_alpha_);
+      const double n = filtered_up_dir_.length();
+      if (n > 1e-6) {
+        filtered_up_dir_ /= n;
+      }
     }
 
-    const double norm = filtered_acc_.length();
-    if (norm < 1e-3) {
-      return;
-    }
-
-    tf2::Vector3 g_dir = filtered_acc_ / norm;
+    const tf2::Vector3 g_dir = filtered_up_dir_;
 
     if (!gravity_inited_) {
       init_sum_acc_ += g_dir;
@@ -230,27 +243,27 @@ private:
         if (n0 < 1e-3) {
           init_sum_acc_.setZero();
           init_count_ = 0;
-          RCLCPP_WARN(get_logger(), "gravity init failed (norm too small), retrying...");
+          RCLCPP_WARN(get_logger(), "up direction init failed (norm too small), retrying...");
           return;
         }
         gravity_init_dir_ /= n0;
         gravity_inited_ = true;
         RCLCPP_INFO(get_logger(),
-          "gravity direction initialized with %d samples (frame=%s)",
-          init_count_, base_frame_.c_str());
+          "up direction initialized with %d samples (map=%s base=%s)",
+          init_count_, map_frame_.c_str(), base_frame_.c_str());
       }
       return;
     }
 
-    // Tilt magnitude relative to initial gravity direction.
+    // Tilt magnitude relative to initial up direction.
     const double dot = clamp(gravity_init_dir_.dot(g_dir), -1.0, 1.0);
     const double tilt_deg = std::acos(dot) * 180.0 / M_PI;
 
-    // Uphill direction in base frame: use xy projection of current gravity direction.
+    // Uphill direction in base frame: use xy projection of current up direction.
     const double xy_norm = std::hypot(g_dir.x(), g_dir.y());
 
-    const bool raw_slope = (tilt_deg >= slope_enter_threshold_deg_) && (xy_norm >= min_xy_acc_norm_);
-    const bool raw_flat = (tilt_deg <= slope_exit_threshold_deg_) || (xy_norm < min_xy_acc_norm_);
+    const bool raw_slope = (tilt_deg >= slope_enter_threshold_deg_) && (xy_norm >= min_xy_up_norm_);
+    const bool raw_flat = (tilt_deg <= slope_exit_threshold_deg_) || (xy_norm < min_xy_up_norm_);
 
     // 方向只在“认为在坡上/可能在坡上”时更新，避免平地噪声把方向翻来覆去
     if (raw_slope && xy_norm > 1e-6) {
@@ -262,7 +275,6 @@ private:
         uphill_dir_y_ = uy;
         have_uphill_dir_ = true;
       } else {
-        // 简单低通平滑方向
         uphill_dir_x_ = uphill_dir_x_ * (1.0 - uphill_dir_lpf_alpha_) + ux * uphill_dir_lpf_alpha_;
         uphill_dir_y_ = uphill_dir_y_ * (1.0 - uphill_dir_lpf_alpha_) + uy * uphill_dir_lpf_alpha_;
         const double n = std::hypot(uphill_dir_x_, uphill_dir_y_);
@@ -302,7 +314,6 @@ private:
     if (slope_next != slope_detected_) {
       if (scan_mode_pub_) {
         sentry_msgs::msg::ScanMode m;
-        // 有坡度 -> false；无坡度 -> true
         m.scan_mod_type = !slope_next;
         scan_mode_pub_->publish(m);
       }
@@ -316,6 +327,9 @@ private:
 
   void onTimer()
   {
+    // 用 TF(map->base_frame) 更新坡度状态
+    updateSlopeStateFromTf();
+
     geometry_msgs::msg::Twist cmd_out;
 
     const auto t = now();
@@ -352,7 +366,7 @@ private:
   // Params
   std::string input_cmd_topic_;
   std::string output_cmd_topic_;
-  std::string imu_topic_;
+  std::string map_frame_;
   std::string vw_topic_;
   std::string scan_mode_topic_;
   std::string base_frame_;
@@ -371,13 +385,13 @@ private:
   double cmd_timeout_sec_ = 0.2;
 
   bool use_tf_ = true;
-  double acc_lpf_alpha_ = 0.1;
-  double min_xy_acc_norm_ = 0.15;
+  double tf_timeout_sec_ = 0.05;
+  double up_lpf_alpha_ = 0.2;
+  double min_xy_up_norm_ = 0.15;
   double uphill_dir_lpf_alpha_ = 0.2;
 
   // IO
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
   rclcpp::Publisher<sentry_msgs::msg::ScanMode>::SharedPtr scan_mode_pub_;
@@ -392,8 +406,8 @@ private:
   bool have_cmd_ = false;
   rclcpp::Time last_cmd_time_;
 
-  bool have_filtered_acc_ = false;
-  tf2::Vector3 filtered_acc_;
+  bool have_filtered_up_ = false;
+  tf2::Vector3 filtered_up_dir_{0.0, 0.0, 1.0};
 
   bool gravity_inited_ = false;
   tf2::Vector3 gravity_init_dir_{0.0, 0.0, 1.0};
