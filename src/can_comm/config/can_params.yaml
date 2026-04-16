@@ -1,7 +1,70 @@
 can_comm_node:
   ros__parameters:
-    port: "can0"          # CAN 设备端口
-    send_frequency: 500      # 发送频率 Hz
-    id_xyz: 0x180            # vx,vy,vyaw,vw 帧 CAN ID
-    id_scan: 0x190           # scan mode 帧 CAN ID
-    hurt_data_topic: /rm2_referee/hurt_data
+    # CAN 设备端口
+    port: "can0"
+
+    # 发送频率 (Hz)
+    send_frequency: 500
+
+    # CAN ID
+    id_xyz: 0x180   # vx, vy, vw, vyaw
+    id_scan: 0x190  # scan mode + armor presence + auto shoot
+
+    # topics
+    cmd_vel_topic: "/cmd_vel"
+    vw_topic: "/vw"
+    scan_mod_type_topic: "/scan_mod_type"
+    auto_shoot_type_topic: "/auto_shoot_type"
+    all_detect_topic: "/detector/armor_presence"
+    game_status_topic: "/rm_referee/game_status"
+
+    # 超时门控 (s)
+    cmd_vel_timeout_s: 0.1
+    vw_timeout_s: 0.1
+
+hurt_spin_vw_node:
+  ros__parameters:
+    # 输出给 can_comm_node 的 vw 话题
+    vw_out_topic: "/vw"
+
+    # 裁判系统受击信息
+    hurt_data_topic: "/rm_referee/hurt_data"
+
+    # 触发条件：HurtData.hp_deduction_reason == hurt_reason_value
+    hurt_reason_value: 0
+
+    # 触发后持续输出 spin_vw，持续 spin_duration_s 秒
+    spin_vw: 1.0
+    spin_duration_s: 5.0
+
+    # 定时发布频率 (Hz)
+    publish_rate_hz: 50.0
+
+vxvy_to_vw_node:
+  ros__parameters:
+    cmd_vel_topic: "/cmd_vel"
+    # 若启用该节点，通常用于替代 hurt_spin_vw_node 输出到同一通道
+    vw_topic: "/vw"
+
+vyaw_tf_yaw_controller:
+  ros__parameters:
+    cmd_vel_topic: "/cmd_vel"
+    map_frame: "map"
+    base_frame: "base_link"
+
+    # 方向相关参数使用角度制
+    yaw_tolerance_deg: 3.0
+
+    # Pose-a in map frame
+    a_x: 0.0
+    a_y: 0.0
+    a_yaw_deg: 0.0
+
+    # 旋转速度约束（绝对值）
+    min_abs_vyaw: 0.15
+    max_abs_vyaw: 1.0
+
+    # 简单比例控制增益（基于弧度误差）
+    k_p: 1.2
+
+    control_frequency: 30.0
