@@ -173,7 +173,6 @@ namespace sentry_nav_bt_test
             blackboard_->set<double>("ul_center_hold_exit_distance_threshold", 0.55);
             blackboard_->set<int>("uc_fortress_hold_active", 0);
             blackboard_->set<std::string>("uc_fortress_goal_name", "fortress");
-            blackboard_->set<double>("uc_fortress_arrive_distance_threshold", 0.10);
             blackboard_->set<double>("uc_fortress_hold_distance_threshold", 0.25);
             blackboard_->set<double>("uc_fortress_hold_exit_distance_threshold", 0.30);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
@@ -181,6 +180,9 @@ namespace sentry_nav_bt_test
             blackboard_->set<uint32_t>("rfid_status", 0U);
             blackboard_->set<uint8_t>("rfid_status_2", 0U);
             blackboard_->set<int>("rfid_ally_fortress_detected", 0);
+            blackboard_->set<int>("rfid_supply_zone_bit19_detected", 0);
+            blackboard_->set<int>("rfid_supply_zone_bit20_detected", 0);
+            blackboard_->set<int>("rfid_supply_zone_detected", 0);
 
             // 初始化 hurt_armor_id 为 -1
             blackboard_->set<int>("hurt_armor_id", -1);
@@ -391,17 +393,27 @@ namespace sentry_nav_bt_test
                     const uint32_t rfid_status = msg->rfid_status;
                     const uint8_t rfid_status_2 = msg->rfid_status_2;
                     const int ally_fortress_rfid_detected = static_cast<int>((rfid_status >> 17U) & 0x01U);
+                    const int supply_zone_bit19_detected = static_cast<int>((rfid_status >> 19U) & 0x01U);
+                    const int supply_zone_bit20_detected = static_cast<int>((rfid_status >> 20U) & 0x01U);
+                    const int supply_zone_detected =
+                        (supply_zone_bit19_detected == 1 || supply_zone_bit20_detected == 1) ? 1 : 0;
 
                     bb->set("rfid_status", rfid_status);
                     bb->set("rfid_status_2", rfid_status_2);
                     bb->set("rfid_ally_fortress_detected", ally_fortress_rfid_detected);
+                    bb->set("rfid_supply_zone_bit19_detected", supply_zone_bit19_detected);
+                    bb->set("rfid_supply_zone_bit20_detected", supply_zone_bit20_detected);
+                    bb->set("rfid_supply_zone_detected", supply_zone_detected);
 
                     RCLCPP_DEBUG(
                         node_->get_logger(),
-                        "黑板更新: rfid_status=0x%08X, rfid_status_2=0x%02X, ally_fortress_rfid(bit17)=%d",
+                        "黑板更新: rfid_status=0x%08X, rfid_status_2=0x%02X, ally_fortress_rfid(bit17)=%d, supply_zone(bit19)=%d, supply_zone(bit20)=%d, supply_zone(any)=%d",
                         static_cast<unsigned int>(rfid_status),
                         static_cast<unsigned int>(rfid_status_2),
-                        ally_fortress_rfid_detected);
+                        ally_fortress_rfid_detected,
+                        supply_zone_bit19_detected,
+                        supply_zone_bit20_detected,
+                        supply_zone_detected);
                 });
 
             // // 订阅自瞄目标信息（从自瞄系统获得）               ——还没沟通好

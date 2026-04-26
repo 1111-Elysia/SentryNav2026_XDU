@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3">
+  <BehaviorTree ID="SupplyReturn">
+    <Sequence name="回补模式">
+      <Fallback name="回补触发或保持">
+        <CheckCondition key_name="{supply_active_key}" comparison="eq" threshold="1"/>
+        <Sequence name="触发回补模式">
+          <Fallback name="回补触发">
+            <Inverter>
+              <CheckCondition key_name="current_hp" comparison="gte" threshold="{supply_low_hp_threshold}"/>
+            </Inverter>
+            <Sequence>
+              <CheckCondition key_name="current_hp" comparison="gte" threshold="{supply_low_hp_threshold}"/>
+              <CheckCondition key_name="projectile_allowance_17mm" comparison="lte" threshold="{supply_low_ammo_threshold}"/>
+            </Sequence>
+          </Fallback>
+          <Action ID="SetBlackboardValue" key="{supply_active_key}" value="1" type="int"/>
+          <PrintNode message="{supply_start_message}"/>
+        </Sequence>
+      </Fallback>
+      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="0" type="int"/>
+      <Action ID="SetBlackboardValue" key="{fortress_active_key}" value="0" type="int"/>
+      <GoalSelector goal_name="{supply_goal_name}" goal="{supply_goal}"/>
+      <Inverter>
+        <KeepRunningUntilFailure>
+          <Sequence name="回补_未补满时持续回补闭环">
+            <Inverter>
+              <Sequence name="回补已完成">
+                <CompareValues first_key="current_hp" second_key="maximum_hp" comparison="gte"/>
+                <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="{supply_ready_ammo_threshold}"/>
+              </Sequence>
+            </Inverter>
+            <ReactiveFallback name="回补_RFID保持或重发补给点">
+              <Sequence name="回补_RFID在补给区内_原地等待恢复">
+                <CheckCondition key_name="{supply_rfid_detected_key}" comparison="eq" threshold="1"/>
+                <PrintNode message="[回补] 已读到补给区 RFID，保持防御姿态等待恢复" throttle_ms="2000"/>
+                <Action ID="MaintainSentryPosture" mode="2"/>
+                <Wait wait_duration="0.20"/>
+              </Sequence>
+              <RetryUntilSuccessful num_attempts="100">
+                <ReactiveSequence name="回补_RFID丢失_重新发补给点">
+                  <PrintNode message="[回补] 未读到补给区 RFID，重新发补给点" throttle_ms="2000"/>
+                  <Action ID="MaintainSentryPosture" mode="3"/>
+                  <ReliableNavigateToPose
+                    goal="{supply_goal}"
+                    goal_name="{supply_goal_name}"
+                    reach_threshold="{supply_reach_threshold}"
+                    resend_interval="{nav_resend_interval}"
+                    response_timeout="{nav_response_timeout}"
+                    result_retry_delay="{nav_result_retry_delay}"
+                    success_condition_key="{supply_rfid_detected_key}"
+                    success_condition_comparison="eq"
+                    success_condition_threshold="1"/>
+                </ReactiveSequence>
+              </RetryUntilSuccessful>
+            </ReactiveFallback>
+          </Sequence>
+        </KeepRunningUntilFailure>
+      </Inverter>
+      <PrintNode message="{supply_done_message}"/>
+      <Action ID="SetBlackboardValue" key="{supply_active_key}" value="0" type="int"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

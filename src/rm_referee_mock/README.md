@@ -85,6 +85,7 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 - `0x0003` `rm_referee_msgs/GameRobotHP`：己方机器人血量
 - `0x0101` `rm_referee_msgs/EventData`：场地事件数据
 - `0x0201` `rm_referee_msgs/RobotStatus`：本机器人状态
+- `0x0202` `rm_referee_msgs/PowerHeatData`：缓冲能量和射击热量
 - `0x0206` `rm_referee_msgs/HurtData`：扣血信息
 - `0x0208` `rm_referee_msgs/ProjectileAllowance`：允许发弹量和剩余金币
 - `0x020D` `rm_referee_msgs/SentryInfo`：哨兵兑换、复活、姿态与能量机关激活状态
@@ -92,6 +93,15 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 可以接收并回显的发送数据：
 
 - 目前支持解析哨兵发送的 `0x0120` 子内容部分字段
+
+复活规则模拟：
+
+- 哨兵 HP 变为 `0` 时开始复活读条，并将射击热量清零、缓冲能量恢复到 mock 的缓冲能量上限。
+- 读条长度按 `10 + (420 - 比赛剩余时长) / 10 + 20 * 累计金币立即复活次数` 计算，小数四舍五入。
+- 常规情况下每秒读条 `+1`；勾选补给区或基地血量低于 `2000` 时每秒 `+4`。
+- 读条完成后置 `SentryInfo.can_confirm_resurrection`，收到 `0x0120 bit0` 后按上限血量 `10%` 回血。
+- 战亡期间如果金币足够 `SentryInfo.buy_revive_cost`，置 `SentryInfo.can_buy_resurrection`，收到 `0x0120 bit1` 后扣金币并回满血，同时累计金币复活次数。
+- 读条复活后 mock 会临时锁定发射机构；勾选补给区、基地增益点或前哨站增益点状态时视作检测到可占领交互模块卡并解除虚弱。
 
 需要注意两点：
 

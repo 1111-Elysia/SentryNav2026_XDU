@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3" project_name="sentry_nav_bt_test">
+    <include path="5.3tree.xml"/>
+    <include path="modules/fortress_hold.xml"/>
+    <include path="modules/go_wait_until_time_above.xml"/>
+    <include path="modules/point_hold.xml"/>
+    <include path="modules/resurrection.xml"/>
+    <include path="modules/rune_task.xml"/>
+    <include path="modules/supply_return.xml"/>
+    <include path="uc_main.xml"/>
+    <!-- Description of Node Models (used by Groot) -->
+    <TreeNodesModel>
+        <Action ID="AutoAimAndFire" editable="true">
+            <input_port name="target_type"/>
+        </Action>
+        <Condition ID="CheckCondition" editable="true">
+            <input_port name="key_name"/>
+            <input_port name="comparison"/>
+            <input_port name="threshold"/>
+        </Condition>
+        <Condition ID="CheckGoalReached" editable="true">
+            <input_port name="goal"/>
+            <input_port name="threshold"/>
+        </Condition>
+        <Condition ID="CompareValues" editable="true">
+            <input_port name="first_key"/>
+            <input_port name="second_key"/>
+            <input_port name="comparison"/>
+        </Condition>
+        <Action ID="ConfirmResurrection" editable="true">
+            <input_port name="posture"/>
+            <input_port name="burst_count"/>
+            <input_port name="burst_interval_ms"/>
+            <input_port name="min_interval_ms"/>
+        </Action>
+        <Action ID="EngageRune" editable="true">
+            <input_port name="rune_type"/>
+            <input_port name="posture"/>
+            <input_port name="timeout_ms"/>
+            <input_port name="request_interval_ms"/>
+        </Action>
+        <Action ID="GoalSelector" editable="true">
+            <input_port name="goal_name"/>
+            <output_port name="goal"/>
+        </Action>
+        <Action ID="MaintainSentryPosture" editable="true">
+            <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+            <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
+        </Action>
+        <Action ID="NavigateToPose" editable="true">
+            <input_port name="goal"/>
+        </Action>
+        <Action ID="PrintNode" editable="true">
+            <input_port name="message"/>
+            <input_port name="throttle_ms"/>
+        </Action>
+        <Action ID="ReliableNavigateToPose" editable="true">
+            <input_port name="goal"/>
+            <input_port name="goal_name"/>
+            <input_port name="reach_threshold"/>
+            <input_port name="resend_interval"/>
+            <input_port name="response_timeout"/>
+            <input_port name="result_retry_delay"/>
+            <input_port name="success_condition_key"/>
+            <input_port name="success_condition_comparison"/>
+            <input_port name="success_condition_threshold"/>
+        </Action>
+        <Action ID="RequestActivateRune" editable="true">
+            <input_port name="posture" type="int">请求时保持的姿态</input_port>
+            <input_port name="protocol_ver" type="string">old or new</input_port>
+        </Action>
+        <Action ID="SetBlackboardValue" editable="true">
+            <input_port name="key"/>
+            <input_port name="value"/>
+            <input_port name="type"/>
+        </Action>
+        <Action ID="SetSentryPosture" editable="true">
+            <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+            <input_port name="timeout_ms" type="int">姿态切换等待超时</input_port>
+            <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
+        </Action>
+        <Action ID="Wait" editable="true">
+            <input_port name="wait_duration"/>
+        </Action>
+    </TreeNodesModel>
+</root>

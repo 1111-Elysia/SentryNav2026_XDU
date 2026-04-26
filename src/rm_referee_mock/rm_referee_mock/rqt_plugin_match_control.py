@@ -12,6 +12,7 @@ from rm_referee_msgs.msg import (
     EventData, 
     RobotStatus, 
     ProjectileAllowance, 
+    PowerHeatData,
     HurtData,
     SentryInfo 
 )
@@ -244,13 +245,30 @@ class MatchControlPlugin(Plugin):
         robot_status_msg.maximum_hp = int(status["robot_status"]["max_hp"])
         robot_status_msg.shooter_barrel_cooling_value = 0
         robot_status_msg.shooter_barrel_heat_limit = 100
-        robot_status_msg.chassis_power_limit = 120
+        robot_status_msg.chassis_power_limit = int(status["robot_status"].get("chassis_power_limit", 120))
         # 假定功率管理都开启
         robot_status_msg.power_management_gimbal_output = True
         robot_status_msg.power_management_chassis_output = True
-        robot_status_msg.power_management_shooter_output = True
+        robot_status_msg.power_management_shooter_output = bool(
+            status["robot_status"].get("shooter_output", True))
         self._publisher_pool.publish(
             f"{topic_prefix}/robot_status", RobotStatus, robot_status_msg)
+
+        # Publish PowerHeatData
+        power_heat_status = status.get("power_heat_data", {})
+        power_heat_msg = PowerHeatData()
+        power_heat_msg.header.stamp = current_time_msg
+        power_heat_msg.header.frame_id = "referee_system"
+        power_heat_msg.reserved = 0
+        power_heat_msg.reserved_2 = 0
+        power_heat_msg.reserved_3 = 0.0
+        power_heat_msg.buffer_energy = int(power_heat_status.get("buffer_energy", 0))
+        power_heat_msg.shooter_17mm_1_barrel_heat = int(
+            power_heat_status.get("shooter_17mm_1_barrel_heat", 0))
+        power_heat_msg.shooter_42mm_barrel_heat = int(
+            power_heat_status.get("shooter_42mm_barrel_heat", 0))
+        self._publisher_pool.publish(
+            f"{topic_prefix}/power_heat_data", PowerHeatData, power_heat_msg)
 
         # [新增] Publish ProjectileAllowance 
         ammo_msg = ProjectileAllowance()

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3">
+  <BehaviorTree ID="Resurrection">
+    <Sequence name="复活机制">
+      <CheckCondition key_name="current_hp" comparison="eq" threshold="0"/>
+      <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
+      <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
+      <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
+      <Action ID="ConfirmResurrection" posture="0" burst_count="3" burst_interval_ms="20" min_interval_ms="100"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

@@ -1,6 +1,0 @@
-Language: Cpp
-BasedOnStyle: Google
-ColumnLimit: 120
-Standard: c++17
-PointerAlignment: Right
-SortIncludes: false

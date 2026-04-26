@@ -37,9 +37,17 @@ private:
     ACCEPTED
   };
 
+  enum class GoalStatus
+  {
+    NOT_REACHED,
+    REACHED,
+    REACHED_GUARD_UNSATISFIED
+  };
+
   void resetRuntimeState_();
   bool refreshGoalInput_(bool *goal_changed = nullptr);
-  bool isGoalReached_() const;
+  bool isSuccessConditionSatisfied_(double *current_value = nullptr) const;
+  GoalStatus evaluateGoalStatus_();
   void sendGoal_();
   void cancelGoal_(const char *reason);
 
@@ -52,6 +60,9 @@ private:
   double resend_interval_{0.50};
   double response_timeout_{1.00};
   double result_retry_delay_{0.50};
+  std::string success_condition_key_;
+  std::string success_condition_comparison_{"eq"};
+  double success_condition_threshold_{1.0};
 
   InternalState state_{InternalState::IDLE};
   rclcpp::Time last_send_time_{0, 0, RCL_ROS_TIME};

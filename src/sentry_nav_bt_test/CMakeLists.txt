@@ -109,11 +109,6 @@ install(TARGETS
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
-install(PROGRAMS
-  scripts/compatibility_bridge.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 install(DIRECTORY include/
   DESTINATION include/
 )

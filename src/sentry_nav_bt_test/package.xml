@@ -24,7 +24,6 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>sentry_msgs</depend>
   <depend>rm_referee_msgs</depend>
-  <depend>rm2_referee_msgs</depend>
   
 
   

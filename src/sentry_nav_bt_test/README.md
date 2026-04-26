@@ -2,16 +2,13 @@
 
 `sentry_nav_bt_test` 是一个基于 `BehaviorTree.CPP + Nav2 + ROS 2` 的哨兵导航包。它把裁判系统状态、TF 位姿、路径点配置和自定义行为树节点组织到同一个执行入口里，用来驱动哨兵在比赛中的导航与局内决策。
 
-当前默认启动入口为 `launch/sentry_nav_bt_test.launch.py`，默认加载的行为树为 `config/uc.xml`。
+当前默认启动入口为 `launch/sentry_nav_bt_test.launch.py`，默认加载的行为树为 `config/uc_test.xml`。
 
 ## 功能概览
 
 - 等待 `navigate_to_pose` action server 就绪后再开始执行行为树
 - 监听 `/rm_referee/*` 相关话题，并将比赛状态、血量、受击信息、中心增益点占领状态等写入黑板
-- 根据机器人 ID 自动选择红蓝方路径点文件
-  - `robot_id == 7` 认为是红方
-  - `robot_id == 107` 认为是蓝方
-  - 如果 10 秒内没有收到机器人 ID，会退回到默认红方 ID `7`
+- 从单一 `config/waypoints.json` 加载路径点，不再按机器人 ID 区分红蓝方点位
 - 从路径点配置中提取初始位姿并发布到 `/initialpose`
 - 提供一组自定义行为树节点，用于目标点选择、可靠导航、巡逻、追击、自定义条件判断和裁判系统指令发送
 - 默认 `uc.xml` 实现了高校赛对抗主流程，包括赛前等待、开赛初始化、复活、回补、小符/大符激活、前哨站点位、防御姿态切换和堡垒驻守
@@ -26,8 +23,7 @@ src/sentry_nav_bt_test
 │   ├── chase_bt.xml
 │   ├── uc.xml
 │   ├── ul_3.21.xml
-│   ├── waypoints_red.json
-│   └── waypoints_blue.json
+│   └── waypoints.json
 ├── include/sentry_nav_bt_test
 │   ├── topic_listener.hpp
 │   ├── reliable_navigate_to_pose.hpp
@@ -36,8 +32,6 @@ src/sentry_nav_bt_test
 │   └── ...
 ├── launch
 │   └── sentry_nav_bt_test.launch.py
-├── scripts
-│   └── compatibility_bridge.py
 └── src
     ├── sentry_nav_bt_test.cpp
     ├── reliable_navigate_to_pose.cpp
@@ -64,9 +58,6 @@ src/sentry_nav_bt_test
 - `nlohmann_json`
 - `sentry_msgs`
 - `rm_referee_msgs`
-- `rm2_referee_msgs`
-
-其中 `rm2_referee_msgs` 主要用于旧协议兼容桥接脚本；如果你不启用 `use_old_protocol:=true`，它不会进入主逻辑，但仍然需要包能被导入。
 
 ## 编译
 
@@ -89,24 +80,11 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py
 
 默认行为：
 
-- 加载 `config/uc.xml`
-- 红方路径点文件使用 `config/waypoints_red.json`
-- 蓝方路径点文件使用 `config/waypoints_blue.json`
+- 加载 `config/uc_test.xml`
+- 路径点文件使用 `config/waypoints.json`
 - 节点参数中固定设置了 `use_sim_time=False`
 
-### 2. 使用旧协议桥接
-
-如果上游仍然发布的是 `/rm2_referee/*` 话题，可以开启兼容桥接：
-
-```bash
-ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
-  use_old_protocol:=true \
-  team_color:=red
-```
-
-此时会额外启动 `scripts/compatibility_bridge.py`，把旧协议话题桥接到本包使用的新协议命名空间 `/rm_referee/*`。
-
-### 3. 切换到追击行为树
+### 2. 切换到追击行为树
 
 ```bash
 ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
@@ -121,24 +99,16 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 - `bt_xml_filename`
   - 行为树 XML 完整路径
-  - 默认值：安装目录下的 `config/uc.xml`
-- `waypoints_red_file`
-  - 红方路径点 JSON
-- `waypoints_blue_file`
-  - 蓝方路径点 JSON
+  - 默认值：安装目录下的 `config/uc_test.xml`
+- `waypoints_file`
+  - 路径点 JSON
+  - 默认值：安装目录下的 `config/waypoints.json`
 - `bt_message_log_file`
   - `PrintNode` 额外落盘的日志目录/基准文件路径
   - 默认值：`/tmp/sentry_nav_bt_messages.log`
   - 固定路径会持续追加所有运行记录，例如：`/tmp/sentry_nav_bt_messages.log`
   - 同时也会按每次启动生成唯一文件，例如：`/tmp/sentry_nav_bt_messages_2026-03-27_21-05-33_pid12345.log`
   - 传空字符串可关闭该文件输出
-- `use_old_protocol`
-  - 是否启动旧协议到新协议的桥接
-  - 默认值：`false`
-- `team_color`
-  - 仅兼容桥接脚本使用
-  - 可选值：`red` / `blue`
-
 注意：
 
 - 当前 launch 文件里把 `navigate_bt_node` 的 `use_sim_time` 写死成了 `False`
@@ -219,15 +189,15 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `outpost_point`：`0.25 m`
 - `large_rune_point`：`0.10 m`
 - `base_defense_point`：`0.25 m`
-- 堡垒驻守分成两层
-  - 回堡垒点位的真正到点阈值：`uc_fortress_arrive_distance_threshold = 0.10 m`
-  - 已进入驻守后允许的活动半径：`uc_fortress_hold_distance_threshold = 0.25 m`
+- 堡垒驻守当前分成两层
+  - 回堡垒点位时，`ReliableNavigateToPose` 的到点阈值使用 `uc_fortress_hold_distance_threshold = 0.25 m`
+  - 已进入驻守后，`CheckGoalReached` 允许的驻守半径使用 `uc_fortress_hold_exit_distance_threshold = 0.30 m`
 - 堡垒驻守阶段仍然额外使用 `CheckGoalReached + ReliableNavigateToPose`
   - 这套逻辑和 `ul.xml` 的中心驻守是同一类思路
-  - 进入堡垒驻守后，只要仍在 `0.25 m` 半径内，就继续驻守
+  - 进入堡垒驻守后，只要仍在 `0.30 m` 半径内，就继续驻守
   - 一旦偏离这个半径，就重新回堡垒点位
-  - 在堡垒驻守激活且位于驻守半径内时，会持续发布 `/vw = 1`
-  - 离开驻守半径后，堡垒驻守 `/vw` 发布会停止
+  - 回堡垒导航时，进入 `0.25 m` 阈值内就算重新到点
+  - 堡垒驻守不再触发 `/vw = 1`，`/vw` 持续发布只保留给 UL 中心驻守
 
 当前 `ReliableNavigateToPose` 本身在本地到点后会直接返回 `SUCCESS`，不会因为 Nav2 的异步回调稍晚一点到达就再次主动重发同一目标。联调里如果看到“已经到点但又重新开始发点”，更常见的原因不是导航节点内部死循环，而是外层行为树分支被重新进入。
 
@@ -236,7 +206,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 最近一轮已经处理了三个容易在 UC 联调里触发的问题：
 
 1. `复活机制` / `回补模式` 不再在“条件尚未命中”时提前清掉 `in_rune_phase` 和 `uc_fortress_hold_active`。
-   - 这样可以避免堡垒驻守 `/vw` 状态在同一个主循环里被反复抖掉
+   - 这样可以避免堡垒驻守状态在同一个主循环里被反复抖掉
    - 也避免了“受击姿态辅助”每 tick 都把打符态误读成非打符态
 
 2. `MaintainSentryPosture` 现在优先读取 `current_posture`，并结合共享黑板里的最近一次姿态请求状态做去重。
@@ -394,8 +364,8 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `in_rune_phase`
 - `uc_fortress_hold_active`
 - `uc_fortress_goal_name`
-- `uc_fortress_arrive_distance_threshold`
 - `uc_fortress_hold_distance_threshold`
+- `uc_fortress_hold_exit_distance_threshold`
 - `posture_switch_cooldown_ms`
 - `last_posture_request_target`
 - `last_posture_request_pending`
@@ -489,6 +459,5 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 每次启动都会保留自己的独立日志，同时固定路径也能看到完整运行历史
 - 默认中心到点阈值 `ul_center_arrive_distance_threshold = 0.10 m`
 - 默认中心驻守半径 `ul_center_hold_distance_threshold = 0.50 m`
-- 默认堡垒到点阈值 `uc_fortress_arrive_distance_threshold = 0.10 m`
-- 默认堡垒驻守半径 `uc_fortress_hold_distance_threshold = 0.25 m`
-- `/vw` 驻守发布逻辑已从 `topic_listener.hpp` 中拆到独立的 `center_hold_vw_controller.hpp`
+- 默认堡垒回点阈值 `uc_fortress_hold_distance_threshold = 0.25 m`
+- 默认堡垒驻守退出阈值 `uc_fortress_hold_exit_distance_threshold = 0.30 m`

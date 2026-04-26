@@ -1,6 +1,0 @@
-referee_node:
-  ros__parameters:
-    enable_normal: true # 启用常规链路
-    enable_fpv: false # 启用图传链路
-    normal_tty_device: "/dev/ttyACM0"
-    fpv_tty_device: "/dev/ttyTHS0"

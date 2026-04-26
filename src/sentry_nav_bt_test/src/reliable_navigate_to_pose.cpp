@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "sentry_nav_bt_test/blackboard_utils.hpp"
+
 namespace sentry_nav_bt_test
 {
 
@@ -26,7 +28,10 @@ BT::PortsList ReliableNavigateToPose::providedPorts()
     BT::InputPort<double>("reach_threshold", 0.30, "到点距离阈值"),
     BT::InputPort<double>("resend_interval", 0.50, "重发最小间隔"),
     BT::InputPort<double>("response_timeout", 1.00, "等待 Nav2 接收超时"),
-    BT::InputPort<double>("result_retry_delay", 0.50, "结果失败后的重试延迟")
+    BT::InputPort<double>("result_retry_delay", 0.50, "结果失败后的重试延迟"),
+    BT::InputPort<std::string>("success_condition_key", "", "判定导航成功时需要满足的黑板键"),
+    BT::InputPort<std::string>("success_condition_comparison", "eq", "成功条件比较符"),
+    BT::InputPort<double>("success_condition_threshold", 1.0, "成功条件阈值")
   };
 }
 
@@ -98,6 +103,9 @@ BT::NodeStatus ReliableNavigateToPose::onStart()
   getInput("resend_interval", resend_interval_);
   getInput("response_timeout", response_timeout_);
   getInput("result_retry_delay", result_retry_delay_);
+  getInput("success_condition_key", success_condition_key_);
+  getInput("success_condition_comparison", success_condition_comparison_);
+  getInput("success_condition_threshold", success_condition_threshold_);
 
   resetRuntimeState_();
 
@@ -117,11 +125,40 @@ BT::NodeStatus ReliableNavigateToPose::onStart()
   return BT::NodeStatus::RUNNING;
 }
 
-bool ReliableNavigateToPose::isGoalReached_() const
+bool ReliableNavigateToPose::isSuccessConditionSatisfied_(double *current_value) const
 {
+  if (success_condition_key_.empty()) {
+    return true;
+  }
+
   auto blackboard = config().blackboard;
   if (!blackboard) {
     return false;
+  }
+
+  double value = 0.0;
+  if (!blackboard_utils::getValue(
+      blackboard, success_condition_key_, value, "ReliableNavigateToPose"))
+  {
+    return false;
+  }
+
+  if (current_value) {
+    *current_value = value;
+  }
+
+  return blackboard_utils::compareValues(
+    value,
+    success_condition_comparison_,
+    success_condition_threshold_,
+    "ReliableNavigateToPose");
+}
+
+ReliableNavigateToPose::GoalStatus ReliableNavigateToPose::evaluateGoalStatus_()
+{
+  auto blackboard = config().blackboard;
+  if (!blackboard) {
+    return GoalStatus::NOT_REACHED;
   }
 
   geometry_msgs::msg::PoseStamped current_pose;
@@ -131,11 +168,11 @@ bool ReliableNavigateToPose::isGoalReached_() const
       RCLCPP_WARN(node_->get_logger(), "[ReliableNavigate] 当前位姿没有更新，暂不使用到点判定");
       last_pose_invalid_logged_ = true;
     }
-    return false;
+    return GoalStatus::NOT_REACHED;
   }
 
   if (!blackboard->get("waypoint_now", current_pose)) {
-    return false;
+    return GoalStatus::NOT_REACHED;
   }
 
   last_pose_invalid_logged_ = false;
@@ -145,6 +182,23 @@ bool ReliableNavigateToPose::isGoalReached_() const
   const double distance = std::hypot(dx, dy);
 
   if (distance <= reach_threshold_) {
+    double success_condition_value = 0.0;
+    if (!isSuccessConditionSatisfied_(&success_condition_value)) {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(),
+        *node_->get_clock(),
+        1000,
+        "[ReliableNavigate] 已到达目标%s%s%s附近，但成功条件 '%s' 未满足 (当前=%.3f, 期望 %s %.3f)，继续重发",
+        goal_name_.empty() ? "" : "[",
+        goal_name_.empty() ? "" : goal_name_.c_str(),
+        goal_name_.empty() ? "" : "]",
+        success_condition_key_.c_str(),
+        success_condition_value,
+        success_condition_comparison_.c_str(),
+        success_condition_threshold_);
+      return GoalStatus::REACHED_GUARD_UNSATISFIED;
+    }
+
     RCLCPP_INFO(
       node_->get_logger(),
       "[ReliableNavigate] 到达目标%s%s%s, 距离 %.3f m <= %.3f m",
@@ -153,7 +207,7 @@ bool ReliableNavigateToPose::isGoalReached_() const
       goal_name_.empty() ? "" : "]",
       distance,
       reach_threshold_);
-    return true;
+    return GoalStatus::REACHED;
   }
 
   const auto now = node_->now();
@@ -165,10 +219,10 @@ bool ReliableNavigateToPose::isGoalReached_() const
       goal_name_.empty() ? "" : goal_name_.c_str(),
       goal_name_.empty() ? "" : "]",
       distance);
-    const_cast<ReliableNavigateToPose *>(this)->last_log_time_ = now;
+    last_log_time_ = now;
   }
 
-  return false;
+  return GoalStatus::NOT_REACHED;
 }
 
 void ReliableNavigateToPose::sendGoal_()
@@ -417,14 +471,22 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
     resetRuntimeState_();
   }
 
-  if (isGoalReached_()) {
+  const auto now = node_->now();
+  const GoalStatus goal_status = evaluateGoalStatus_();
+  if (goal_status == GoalStatus::REACHED) {
     if (goal_handle_ || state_ != InternalState::IDLE || last_send_time_.nanoseconds() != 0) {
       cancelGoal_("goal_reached_locally");
     }
     return BT::NodeStatus::SUCCESS;
   }
 
-  const auto now = node_->now();
+  if (goal_status == GoalStatus::REACHED_GUARD_UNSATISFIED &&
+    !cancel_requested_ &&
+    (goal_handle_ || state_ != InternalState::IDLE))
+  {
+    cancelGoal_("success_condition_unsatisfied");
+  }
+
   if (!client_->action_server_is_ready()) {
     if (last_log_time_.nanoseconds() == 0 || (now - last_log_time_).seconds() > 1.0) {
       RCLCPP_WARN(node_->get_logger(), "[ReliableNavigate] Nav2 action server 尚未就绪，继续等待");
@@ -435,7 +497,32 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
 
   if (result_ready_) {
     if (result_success_) {
-      return BT::NodeStatus::SUCCESS;
+      double success_condition_value = 0.0;
+      if (isSuccessConditionSatisfied_(&success_condition_value)) {
+        return BT::NodeStatus::SUCCESS;
+      }
+
+      result_ready_ = false;
+      result_success_ = false;
+      state_ = InternalState::IDLE;
+      goal_handle_.reset();
+      ++retry_count_;
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(),
+        *node_->get_clock(),
+        1000,
+        "[ReliableNavigate] Nav2 返回成功%s%s%s，但成功条件 '%s' 未满足 (当前=%.3f, 期望 %s %.3f)，准备重发, retry_count=%d",
+        goal_name_.empty() ? "" : "[",
+        goal_name_.empty() ? "" : goal_name_.c_str(),
+        goal_name_.empty() ? "" : "]",
+        success_condition_key_.c_str(),
+        success_condition_value,
+        success_condition_comparison_.c_str(),
+        success_condition_threshold_,
+        retry_count_);
+      if ((now - last_send_time_).seconds() < result_retry_delay_) {
+        return BT::NodeStatus::RUNNING;
+      }
     }
 
     result_ready_ = false;
@@ -447,9 +534,9 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
 
   switch (state_) {
     case InternalState::IDLE:
-      if (last_send_time_.nanoseconds() == 0 ||
+      if (!cancel_requested_ && (last_send_time_.nanoseconds() == 0 ||
         (now - last_send_time_).seconds() >= resend_interval_)
-      {
+      ) {
         sendGoal_();
       }
       break;

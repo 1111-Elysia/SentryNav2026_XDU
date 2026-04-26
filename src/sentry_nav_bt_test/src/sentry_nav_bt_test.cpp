@@ -3,10 +3,11 @@
 #include <string>
 #include <chrono>
 #include <thread>
-#include <atomic>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <algorithm>
+#include <vector>
 #include <unistd.h>
 
 // ROS
@@ -23,9 +24,6 @@
 #include "nav2_behavior_tree/plugins/action/wait_action.hpp"
 #include "nav2_behavior_tree/plugins/control/recovery_node.hpp"
 #include "nav2_behavior_tree/plugins/decorator/rate_controller.hpp"
-
-// 裁判系统
-#include "rm_referee_msgs/msg/robot_status.hpp"
 
 // 行为树节点
 #include "sentry_nav_bt_test/check_condition.hpp"
@@ -51,6 +49,25 @@ struct BtMessageLogPaths
 {
     std::string history_log_path;
     std::string run_log_path;
+};
+
+class ValidationWaitAction : public BT::SyncActionNode
+{
+public:
+    ValidationWaitAction(const std::string &name, const BT::NodeConfiguration &config)
+        : BT::SyncActionNode(name, config)
+    {
+    }
+
+    static BT::PortsList providedPorts()
+    {
+        return {BT::InputPort<double>("wait_duration", 0.0, "Validation-only wait duration")};
+    }
+
+    BT::NodeStatus tick() override
+    {
+        return BT::NodeStatus::SUCCESS;
+    }
 };
 
 std::string getCurrentTimestampString()
@@ -177,6 +194,73 @@ bool initializeBtMessageLogFile(
     return true;
 }
 
+bool registerBehaviorTreesFromDirectory(
+    BT::BehaviorTreeFactory &factory,
+    const std::string &directory,
+    const rclcpp::Logger &logger)
+{
+    namespace fs = std::filesystem;
+
+    if (directory.empty()) {
+        return true;
+    }
+
+    std::error_code ec;
+    const fs::path dir_path(directory);
+    if (!fs::exists(dir_path, ec) || !fs::is_directory(dir_path, ec)) {
+        RCLCPP_ERROR(logger, "行为树子树目录不存在或不是目录: %s", directory.c_str());
+        return false;
+    }
+
+    std::vector<fs::path> xml_files;
+    for (const auto &entry : fs::recursive_directory_iterator(dir_path, ec)) {
+        if (ec) {
+            RCLCPP_ERROR(logger, "遍历行为树子树目录失败: %s (%s)", directory.c_str(), ec.message().c_str());
+            return false;
+        }
+        if (entry.is_regular_file() && entry.path().extension() == ".xml") {
+            xml_files.push_back(entry.path());
+        }
+    }
+
+    std::sort(xml_files.begin(), xml_files.end());
+    for (const auto &xml_file : xml_files) {
+        try {
+            factory.registerBehaviorTreeFromFile(xml_file.string());
+            RCLCPP_INFO(logger, "已注册行为树子树: %s", xml_file.string().c_str());
+        } catch (const std::exception &e) {
+            RCLCPP_ERROR(
+                logger,
+                "注册行为树子树失败: %s (%s)",
+                xml_file.string().c_str(),
+                e.what());
+            return false;
+        }
+    }
+
+    if (xml_files.empty()) {
+        RCLCPP_WARN(logger, "行为树子树目录为空: %s", directory.c_str());
+    }
+
+    return true;
+}
+
+void useValidationOnlyNodes(BT::BehaviorTreeFactory &factory)
+{
+    factory.unregisterBuilder("Wait");
+    factory.registerNodeType<ValidationWaitAction>("Wait");
+}
+
+BT::Tree createRegisteredBehaviorTree(
+    BT::BehaviorTreeFactory &factory,
+    const std::string &main_tree_file,
+    const std::string &main_tree_id,
+    const BT::Blackboard::Ptr &blackboard)
+{
+    factory.registerBehaviorTreeFromFile(main_tree_file);
+    return factory.createTree(main_tree_id, blackboard);
+}
+
 }  // namespace
 
 void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
@@ -251,29 +335,41 @@ int main(int argc, char **argv)
 
     // 从参数获取行为树XML文件名
     std::string bt_xml_filename;
+    std::string bt_main_tree_id;
     node->declare_parameter("bt_xml_filename", "");
+    node->declare_parameter("bt_main_tree_id", "MainTree");
     if (!node->get_parameter("bt_xml_filename", bt_xml_filename))
     {
         RCLCPP_ERROR(node->get_logger(), "无法获取参数 'bt_xml_filename'");
         return 1;
     }
+    node->get_parameter("bt_main_tree_id", bt_main_tree_id);
 
     // 获取路径点文件参数
-    std::string waypoints_red_file;
-    std::string waypoints_blue_file;
+    std::string waypoints_file;
     std::string bt_message_log_file;
+    std::string bt_subtree_dir;
+    bool validate_bt_only = false;
 
-    node->declare_parameter("waypoints_red_file", "");
-    node->declare_parameter("waypoints_blue_file", "");
+    node->declare_parameter("waypoints_file", "");
     node->declare_parameter("bt_message_log_file", "/tmp/sentry_nav_bt_messages.log");
+    node->declare_parameter("bt_subtree_dir", "");
+    node->declare_parameter("validate_bt_only", false);
 
-    node->get_parameter("waypoints_red_file", waypoints_red_file);
-    node->get_parameter("waypoints_blue_file", waypoints_blue_file);
+    node->get_parameter("waypoints_file", waypoints_file);
     node->get_parameter("bt_message_log_file", bt_message_log_file);
+    node->get_parameter("bt_subtree_dir", bt_subtree_dir);
+    node->get_parameter("validate_bt_only", validate_bt_only);
 
     // 创建行为树工厂
     BT::BehaviorTreeFactory factory;
     RegisterBehaviorTreePlugins(factory,node);
+    if (validate_bt_only) {
+        useValidationOnlyNodes(factory);
+    }
+    if (!registerBehaviorTreesFromDirectory(factory, bt_subtree_dir, node->get_logger())) {
+        return 1;
+    }
 
     // 打印可用行为树节点
     RCLCPP_INFO(node->get_logger(), "可用的行为树节点:");
@@ -325,6 +421,31 @@ int main(int argc, char **argv)
 
     bb_manager->bb_manager_init();
 
+    if (validate_bt_only)
+    {
+        try
+        {
+            auto tree = createRegisteredBehaviorTree(
+                factory,
+                bt_xml_filename,
+                bt_main_tree_id,
+                blackboard);
+            RCLCPP_INFO(
+                node->get_logger(),
+                "行为树 XML 校验通过: %s (main_tree_id=%s)",
+                bt_xml_filename.c_str(),
+                bt_main_tree_id.c_str());
+        }
+        catch (const std::exception &e)
+        {
+            RCLCPP_ERROR(node->get_logger(), "行为树 XML 校验失败: %s", e.what());
+            return 1;
+        }
+
+        rclcpp::shutdown();
+        return 0;
+    }
+
     // std::this_thread::sleep_for(std::chrono::seconds(5));
 
     // 等待导航action server启动
@@ -355,172 +476,100 @@ int main(int argc, char **argv)
 
     RCLCPP_INFO(node->get_logger(), "导航服务器已可用");
 
-    // ======== 添加临时机器人ID监听器 ========
-    RCLCPP_INFO(node->get_logger(), "等待获取机器人ID...");
-
-    // 用于同步的标志
-    std::atomic<bool> id_received(false);
-    uint8_t robot_id = 0; // 默认ID
-
-    // 配置QoS
-    auto qos = rclcpp::QoS(rclcpp::SystemDefaultsQoS());
-    qos.best_effort();         // 设置为BEST_EFFORT可靠性
-    qos.durability_volatile(); // 设置为VOLATILE持久性
-
-    // 创建临时订阅者监听机器人状态
-    auto robot_status_sub = node->create_subscription<rm_referee_msgs::msg::RobotStatus>(
-        "/rm_referee/robot_status",
-        qos,
-        [&](const rm_referee_msgs::msg::RobotStatus::SharedPtr msg)
-        {
-            robot_id = msg->robot_id;
-            RCLCPP_DEBUG(node->get_logger(), "获取到机器人ID: %d", robot_id);
-            id_received = true;
-        });
-
-    // 等待ID接收或超时 - 修改为主动轮询方式
+    if (waypoints_file.empty())
     {
-        const auto start_wait_time = std::chrono::steady_clock::now();
-        const auto timeout_duration = std::chrono::seconds(10);
+        RCLCPP_ERROR(node->get_logger(), "路径点文件参数 'waypoints_file' 未设置！");
+        return 1;
+    }
 
-        RCLCPP_INFO(node->get_logger(), "等待接收机器人ID，最多等待10秒...");
+    RCLCPP_INFO(node->get_logger(), "加载路径点: %s", waypoints_file.c_str());
+    bb_manager->load_waypoints(waypoints_file);
 
-        while (!id_received)
+    // 加载路径点后，发布初始位姿
+    auto initial_pose_pub = node->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+        "/initialpose", 10);
+
+    // 从黑板获取初始位姿
+    geometry_msgs::msg::PoseStamped init_pose;
+    std::string init_pose_key = "waypoint_init"; // 首先尝试指定的初始位姿键
+
+    bool pose_found = false;
+
+    // 尝试从黑板读取指定的初始位姿
+    if (blackboard->get(init_pose_key, init_pose))
+    {
+        pose_found = true;
+        RCLCPP_INFO(node->get_logger(), "找到指定的初始位姿 '%s'", init_pose_key.c_str());
+    }
+    // 如果没有指定的初始位姿，尝试使用第一个路径点
+    else if (blackboard->get("waypoint_0", init_pose))
+    {
+        pose_found = true;
+        RCLCPP_INFO(node->get_logger(), "使用第一个路径点作为初始位姿");
+    }
+    // 如果都没有，尝试使用起点
+    else if (blackboard->get("waypoint_start", init_pose))
+    {
+        pose_found = true;
+        RCLCPP_INFO(node->get_logger(), "使用起点作为初始位姿");
+    }
+
+    if (pose_found)
+    {
+        // [修复] 转换为 PoseWithCovarianceStamped 并设置协方差
+        geometry_msgs::msg::PoseWithCovarianceStamped init_pose_cov;
+
+        // 复制 Header
+        init_pose_cov.header = init_pose.header;
+        init_pose_cov.header.stamp = node->now(); // 刷新时间戳
+
+        // 确保帧ID正确
+        if (init_pose_cov.header.frame_id.empty())
         {
-            // 关键修改: 处理待处理的ROS消息
-            rclcpp::spin_some(node);
+            init_pose_cov.header.frame_id = "map";
+        }
 
-            // 检查是否已超时
-            auto elapsed = std::chrono::steady_clock::now() - start_wait_time;
-            if (elapsed > timeout_duration)
-            {
-                // 强制使用 ID 7 (红方)，防止 ID 为 0 导致路径点不加载
-                robot_id = 7;
-                RCLCPP_WARN(node->get_logger(), "超时未收到机器人ID，强制使用默认ID: %d", robot_id);
-                break;
-            }
+        // 复制 Pose
+        init_pose_cov.pose.pose = init_pose.pose;
 
-            // 短暂等待，避免CPU过载
+        // 设置协方差 (AMCL/Nav2 需要这个来确认定位可信度)
+        // 0.25 是一个常见的经验值
+        for(int i=0; i<36; i++) { init_pose_cov.pose.covariance[i] = 0.0; }
+        init_pose_cov.pose.covariance[0] = 0.25;  // X 轴方差
+        init_pose_cov.pose.covariance[7] = 0.25;  // Y 轴方差
+        init_pose_cov.pose.covariance[35] = 0.0685; // Yaw 轴方差 (约等于 15度)
+
+        // 发布初始位姿
+        RCLCPP_INFO(node->get_logger(),
+                    "发布初始位姿 (标准格式): [%.2f, %.2f, %.2f]",
+                    init_pose_cov.pose.pose.position.x,
+                    init_pose_cov.pose.pose.position.y,
+                    init_pose_cov.pose.pose.position.z);
+
+        // 多次发布以确保接收
+        for (int i = 0; i < 3; i++)
+        {
+            initial_pose_pub->publish(init_pose_cov);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
-        if (id_received)
-        {
-            RCLCPP_INFO(node->get_logger(), "成功接收到机器人ID: %d", robot_id);
-        }
+        // 在黑板中记录已发布初始位姿
+        blackboard->set("initial_pose_published", true);
+        // 这里可以继续存 PoseStamped 以便内部逻辑使用
+        blackboard->set("initial_pose", init_pose);
     }
-
-    // 将ID存储到黑板，供行为树使用
-    blackboard->set("robot_id", robot_id);
-
-    if (robot_id == 7)
+    else
     {
-        RCLCPP_INFO(node->get_logger(), "红方: 加载 %s", waypoints_red_file.c_str());
-        // 使用参数路径，而不是硬编码路径
-        if (!waypoints_red_file.empty()) {
-            bb_manager->load_waypoints(waypoints_red_file);
-        } else {
-            RCLCPP_ERROR(node->get_logger(), "红方路径点文件参数未设置！");
-        }
-    }
-    else if (robot_id == 107)
-    {
-        RCLCPP_WARN(node->get_logger(), "蓝方: 加载 %s", waypoints_blue_file.c_str());
-        // 使用参数路径
-        if (!waypoints_blue_file.empty()) {
-            bb_manager->load_waypoints(waypoints_blue_file);
-        } else {
-            RCLCPP_ERROR(node->get_logger(), "蓝方路径点文件参数未设置！");
-        }
-    }
-    // 在确定颜色并加载路径点后，发布初始位姿
-    if (robot_id == 7 || robot_id == 107)
-    {
-        // [修复] 创建初始位姿发布者：使用标准 Nav2 话题 /initialpose 和带协方差的消息类型
-        auto initial_pose_pub = node->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-            "/initialpose", 10);
-
-        // 等待一段时间确保发布者已注册
-        // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
-        // 从黑板获取初始位姿
-        geometry_msgs::msg::PoseStamped init_pose;
-        std::string init_pose_key = "waypoint_init"; // 首先尝试指定的初始位姿键
-
-        bool pose_found = false;
-
-        // 尝试从黑板读取指定的初始位姿
-        if (blackboard->get(init_pose_key, init_pose))
-        {
-            pose_found = true;
-            RCLCPP_INFO(node->get_logger(), "找到指定的初始位姿 '%s'", init_pose_key.c_str());
-        }
-        // 如果没有指定的初始位姿，尝试使用第一个路径点
-        else if (blackboard->get("waypoint_0", init_pose))
-        {
-            pose_found = true;
-            RCLCPP_INFO(node->get_logger(), "使用第一个路径点作为初始位姿");
-        }
-        // 如果都没有，尝试使用起点
-        else if (blackboard->get("waypoint_start", init_pose))
-        {
-            pose_found = true;
-            RCLCPP_INFO(node->get_logger(), "使用起点作为初始位姿");
-        }
-
-        if (pose_found)
-        {
-            // [修复] 转换为 PoseWithCovarianceStamped 并设置协方差
-            geometry_msgs::msg::PoseWithCovarianceStamped init_pose_cov;
-            
-            // 复制 Header
-            init_pose_cov.header = init_pose.header;
-            init_pose_cov.header.stamp = node->now(); // 刷新时间戳
-
-            // 确保帧ID正确
-            if (init_pose_cov.header.frame_id.empty())
-            {
-                init_pose_cov.header.frame_id = "map";
-            }
-
-            // 复制 Pose
-            init_pose_cov.pose.pose = init_pose.pose;
-
-            // 设置协方差 (AMCL/Nav2 需要这个来确认定位可信度)
-            // 0.25 是一个常见的经验值
-            for(int i=0; i<36; i++) { init_pose_cov.pose.covariance[i] = 0.0; }
-            init_pose_cov.pose.covariance[0] = 0.25;  // X 轴方差
-            init_pose_cov.pose.covariance[7] = 0.25;  // Y 轴方差
-            init_pose_cov.pose.covariance[35] = 0.0685; // Yaw 轴方差 (约等于 15度)
-
-            // 发布初始位姿
-            RCLCPP_INFO(node->get_logger(),
-                        "发布初始位姿 (标准格式): [%.2f, %.2f, %.2f]",
-                        init_pose_cov.pose.pose.position.x,
-                        init_pose_cov.pose.pose.position.y,
-                        init_pose_cov.pose.pose.position.z);
-
-            // 多次发布以确保接收
-            for (int i = 0; i < 3; i++)
-            {
-                initial_pose_pub->publish(init_pose_cov);
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-
-            // 在黑板中记录已发布初始位姿
-            blackboard->set("initial_pose_published", true);
-            // 这里可以继续存 PoseStamped 以便内部逻辑使用
-            blackboard->set("initial_pose", init_pose);
-        }
-        else
-        {
-            RCLCPP_ERROR(node->get_logger(), "未能找到有效的初始位姿信息");
-        }
+        RCLCPP_ERROR(node->get_logger(), "未能找到有效的初始位姿信息");
     }
 
     try
     {
-        auto tree = factory.createTreeFromFile(bt_xml_filename, blackboard);
+        auto tree = createRegisteredBehaviorTree(
+            factory,
+            bt_xml_filename,
+            bt_main_tree_id,
+            blackboard);
 
         auto publisher_zmq = std::make_shared<BT::PublisherZMQ>(tree);
         RCLCPP_INFO(node->get_logger(), "Groot ZMQ Publisher started. Port: 1666");
