@@ -21,8 +21,22 @@ find_package(tf2 REQUIRED)
 find_package(nav2_bringup REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(nav2_msgs REQUIRED)
+find_package(rm_referee_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(include)
+
+# ===== 构建 odin_tf 节点 =====
+add_executable(odin_tf
+  src/odin_tf.cpp
+)
+ament_target_dependencies(odin_tf
+  rclcpp
+  tf2_ros
+  rm_referee_msgs
+  std_msgs
+  tf2_geometry_msgs
+)
 
 # ===== 构建 TF Odom Publisher 节点 =====
 add_executable(tf_odom_publisher 
@@ -56,6 +70,7 @@ ament_target_dependencies(tf_only_odom
 
 # ===== 安装可执行文件 =====
 install(TARGETS
+  odin_tf
   tf_odom_publisher
   tf_only_odom
   DESTINATION lib/${PROJECT_NAME}

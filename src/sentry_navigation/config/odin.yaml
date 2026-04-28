@@ -1,0 +1,18 @@
+odin_tf:
+  ros__parameters:
+    odin_frame: "odin1_base_link"
+
+    # 发布频率 (Hz)
+    publish_rate: 100.0
+    
+    # ===== base_link → odin1_base_link 变换参数 =====
+    # 平移 (m)
+    base_link_to_odin1_base_link_x: 0.22
+    base_link_to_odin1_base_link_y: 0.0
+    base_link_to_odin1_base_link_z: 0.0
+    
+    # 旋转 角度制
+    base_link_to_odin1_base_link_roll: 0.0
+    base_link_to_odin1_base_link_pitch: 45.0
+    base_link_to_odin1_base_link_yaw: 0.0
+

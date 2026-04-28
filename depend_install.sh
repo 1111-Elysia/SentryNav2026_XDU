@@ -4,3 +4,4 @@ sudo apt install -y ros-humble-navigation2 ros-humble-nav2-msgs ros-humble-nav2-
 sudo apt install -y ros-humble-rmw-cyclonedds-cpp
 sudo apt install -y ros-humble-spatio-temporal-voxel-layer
 sudo apt-get install -y libboost-system-dev
+sudo apt install -y libyaml-cpp-dev libusb-1.0-0-dev libopencv-dev

@@ -53,7 +53,7 @@ trap 'echo "[INFO] 用户手动终止，正在清理..."; nuclear_cleanup; exit 
 
 while true; do
     echo "=========================================="
-    echo ">>> 准备启动新的导航会话..."
+    echo ">>> 赞美欧姆弥赛亚，愿哨兵小姐武运昌隆"
     
     # 每次启动前，先执行核弹以保平安
     nuclear_cleanup

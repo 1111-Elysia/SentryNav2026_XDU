@@ -1,0 +1,104 @@
+register_keys:
+  # 如果关闭，即使USB连接低于USB 3.0也允许连接
+  # 注意：强烈建议始终使用USB 3.0，因为SLAM模式等高级功能需要USB 3.0才能可靠地传输地图文件
+  strict_usb3.0_check: 0  # 0: 关闭; 1: 开启
+
+  # 0: 使用odin内部系统时间作为数据时间戳，典型且推荐使用
+  # 1: 使用主机ROS时间（接收时）作为数据时间戳，仅在确实需要此设置时使用，不建议大多数用户使用
+  # 2: 将odin1时间对齐到主机时间，时间戳是传感器数据在主机时间轴上的接收时间
+  use_host_ros_time: 0  # 改为0以使用设备时间戳，不进行PTP偏移校正
+
+  streamctrl: 1           # 0: 关闭; 1: 开启
+
+  # 来自设备的原始RGB数据，jpeg格式
+  sendrgbcompressed: 1    # 0: 关闭; 1: 开启
+
+  # RGB数据，从设备的原始jpeg数据解码而来，bgr8格式
+  # 在主机设备上处理
+  sendrgb: 1              # 0: 关闭; 1: 开启
+
+  # 从解码的RGB数据处理得到的去畸变RGB图像
+  # 依赖sendrgb启用。相关相机参数可在ws/src/odin_ros_driver/config/calib.yaml中找到
+  # 在主机设备上处理
+  sendrgbundistort: 0    # 0: 关闭; 1: 开启
+
+  # IMU数据
+  sendimu: 1              # 0: 关闭; 1: 开启
+
+  # SDK IMU平滑发送功能
+  # 启用后，SDK将使用专用的高优先级线程以精确间隔（默认400Hz）发送IMU数据，以减少抖动和时间方差
+  enable_imu_smooth: 0    # 0: 禁用SDK IMU平滑发送; 1: 启用（默认）
+
+  # SDK IMU平滑发送频率，单位Hz（仅在enable_imu_smooth = 1时生效）
+  imu_smooth_frequency: 400  # 1-1000 Hz，推荐400 Hz
+
+  # 里程计数据
+  sendodom: 1             # 0: 关闭; 1: 开启
+
+  # 从odom到base_link的TF变换。除非确实需要关闭，否则请保持开启。
+  # 注意：对rviz显示cloud_raw至关重要。
+  send_odom_baselink_tf: 1 # 0: 关闭; 1: 开启
+
+  # 原始dtof数据
+  senddtof: 1             # 0: 关闭; 1: 开启
+  cloud_raw_confidence_threshold: 35 # 详情请参考readme文档
+  
+  # dtof传感器帧率。支持的值：100（10fps）或145（14.5fps）
+  # 更高的帧率可提供更平滑的点云数据，但可能会增加数据带宽
+  # 注意：数值需乘以10（例如，145表示14.5fps）
+  dtof_fps: 100           # 100: 10fps; 145: 14.5fps
+
+  # SLAM点云数据
+  sendcloudslam: 1        # 0: 关闭; 1: 开启
+
+  # 使用原始点云、RGB图像和设备端calib.yaml处理得到
+  # 在主机设备上处理
+  sendcloudrender: 1      # 0: 关闭; 1: 开启
+
+  # 深度补全演示，计算资源消耗高。
+  # 更多信息请参阅readme文档。
+  # 在主机设备上处理
+  senddepth: 0            # 0: 关闭; 1: 开启
+
+  # 点云重投影演示，使用里程计将cloud_slam投影到相机图像上
+  # 在主机设备上处理
+  sendreprojection: 0    # 0: 关闭; 1: 开启
+
+  # 图像叠加设置 - 在相机图像上叠加重投影点
+  # 在主机设备上处理
+  sendoverlay: 0                                    # 0: 关闭; 1: 开启
+  overlay_reprojected_topic: "/odin1/reprojected_image"  # 重投影图像话题
+  overlay_camera_topic: "/odin1/image/undistorted"       # 相机图像话题（去畸变）
+  overlay_output_topic: "/odin1/overlay_image"           # 输出叠加图像话题
+  overlay_alpha: 0.6                                     # 混合透明度（0.0-1.0，值越大重投影颜色越明显）
+
+  # 将rgb、里程计和SLAM点云数据记录为专有olx格式，以便在MindCloud(TM)软件中进行后续处理。
+  # 保存路径：ws/src/odin_ros_driver/recorddata/{record_start_time}/
+  # 注意：请复制整个文件夹以进行后处理。
+  recorddata: 0           # 0: 关闭; 1: 开启
+
+  # 将设备运行时状态信息保存到 ws/src/odin_ros_driver/log/Driver_{driver_start_time}/Conn_{device_connection_time}/dev_status.csv
+  devstatuslog: 1         # 0: 关闭; 1: 开启
+
+  save_log: 0 # 0: 关闭; 1: 开启
+
+  # 原始dtof传感器强度数据，灰度格式，主要用于调试目的。
+  pubintensitygray: 0     # 0: 关闭; 1: 开启
+
+  showpath: 0             # 0: 关闭; 1: 开启
+  showcamerapose: 0       # 0: 关闭; 1: 开启
+  
+  custom_map_mode: 2      # 0: 里程计模式 1: SLAM模式 2: 重定位模式
+  custom_init_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  relocalization_map_abs_path: "/home/pgd/SentryNav2026_XDU/src/odin_ros_driver/map/20260428_151440/map_20260428_151515.bin" # 重定位模式必须设置，否则会失败
+
+  # 要获取建图结果文件，请使用提供的set_param.sh脚本："./set_param.sh save_map 1"
+  mapping_result_dest_dir: "" # "": 如果未指定，保存到默认位置 {ws}/src/odin_ros_driver/map/{driver_start_time}/
+  mapping_result_file_name: "" # "": 如果未指定，以上述位置保存，使用默认文件名 map_{map_save_time}.bin
+
+  # 图像遮罩传输设置
+  sendimagemask: 0        # 0: 关闭; 1: 开启 - 启动时将图像遮罩传输到设备
+  image_mask_abs_path: "" # 图像遮罩文件的绝对路径（例如：/path/to/mask.png，分辨率1600x1296）
+
+  # 算法重置设置
+  resetalgo: 0            # 0: 关闭; 1: 开启 - 启动时向设备发送algo_reset命令
