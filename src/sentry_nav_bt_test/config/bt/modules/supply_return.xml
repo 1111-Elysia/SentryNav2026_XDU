@@ -14,12 +14,12 @@
               <CheckCondition key_name="projectile_allowance_17mm" comparison="lte" threshold="{supply_low_ammo_threshold}"/>
             </Sequence>
           </Fallback>
-          <Action ID="SetBlackboardValue" key="{supply_active_key}" value="1" type="int"/>
+          <SetBlackboardValue key="{supply_active_key}" value="1" type="int"/>
           <PrintNode message="{supply_start_message}"/>
         </Sequence>
       </Fallback>
-      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="0" type="int"/>
-      <Action ID="SetBlackboardValue" key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <GoalSelector goal_name="{supply_goal_name}" goal="{supply_goal}"/>
       <Inverter>
         <KeepRunningUntilFailure>
@@ -34,13 +34,13 @@
               <Sequence name="回补_RFID在补给区内_原地等待恢复">
                 <CheckCondition key_name="{supply_rfid_detected_key}" comparison="eq" threshold="1"/>
                 <PrintNode message="[回补] 已读到补给区 RFID，保持防御姿态等待恢复" throttle_ms="2000"/>
-                <Action ID="MaintainSentryPosture" mode="2"/>
+                <MaintainSentryPosture mode="2"/>
                 <Wait wait_duration="0.20"/>
               </Sequence>
               <RetryUntilSuccessful num_attempts="100">
                 <ReactiveSequence name="回补_RFID丢失_重新发补给点">
                   <PrintNode message="[回补] 未读到补给区 RFID，重新发补给点" throttle_ms="2000"/>
-                  <Action ID="MaintainSentryPosture" mode="3"/>
+                  <MaintainSentryPosture mode="3"/>
                   <ReliableNavigateToPose
                     goal="{supply_goal}"
                     goal_name="{supply_goal_name}"
@@ -58,7 +58,7 @@
         </KeepRunningUntilFailure>
       </Inverter>
       <PrintNode message="{supply_done_message}"/>
-      <Action ID="SetBlackboardValue" key="{supply_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{supply_active_key}" value="0" type="int"/>
     </Sequence>
   </BehaviorTree>
 </root>

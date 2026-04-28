@@ -2,20 +2,20 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="FortressHold">
     <Sequence name="堡垒驻守">
-      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="0" type="int"/>
-      <Action ID="SetBlackboardValue" key="{fortress_active_key}" value="1" type="int"/>
-      <Action ID="SetBlackboardValue" key="{fortress_goal_name_key}" value="{fortress_goal_name}" type="string"/>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="1" type="int"/>
+      <SetBlackboardValue key="{fortress_goal_name_key}" value="{fortress_goal_name}" type="string"/>
       <GoalSelector goal_name="{fortress_goal_name}" goal="{fortress_goal}"/>
       <Fallback name="堡垒驻守维持">
         <ReactiveSequence name="已在堡垒驻守半径内">
           <CheckGoalReached goal="{fortress_goal}" threshold="{fortress_hold_exit_threshold}"/>
-          <Action ID="MaintainSentryPosture" mode="{fortress_hold_posture}"/>
+          <MaintainSentryPosture mode="{fortress_hold_posture}"/>
           <Wait wait_duration="{fortress_wait_duration}"/>
         </ReactiveSequence>
         <Sequence name="回堡垒点位">
           <PrintNode message="{fortress_move_message}"/>
           <ReactiveSequence name="回堡垒并维持移动姿态">
-            <Action ID="MaintainSentryPosture" mode="{fortress_move_posture}"/>
+            <MaintainSentryPosture mode="{fortress_move_posture}"/>
             <ReliableNavigateToPose
               goal="{fortress_goal}"
               goal_name="{fortress_goal_name}"

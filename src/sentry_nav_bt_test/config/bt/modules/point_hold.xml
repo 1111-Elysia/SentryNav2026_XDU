@@ -2,20 +2,20 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="PointHold">
     <Sequence name="点位驻守">
-      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="0" type="int"/>
-      <Action ID="SetBlackboardValue" key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{point_hold_message}" throttle_ms="{point_hold_log_throttle_ms}"/>
       <GoalSelector goal_name="{point_hold_goal_name}" goal="{point_hold_goal}"/>
       <Fallback name="点位驻守维持">
         <ReactiveSequence name="已在驻守半径内">
           <CheckGoalReached goal="{point_hold_goal}" threshold="{point_hold_exit_threshold}"/>
-          <Action ID="MaintainSentryPosture" mode="{point_hold_posture}"/>
+          <MaintainSentryPosture mode="{point_hold_posture}"/>
           <Wait wait_duration="{point_hold_wait_duration}"/>
         </ReactiveSequence>
         <Sequence name="回驻守点位">
           <RetryUntilSuccessful num_attempts="100">
             <ReactiveSequence name="回驻守点直到进入半径">
-              <Action ID="MaintainSentryPosture" mode="{point_hold_move_posture}"/>
+              <MaintainSentryPosture mode="{point_hold_move_posture}"/>
               <Sequence name="导航并检查到点">
                 <ReliableNavigateToPose
                   goal="{point_hold_goal}"

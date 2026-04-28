@@ -2,12 +2,12 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="GoWaitUntilTimeAbove">
     <Sequence name="前往点位并等待时间窗口结束">
-      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="0" type="int"/>
-      <Action ID="SetBlackboardValue" key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{point_start_message}"/>
       <GoalSelector goal_name="{point_goal_name}" goal="{point_goal}"/>
       <ReactiveSequence name="前往点位并维持移动姿态">
-        <Action ID="MaintainSentryPosture" mode="{point_move_posture}"/>
+        <MaintainSentryPosture mode="{point_move_posture}"/>
         <ReliableNavigateToPose
           goal="{point_goal}"
           goal_name="{point_goal_name}"
@@ -18,7 +18,7 @@
       </ReactiveSequence>
       <PrintNode message="{point_arrived_message}"/>
       <ReactiveSequence name="等待阶段切换并维持姿态">
-        <Action ID="MaintainSentryPosture" mode="{point_wait_posture}"/>
+        <MaintainSentryPosture mode="{point_wait_posture}"/>
         <KeepRunningUntilFailure>
           <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="{point_wait_time_threshold}"/>
         </KeepRunningUntilFailure>

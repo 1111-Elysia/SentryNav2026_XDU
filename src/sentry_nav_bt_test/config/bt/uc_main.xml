@@ -16,7 +16,7 @@
           <Sequence name="首次裁判系统连接成功">
             <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
             <PrintNode message="[UC] 裁判系统已连接，等待比赛开始"/>
-            <Action ID="SetBlackboardValue" key="game_status_connected_logged" value="1" type="int"/>
+            <SetBlackboardValue key="game_status_connected_logged" value="1" type="int"/>
           </Sequence>
         </Fallback>
       </ForceFailure>
@@ -33,11 +33,11 @@
             </Sequence>
             <Sequence name="执行赛前复位">
               <PrintNode message="[UC] 比赛未开始，重置局内状态"/>
-              <Action ID="SetBlackboardValue" key="uc_initialized" value="0" type="int"/>
-              <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
-              <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
-              <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-              <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
+              <SetBlackboardValue key="uc_initialized" value="0" type="int"/>
+              <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+              <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
+              <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+              <SetBlackboardValue key="uc_fortress_goal_name" value="fortress" type="string"/>
             </Sequence>
           </Fallback>
         </Sequence>
@@ -48,11 +48,11 @@
           <CheckCondition key_name="uc_initialized" comparison="eq" threshold="1"/>
           <Sequence name="初始化状态">
             <PrintNode message="[UC] 比赛开始，初始化局内状态"/>
-            <Action ID="SetBlackboardValue" key="in_rune_phase" value="0" type="int"/>
-            <Action ID="SetBlackboardValue" key="uc_supply_active" value="0" type="int"/>
-            <Action ID="SetBlackboardValue" key="uc_fortress_hold_active" value="0" type="int"/>
-            <Action ID="SetBlackboardValue" key="uc_fortress_goal_name" value="fortress" type="string"/>
-            <Action ID="SetBlackboardValue" key="uc_initialized" value="1" type="int"/>
+            <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+            <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
+            <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+            <SetBlackboardValue key="uc_fortress_goal_name" value="fortress" type="string"/>
+            <SetBlackboardValue key="uc_initialized" value="1" type="int"/>
           </Sequence>
         </Fallback>
       </ForceFailure>
@@ -92,12 +92,12 @@
                 <Sequence name="打符阶段受击切防御">
                   <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
                   <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="1"/>
-                  <Action ID="MaintainSentryPosture" mode="2"/>
+                  <MaintainSentryPosture mode="2"/>
                 </Sequence>
                 <Sequence name="非打符阶段受击切进攻">
                   <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
                   <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
-                  <Action ID="MaintainSentryPosture" mode="1"/>
+                  <MaintainSentryPosture mode="1"/>
                 </Sequence>
                 <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
               </Fallback>

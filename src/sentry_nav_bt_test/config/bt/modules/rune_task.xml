@@ -9,12 +9,12 @@
           <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
         </Sequence>
       </Fallback>
-      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="1" type="int"/>
-      <Action ID="SetBlackboardValue" key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{rune_phase_key}" value="1" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{rune_start_message}"/>
       <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
       <ReactiveSequence name="前往符点并维持移动姿态">
-        <Action ID="MaintainSentryPosture" mode="3"/>
+        <MaintainSentryPosture mode="3"/>
         <ReliableNavigateToPose
           goal="{rune_goal}"
           goal_name="{rune_goal_name}"
@@ -24,12 +24,12 @@
           result_retry_delay="{nav_result_retry_delay}"/>
       </ReactiveSequence>
       <PrintNode message="{rune_arrived_message}"/>
-      <Action ID="EngageRune"
-              rune_type="{rune_type}"
-              posture="{rune_posture}"
-              timeout_ms="{rune_timeout_ms}"
-              request_interval_ms="{rune_request_interval_ms}"/>
-      <Action ID="SetBlackboardValue" key="{rune_phase_key}" value="0" type="int"/>
+      <EngageRune
+        rune_type="{rune_type}"
+        posture="{rune_posture}"
+        timeout_ms="{rune_timeout_ms}"
+        request_interval_ms="{rune_request_interval_ms}"/>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <PrintNode message="{rune_done_message}"/>
     </Sequence>
   </BehaviorTree>
