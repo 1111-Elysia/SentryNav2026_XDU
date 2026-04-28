@@ -7,7 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sentry_nav_bt_test/blackboard_utils.hpp"
 
@@ -25,7 +25,7 @@ public:
    * @param name 节点名称
    * @param config 节点配置
    */
-  PrintBlackboardValue(const std::string& name, const BT::NodeConfiguration& config)
+  PrintBlackboardValue(const std::string& name, const BT::NodeConfig& config)
   : BT::ActionNodeBase(name, config)
   {
     node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");

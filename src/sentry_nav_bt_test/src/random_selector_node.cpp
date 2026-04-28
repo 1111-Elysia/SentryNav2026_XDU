@@ -5,7 +5,7 @@ namespace sentry_nav_bt_test
 
     RandomSelector::RandomSelector(
         const std::string &xml_tag_name,
-        const BT::NodeConfiguration &conf)
+        const BT::NodeConfig &conf)
         : BT::SyncActionNode(xml_tag_name, conf),
           gen_(rd_()),
           logger_(rclcpp::get_logger("RandomSelector"))
@@ -71,7 +71,7 @@ namespace sentry_nav_bt_test
 
 } // namespace sentry_nav_bt_test
 
-// #include "behaviortree_cpp_v3/bt_factory.h"
+// #include "behaviortree_cpp/bt_factory.h"
 // BT_REGISTER_NODES(factory)
 // {
 //     factory.registerNodeType<sentry_nav_bt_test::RandomSelector>("RandomSelector");

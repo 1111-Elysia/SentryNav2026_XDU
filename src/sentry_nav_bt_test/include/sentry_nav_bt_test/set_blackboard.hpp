@@ -2,7 +2,7 @@
 #define SENTRY_NAV_BT_TEST_SET_BLACKBOARD_VALUE_HPP_
 
 #include <string>
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "sentry_nav_bt_test/blackboard_utils.hpp"
 #include "rclcpp/rclcpp.hpp"
 
@@ -11,7 +11,7 @@ namespace sentry_nav_bt_test
 class SetBlackboardValue : public BT::SyncActionNode
 {
 public:
-  SetBlackboardValue(const std::string& name, const BT::NodeConfiguration& config)
+  SetBlackboardValue(const std::string& name, const BT::NodeConfig& config)
   : BT::SyncActionNode(name, config)
   {
   }

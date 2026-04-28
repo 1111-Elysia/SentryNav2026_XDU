@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<root BTCPP_format="3" main_tree_to_execute="MainTree">
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <Fallback name="Root">
       <KeepRunningUntilFailure>
@@ -64,9 +64,9 @@
         </Sequence>
 
         <ReactiveFallback name="主逻辑_MainLogic">
-          <SubTreePlus ID="Resurrection" __autoremap="1"/>
+          <SubTree ID="Resurrection" _autoremap="1"/>
 
-          <SubTreePlus
+          <SubTree
             ID="SupplyReturn"
             supply_goal_name="supply_point"
             supply_low_hp_threshold="150"
@@ -82,12 +82,12 @@
             nav_resend_interval="0.30"
             nav_response_timeout="0.80"
             nav_result_retry_delay="0.30"
-            __autoremap="1"/>
+            _autoremap="1"/>
 
           <Sequence name="作战模式">
             <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
             <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
-            <Parallel success_threshold="-1" failure_threshold="1">
+            <Parallel success_count="-1" failure_count="1">
               <Fallback name="受击姿态辅助">
                 <Sequence name="打符阶段受击切防御">
                   <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
@@ -105,7 +105,7 @@
               <ReactiveFallback name="全场策略机">
                 <Sequence name="前期_小符_Phase1">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="390"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="small"
                     rune_goal_name="small_rune_point"
@@ -122,12 +122,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="前期_小符补打优先_Phase1Carry">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="small"
                     rune_goal_name="small_rune_point"
@@ -144,12 +144,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="前期_前哨站_Phase2">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="GoWaitUntilTimeAbove"
                     point_goal_name="outpost_point"
                     point_reach_threshold="0.25"
@@ -163,12 +163,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="前期_小符_Phase3">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="300"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="small"
                     rune_goal_name="small_rune_point"
@@ -185,12 +185,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="前期_小符补打优先_Phase3Carry">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="small"
                     rune_goal_name="small_rune_point"
@@ -207,14 +207,14 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Fallback name="中期_前哨站_Phase4">
                   <Sequence name="Phase4_退守堡垒驻守">
                     <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
                     <CheckCondition key_name="ally_outpost_hp" comparison="lte" threshold="0"/>
-                    <SubTreePlus
+                    <SubTree
                       ID="FortressHold"
                       fortress_goal_name="fortress"
                       fortress_arrive_threshold="0.25"
@@ -229,12 +229,12 @@
                       nav_resend_interval="0.30"
                       nav_response_timeout="0.80"
                       nav_result_retry_delay="0.30"
-                      __autoremap="1"/>
+                      _autoremap="1"/>
                   </Sequence>
                   <Sequence name="Phase4_防守前哨站点位">
                     <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
                     <CheckCondition key_name="ally_outpost_hp" comparison="gt" threshold="0"/>
-                    <SubTreePlus
+                    <SubTree
                       ID="GoWaitUntilTimeAbove"
                       point_goal_name="outpost_point"
                       point_reach_threshold="0.25"
@@ -248,13 +248,13 @@
                       nav_resend_interval="0.30"
                       nav_response_timeout="0.80"
                       nav_result_retry_delay="0.30"
-                      __autoremap="1"/>
+                      _autoremap="1"/>
                   </Sequence>
                 </Fallback>
 
                 <Sequence name="中期_大符_Phase5">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="210"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="large"
                     rune_goal_name="large_rune_point"
@@ -271,12 +271,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="中期_大符补打优先_Phase5Carry">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="large"
                     rune_goal_name="large_rune_point"
@@ -293,12 +293,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="中期_堡垒_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
                     fortress_arrive_threshold="0.25"
@@ -313,12 +313,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="中期_大符_Phase7">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="135"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="large"
                     rune_goal_name="large_rune_point"
@@ -335,12 +335,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="中期_大符补打优先_Phase7Carry">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="large"
                     rune_goal_name="large_rune_point"
@@ -357,12 +357,12 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="后期_堡垒_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
                     fortress_arrive_threshold="0.25"
@@ -377,13 +377,13 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="后期_条件大符_Phase9">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="60"/>
                   <CheckCondition key_name="ally_base_hp" comparison="gte" threshold="2000"/>
-                  <SubTreePlus
+                  <SubTree
                     ID="RuneTask"
                     rune_type="large"
                     rune_goal_name="large_rune_point"
@@ -400,11 +400,11 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
 
                 <Sequence name="后期_守家_Phase10">
-                  <SubTreePlus
+                  <SubTree
                     ID="PointHold"
                     point_hold_goal_name="base_defense_point"
                     point_hold_arrive_threshold="0.25"
@@ -419,7 +419,7 @@
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
-                    __autoremap="1"/>
+                    _autoremap="1"/>
                 </Sequence>
               </ReactiveFallback>
             </Parallel>
@@ -511,8 +511,8 @@
     <Control ID="Sequence"/>
     <Control ID="Fallback"/>
     <Control ID="Parallel">
-      <input_port name="success_threshold"/>
-      <input_port name="failure_threshold"/>
+      <input_port name="success_count"/>
+      <input_port name="failure_count"/>
     </Control>
     <Control ID="ReactiveSequence"/>
     <Control ID="ReactiveFallback"/>

@@ -1,138 +1,169 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<root BTCPP_format="3"
+<root BTCPP_format="4"
       main_tree_to_execute="MainTree">
+
   <BehaviorTree ID="MainTree">
     <Fallback name="Root">
       <KeepRunningUntilFailure>
         <Sequence name="裁判系统连接判定">
           <Inverter>
-            <CheckCondition key_name="game_status_received"
-                            comparison="eq"
-                            threshold="1"/>
+            <Condition ID="CheckCondition"
+                       key_name="game_status_received"
+                       comparison="eq"
+                       threshold="1"/>
           </Inverter>
         </Sequence>
       </KeepRunningUntilFailure>
       <ForceFailure>
         <Fallback name="裁判系统连接成功日志">
-          <CheckCondition key_name="game_status_connected_logged"
-                          comparison="eq"
-                          threshold="1"/>
+          <Condition ID="CheckCondition"
+                     key_name="game_status_connected_logged"
+                     comparison="eq"
+                     threshold="1"/>
           <Sequence name="首次裁判系统连接成功">
-            <CheckCondition key_name="game_status_received"
-                            comparison="eq"
-                            threshold="1"/>
-            <PrintNode message="[UC] 裁判系统已连接，等待比赛开始"
-                       throttle_ms=""/>
-            <SetBlackboardValue key="game_status_connected_logged"
-                                value="1"
-                                type="int"/>
+            <Condition ID="CheckCondition"
+                       key_name="game_status_received"
+                       comparison="eq"
+                       threshold="1"/>
+            <Action ID="PrintNode"
+                    message="[UC] 裁判系统已连接，等待比赛开始"
+                    throttle_ms=""/>
+            <Action ID="SetBlackboardValue"
+                    key="game_status_connected_logged"
+                    value="1"
+                    type="int"/>
           </Sequence>
         </Fallback>
       </ForceFailure>
       <KeepRunningUntilFailure>
         <Sequence name="开始比赛检测">
-          <CheckCondition key_name="game_progress"
-                          comparison="lte"
-                          threshold="3"/>
+          <Condition ID="CheckCondition"
+                     key_name="game_progress"
+                     comparison="lte"
+                     threshold="3"/>
           <Fallback name="赛前状态复位">
             <Sequence name="赛前状态已复位">
-              <CheckCondition key_name="uc_initialized"
-                              comparison="eq"
-                              threshold="0"/>
-              <CheckCondition key_name="in_rune_phase"
-                              comparison="eq"
-                              threshold="0"/>
-              <CheckCondition key_name="uc_supply_active"
-                              comparison="eq"
-                              threshold="0"/>
-              <CheckCondition key_name="uc_fortress_hold_active"
-                              comparison="eq"
-                              threshold="0"/>
+              <Condition ID="CheckCondition"
+                         key_name="uc_initialized"
+                         comparison="eq"
+                         threshold="0"/>
+              <Condition ID="CheckCondition"
+                         key_name="in_rune_phase"
+                         comparison="eq"
+                         threshold="0"/>
+              <Condition ID="CheckCondition"
+                         key_name="uc_supply_active"
+                         comparison="eq"
+                         threshold="0"/>
+              <Condition ID="CheckCondition"
+                         key_name="uc_fortress_hold_active"
+                         comparison="eq"
+                         threshold="0"/>
             </Sequence>
             <Sequence name="执行赛前复位">
-              <PrintNode message="[UC] 比赛未开始，重置局内状态"
-                         throttle_ms=""/>
-              <SetBlackboardValue key="uc_initialized"
-                                  value="0"
-                                  type="int"/>
-              <SetBlackboardValue key="in_rune_phase"
-                                  value="0"
-                                  type="int"/>
-              <SetBlackboardValue key="uc_supply_active"
-                                  value="0"
-                                  type="int"/>
-              <SetBlackboardValue key="uc_fortress_hold_active"
-                                  value="0"
-                                  type="int"/>
-              <SetBlackboardValue key="uc_fortress_goal_name"
-                                  value="fortress"
-                                  type="string"/>
+              <Action ID="PrintNode"
+                      message="[UC] 比赛未开始，重置局内状态"
+                      throttle_ms=""/>
+              <Action ID="SetBlackboardValue"
+                      key="uc_initialized"
+                      value="0"
+                      type="int"/>
+              <Action ID="SetBlackboardValue"
+                      key="in_rune_phase"
+                      value="0"
+                      type="int"/>
+              <Action ID="SetBlackboardValue"
+                      key="uc_supply_active"
+                      value="0"
+                      type="int"/>
+              <Action ID="SetBlackboardValue"
+                      key="uc_fortress_hold_active"
+                      value="0"
+                      type="int"/>
+              <Action ID="SetBlackboardValue"
+                      key="uc_fortress_goal_name"
+                      value="fortress"
+                      type="string"/>
             </Sequence>
           </Fallback>
         </Sequence>
       </KeepRunningUntilFailure>
       <ForceFailure>
         <Fallback name="初始化">
-          <CheckCondition key_name="uc_initialized"
-                          comparison="eq"
-                          threshold="1"/>
+          <Condition ID="CheckCondition"
+                     key_name="uc_initialized"
+                     comparison="eq"
+                     threshold="1"/>
           <Sequence name="初始化状态">
-            <PrintNode message="[UC] 比赛开始，初始化局内状态"
-                       throttle_ms=""/>
-            <SetBlackboardValue key="in_rune_phase"
-                                value="0"
-                                type="int"/>
-            <SetBlackboardValue key="uc_supply_active"
-                                value="0"
-                                type="int"/>
-            <SetBlackboardValue key="uc_fortress_hold_active"
-                                value="0"
-                                type="int"/>
-            <SetBlackboardValue key="uc_fortress_goal_name"
-                                value="fortress"
-                                type="string"/>
-            <SetBlackboardValue key="uc_initialized"
-                                value="1"
-                                type="int"/>
+            <Action ID="PrintNode"
+                    message="[UC] 比赛开始，初始化局内状态"
+                    throttle_ms=""/>
+            <Action ID="SetBlackboardValue"
+                    key="in_rune_phase"
+                    value="0"
+                    type="int"/>
+            <Action ID="SetBlackboardValue"
+                    key="uc_supply_active"
+                    value="0"
+                    type="int"/>
+            <Action ID="SetBlackboardValue"
+                    key="uc_fortress_hold_active"
+                    value="0"
+                    type="int"/>
+            <Action ID="SetBlackboardValue"
+                    key="uc_fortress_goal_name"
+                    value="fortress"
+                    type="string"/>
+            <Action ID="SetBlackboardValue"
+                    key="uc_initialized"
+                    value="1"
+                    type="int"/>
           </Sequence>
         </Fallback>
       </ForceFailure>
       <Sequence name="主循环_Root">
         <Sequence name="前置检查">
-          <CheckCondition key_name="game_status_received"
-                          comparison="eq"
-                          threshold="1"/>
-          <CheckCondition key_name="game_progress"
-                          comparison="eq"
-                          threshold="4"/>
+          <Condition ID="CheckCondition"
+                     key_name="game_status_received"
+                     comparison="eq"
+                     threshold="1"/>
+          <Condition ID="CheckCondition"
+                     key_name="game_progress"
+                     comparison="eq"
+                     threshold="4"/>
         </Sequence>
         <ReactiveFallback name="主逻辑_MainLogic">
-          <SubTreePlus ID="Resurrection"
-                       __autoremap="1"/>
+          <SubTree ID="Resurrection"
+                       _autoremap="1"/>
           <Sequence name="作战模式">
-            <Parallel failure_threshold="1"
-                      success_threshold="-1">
+            <Parallel failure_count="1"
+                      success_count="-1">
               <Fallback name="受击姿态辅助">
                 <Sequence name="非打符阶段受击切进攻">
-                  <CheckCondition key_name="is_under_attack"
-                                  comparison="eq"
-                                  threshold="1"/>
-                  <CheckCondition key_name="in_rune_phase"
-                                  comparison="eq"
-                                  threshold="0"/>
-                  <MaintainSentryPosture mode="1"
-                                         cooldown_ms=""/>
+                  <Condition ID="CheckCondition"
+                             key_name="is_under_attack"
+                             comparison="eq"
+                             threshold="1"/>
+                  <Condition ID="CheckCondition"
+                             key_name="in_rune_phase"
+                             comparison="eq"
+                             threshold="0"/>
+                  <Action ID="MaintainSentryPosture"
+                          mode="1"
+                          cooldown_ms=""/>
                 </Sequence>
-                <CheckCondition key_name="game_progress"
-                                comparison="eq"
-                                threshold="4"/>
+                <Condition ID="CheckCondition"
+                           key_name="game_progress"
+                           comparison="eq"
+                           threshold="4"/>
               </Fallback>
               <ReactiveFallback name="全场策略机">
                 <Sequence name="点位1">
-                  <CheckCondition key_name="stage_remain_time"
-                                  comparison="gt"
-                                  threshold="360"/>
-                  <SubTreePlus ID="GoWaitUntilTimeAbove"
+                  <Condition ID="CheckCondition"
+                             key_name="stage_remain_time"
+                             comparison="gt"
+                             threshold="360"/>
+                  <SubTree ID="GoWaitUntilTimeAbove"
                                point_goal_name="outpost_point"
                                point_reach_threshold="0.25"
                                point_wait_time_threshold="360"
@@ -145,13 +176,14 @@
                                nav_resend_interval="0.30"
                                nav_response_timeout="0.80"
                                nav_result_retry_delay="0.30"
-                               __autoremap="1"/>
+                               _autoremap="1"/>
                 </Sequence>
                 <Sequence name="点位2">
-                  <CheckCondition key_name="stage_remain_time"
-                                  comparison="gt"
-                                  threshold="300"/>
-                  <SubTreePlus ID="GoWaitUntilTimeAbove"
+                  <Condition ID="CheckCondition"
+                             key_name="stage_remain_time"
+                             comparison="gt"
+                             threshold="300"/>
+                  <SubTree ID="GoWaitUntilTimeAbove"
                                fortress_active_key="uc_fortress_hold_active"
                                nav_resend_interval="0.30"
                                nav_response_timeout="0.80"
@@ -164,13 +196,14 @@
                                point_wait_posture="1"
                                point_wait_time_threshold="300"
                                rune_phase_key="in_rune_phase"
-                               __autoremap="1"/>
+                               _autoremap="1"/>
                 </Sequence>
                 <Sequence name="点位3">
-                  <CheckCondition key_name="stage_remain_time"
-                                  comparison="gt"
-                                  threshold="240"/>
-                  <SubTreePlus ID="GoWaitUntilTimeAbove"
+                  <Condition ID="CheckCondition"
+                             key_name="stage_remain_time"
+                             comparison="gt"
+                             threshold="240"/>
+                  <SubTree ID="GoWaitUntilTimeAbove"
                                fortress_active_key="uc_fortress_hold_active"
                                nav_resend_interval="0.30"
                                nav_response_timeout="0.80"
@@ -183,10 +216,10 @@
                                point_wait_posture="1"
                                point_wait_time_threshold="240"
                                rune_phase_key="in_rune_phase"
-                               __autoremap="1"/>
+                               _autoremap="1"/>
                 </Sequence>
                 <Sequence name="堡垒">
-                  <SubTreePlus ID="FortressHold"
+                  <SubTree ID="FortressHold"
                                fortress_goal_name="fortress"
                                fortress_arrive_threshold="0.25"
                                fortress_hold_exit_threshold="0.30"
@@ -200,7 +233,7 @@
                                nav_resend_interval="0.30"
                                nav_response_timeout="0.80"
                                nav_result_retry_delay="0.30"
-                               __autoremap="1"/>
+                               _autoremap="1"/>
                 </Sequence>
               </ReactiveFallback>
             </Parallel>

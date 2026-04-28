@@ -12,18 +12,13 @@
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
-#include "behaviortree_cpp_v3/bt_factory.h"
-#include "behaviortree_cpp_v3/utils/shared_library.h"
-#include "nav2_behavior_tree/bt_service_node.hpp"
-#include "nav2_behavior_tree/bt_conversions.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "behaviortree_cpp/bt_factory.h"
+#include "behaviortree_cpp/utils/shared_library.h"
+#include "behaviortree_cpp/loggers/groot2_publisher.h"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
-
-// Nav2 plugins
-#include "nav2_behavior_tree/plugins/action/navigate_to_pose_action.hpp"
-#include "nav2_behavior_tree/plugins/action/wait_action.hpp"
-#include "nav2_behavior_tree/plugins/control/recovery_node.hpp"
-#include "nav2_behavior_tree/plugins/decorator/rate_controller.hpp"
+#include "nav2_msgs/action/navigate_to_pose.hpp"
 
 // 行为树节点
 #include "sentry_nav_bt_test/check_condition.hpp"
@@ -40,8 +35,6 @@
 #include "sentry_nav_bt_test/patrol_nodes.hpp"
 #include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
 
-#include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
-
 namespace
 {
 
@@ -54,7 +47,7 @@ struct BtMessageLogPaths
 class ValidationWaitAction : public BT::SyncActionNode
 {
 public:
-    ValidationWaitAction(const std::string &name, const BT::NodeConfiguration &config)
+    ValidationWaitAction(const std::string &name, const BT::NodeConfig &config)
         : BT::SyncActionNode(name, config)
     {
     }
@@ -68,6 +61,46 @@ public:
     {
         return BT::NodeStatus::SUCCESS;
     }
+};
+
+class WaitAction : public BT::StatefulActionNode
+{
+public:
+    WaitAction(const std::string &name, const BT::NodeConfig &config)
+        : BT::StatefulActionNode(name, config)
+    {
+    }
+
+    static BT::PortsList providedPorts()
+    {
+        return {BT::InputPort<double>("wait_duration", 0.0, "Wait duration in seconds")};
+    }
+
+    BT::NodeStatus onStart() override
+    {
+        double wait_duration = 0.0;
+        getInput("wait_duration", wait_duration);
+        if (wait_duration <= 0.0) {
+            return BT::NodeStatus::SUCCESS;
+        }
+
+        deadline_ = std::chrono::steady_clock::now() +
+                    std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>(wait_duration));
+        return BT::NodeStatus::RUNNING;
+    }
+
+    BT::NodeStatus onRunning() override
+    {
+        return std::chrono::steady_clock::now() >= deadline_
+                   ? BT::NodeStatus::SUCCESS
+                   : BT::NodeStatus::RUNNING;
+    }
+
+    void onHalted() override {}
+
+private:
+    std::chrono::steady_clock::time_point deadline_;
 };
 
 std::string getCurrentTimestampString()
@@ -266,33 +299,17 @@ BT::Tree createRegisteredBehaviorTree(
 void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
                                  const rclcpp::Node::SharedPtr &node)
 {
-    // 注册节点
-    // NavigateToPose
-    BT::NodeBuilder navigate_builder =
-        [](const std::string &name, const BT::NodeConfiguration &config)
-    {
-        return std::make_unique<nav2_behavior_tree::NavigateToPoseAction>(
-            name, "navigate_to_pose", config);
-    };
-    factory.registerBuilder<nav2_behavior_tree::NavigateToPoseAction>("NavigateToPose", navigate_builder);
     BT::NodeBuilder reliable_navigate_builder =
-    [node](const std::string &name, const BT::NodeConfiguration &config)
+    [node](const std::string &name, const BT::NodeConfig &config)
     {
         return std::make_unique<sentry_nav_bt_test::ReliableNavigateToPose>(name, config, node);
     };
     factory.registerBuilder<sentry_nav_bt_test::ReliableNavigateToPose>(
         "ReliableNavigateToPose", reliable_navigate_builder);
-    // 等待
-    BT::NodeBuilder wait_builder =
-        [](const std::string &name, const BT::NodeConfiguration &config)
-    {
-        return std::make_unique<nav2_behavior_tree::WaitAction>(
-            name, "wait", config);
-    };
-    factory.registerBuilder<nav2_behavior_tree::WaitAction>("Wait", wait_builder);
+    factory.registerNodeType<WaitAction>("Wait");
     // 打印黑板值
     BT::NodeBuilder print_blackboard_builder =
-        [](const std::string &name, const BT::NodeConfiguration &config)
+        [](const std::string &name, const BT::NodeConfig &config)
     {
         return std::make_unique<sentry_nav_bt_test::PrintBlackboardValue>(name, config);
     };
@@ -320,7 +337,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     // 设置黑板值
     factory.registerNodeType<sentry_nav_bt_test::SetBlackboardValue>("SetBlackboardValue");
     BT::NodeBuilder chase_builder =
-    [node](const std::string &name, const BT::NodeConfiguration &config)
+    [node](const std::string &name, const BT::NodeConfig &config)
     {
         return std::make_unique<sentry_nav_bt_test::ChaseTargetAction>(name, config, node);
     };
@@ -571,15 +588,15 @@ int main(int argc, char **argv)
             bt_main_tree_id,
             blackboard);
 
-        auto publisher_zmq = std::make_shared<BT::PublisherZMQ>(tree);
-        RCLCPP_INFO(node->get_logger(), "Groot ZMQ Publisher started. Port: 1666");
+        auto groot_publisher = std::make_shared<BT::Groot2Publisher>(tree, 1667);
+        RCLCPP_INFO(node->get_logger(), "Groot2 Publisher started. Port: 1667");
         
         RCLCPP_INFO(node->get_logger(), "运行导航行为树");
         while (rclcpp::ok())
         {
             rclcpp::spin_some(node);
-            tree.rootNode()->executeTick();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            tree.tickOnce();
+            tree.sleep(std::chrono::milliseconds(10));
         }
     }
     catch (const std::exception &e)

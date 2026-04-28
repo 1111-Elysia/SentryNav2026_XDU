@@ -108,7 +108,7 @@ void updatePostureRequestStatus(
 
 } // namespace
 
-RefereeActionBase::RefereeActionBase(const std::string &name, const BT::NodeConfiguration &config)
+RefereeActionBase::RefereeActionBase(const std::string &name, const BT::NodeConfig &config)
     : BT::SyncActionNode(name, config)
 {
     if (!config.blackboard->get("node", node_)) {
@@ -183,7 +183,7 @@ bool RefereeActionBase::send_packet(
     return ok;
 }
 
-MaintainSentryPosture::MaintainSentryPosture(const std::string &name, const BT::NodeConfiguration &config)
+MaintainSentryPosture::MaintainSentryPosture(const std::string &name, const BT::NodeConfig &config)
     : RefereeActionBase(name, config)
 {
 }
@@ -341,7 +341,7 @@ BT::NodeStatus MaintainSentryPosture::tick()
     return BT::NodeStatus::SUCCESS;
 }
 
-ConfirmResurrection::ConfirmResurrection(const std::string &name, const BT::NodeConfiguration &config)
+ConfirmResurrection::ConfirmResurrection(const std::string &name, const BT::NodeConfig &config)
     : RefereeActionBase(name, config)
 {
 }
@@ -422,7 +422,7 @@ BT::NodeStatus ConfirmResurrection::tick()
     return any_send_ok ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
 }
 
-EngageRune::EngageRune(const std::string &name, const BT::NodeConfiguration &config)
+EngageRune::EngageRune(const std::string &name, const BT::NodeConfig &config)
     : BT::StatefulActionNode(name, config)
 {
     if (!config.blackboard->get("node", node_)) {

@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "rclcpp/rclcpp.hpp"
 #include "rm_referee_msgs/srv/tx.hpp"
 #include "sentry_msgs/msg/scan_mode.hpp"
@@ -117,7 +117,7 @@ namespace sentry_nav_bt_test
     class RefereeActionBase : public BT::SyncActionNode
     {
     public:
-        RefereeActionBase(const std::string &name, const BT::NodeConfiguration &config);
+        RefereeActionBase(const std::string &name, const BT::NodeConfig &config);
 
     protected:
         // 尝试初始化工具类 (如果 Robot ID 还没拿到，返回 false)
@@ -138,7 +138,7 @@ namespace sentry_nav_bt_test
     class MaintainSentryPosture : public RefereeActionBase
     {
     public:
-        MaintainSentryPosture(const std::string &name, const BT::NodeConfiguration &config);
+        MaintainSentryPosture(const std::string &name, const BT::NodeConfig &config);
 
         static BT::PortsList providedPorts();
 
@@ -153,7 +153,7 @@ namespace sentry_nav_bt_test
     class ConfirmResurrection : public RefereeActionBase
     {
     public:
-        ConfirmResurrection(const std::string &name, const BT::NodeConfiguration &config);
+        ConfirmResurrection(const std::string &name, const BT::NodeConfig &config);
 
         static BT::PortsList providedPorts();
 
@@ -166,7 +166,7 @@ namespace sentry_nav_bt_test
     class EngageRune : public BT::StatefulActionNode
     {
     public:
-        EngageRune(const std::string &name, const BT::NodeConfiguration &config);
+        EngageRune(const std::string &name, const BT::NodeConfig &config);
 
         static BT::PortsList providedPorts();
 

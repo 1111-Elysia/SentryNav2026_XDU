@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "behaviortree_cpp_v3/blackboard.h"
+#include "behaviortree_cpp/blackboard.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sentry_nav_bt_test/referee_actions.hpp"

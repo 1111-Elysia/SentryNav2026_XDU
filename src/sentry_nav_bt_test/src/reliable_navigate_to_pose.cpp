@@ -9,7 +9,7 @@ namespace sentry_nav_bt_test
 
 ReliableNavigateToPose::ReliableNavigateToPose(
   const std::string &name,
-  const BT::NodeConfiguration &config,
+  const BT::NodeConfig &config,
   const rclcpp::Node::SharedPtr &node)
 : BT::StatefulActionNode(name, config),
   node_(node)

@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -38,7 +38,7 @@ public:
   };
 
   ChaseTargetAction(const std::string &name,
-                    const BT::NodeConfiguration &config,
+                    const BT::NodeConfig &config,
                     const rclcpp::Node::SharedPtr &node);
 
   ~ChaseTargetAction() override = default;

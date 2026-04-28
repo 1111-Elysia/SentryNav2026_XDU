@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<root BTCPP_format="3">
+<root BTCPP_format="4">
   <BehaviorTree ID="SupplyReturn">
     <Sequence name="回补模式">
       <Fallback name="回补触发或保持">

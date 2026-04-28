@@ -5,7 +5,7 @@
 #include <memory>
 
 #include "rclcpp/rclcpp.hpp"
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav2_util/geometry_utils.hpp"
 
@@ -17,7 +17,7 @@ class GoalSelector : public BT::SyncActionNode
 public:
     GoalSelector(
         const std::string &xml_tag_name,
-        const BT::NodeConfiguration &conf);
+        const BT::NodeConfig &conf);
 
     static BT::PortsList providedPorts()
     {

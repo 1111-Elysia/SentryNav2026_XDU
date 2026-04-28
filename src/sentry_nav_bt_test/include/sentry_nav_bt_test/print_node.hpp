@@ -10,7 +10,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "rclcpp/rclcpp.hpp"
 
 namespace sentry_nav_bt_test
@@ -27,7 +27,7 @@ public:
    * @param name 节点名称
    * @param config 节点配置
    */
-  PrintNode(const std::string& name, const BT::NodeConfiguration& config)
+  PrintNode(const std::string& name, const BT::NodeConfig& config)
   : BT::SyncActionNode(name, config)
   {
     node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");

@@ -14,8 +14,7 @@ add_compile_options(-Ofast -O3)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
-find_package(behaviortree_cpp_v3 REQUIRED)
-find_package(nav2_behavior_tree REQUIRED)
+find_package(behaviortree_cpp REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -51,8 +50,7 @@ add_library(sentry_nav_bt_test_nodes SHARED
 ament_target_dependencies(sentry_nav_bt_test_nodes
   rclcpp
   rclcpp_action
-  behaviortree_cpp_v3
-  nav2_behavior_tree
+  behaviortree_cpp
   nav2_msgs
   nav2_util
   geometry_msgs
@@ -63,7 +61,9 @@ ament_target_dependencies(sentry_nav_bt_test_nodes
   tf2_geometry_msgs
   sentry_msgs
   rm_referee_msgs
-  nlohmann_json
+)
+target_link_libraries(sentry_nav_bt_test_nodes
+  nlohmann_json::nlohmann_json
 )
 # 允许 BT 插件导出
 target_compile_definitions(sentry_nav_bt_test_nodes PRIVATE BT_PLUGIN_EXPORT)
@@ -79,14 +79,14 @@ add_executable(navigate_bt_node
 # 链接刚才创建的库
 target_link_libraries(navigate_bt_node 
   sentry_nav_bt_test_nodes
+  nlohmann_json::nlohmann_json
 )
 
 # Executable 的依赖 (主要是 BlackboardManager 在 main 中用到)
 ament_target_dependencies(navigate_bt_node
   rclcpp
   rclcpp_action
-  behaviortree_cpp_v3
-  nav2_behavior_tree
+  behaviortree_cpp
   nav2_msgs
   nav2_util
   geometry_msgs 
@@ -95,7 +95,6 @@ ament_target_dependencies(navigate_bt_node
   tf2_ros
   tf2_geometry_msgs
   rm_referee_msgs
-  nlohmann_json
 )
 
 # ============================================
@@ -124,8 +123,7 @@ ament_export_libraries(sentry_nav_bt_test_nodes)
 ament_export_dependencies(
   rclcpp
   rclcpp_action
-  behaviortree_cpp_v3
-  nav2_behavior_tree
+  behaviortree_cpp
   nav2_msgs
   nav2_util
   tf2_ros

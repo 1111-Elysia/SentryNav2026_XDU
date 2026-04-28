@@ -1,14 +1,14 @@
 #ifndef AUTO_AIM_AND_FIRE_ACTION_HPP
 #define AUTO_AIM_AND_FIRE_ACTION_HPP
 
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "rclcpp/rclcpp.hpp"
 
 namespace sentry_nav_bt_test {
 
 class AutoAimAndFire : public BT::SyncActionNode {
 public:
-    AutoAimAndFire(const std::string& name, const BT::NodeConfiguration& config)
+    AutoAimAndFire(const std::string& name, const BT::NodeConfig& config)
         : BT::SyncActionNode(name, config) {}
 
     static BT::PortsList providedPorts() {

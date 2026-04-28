@@ -24,7 +24,7 @@ std::string trim(const std::string &value)
 }  // namespace
 
 PatrolGoalSelector::PatrolGoalSelector(
-  const std::string &name, const BT::NodeConfiguration &config)
+  const std::string &name, const BT::NodeConfig &config)
 : BT::SyncActionNode(name, config),
   logger_(rclcpp::get_logger("PatrolGoalSelector"))
 {
@@ -118,7 +118,7 @@ BT::NodeStatus PatrolGoalSelector::tick()
 }
 
 CheckGoalReached::CheckGoalReached(
-  const std::string &name, const BT::NodeConfiguration &config)
+  const std::string &name, const BT::NodeConfig &config)
 : BT::ConditionNode(name, config),
   logger_(rclcpp::get_logger("CheckGoalReached"))
 {

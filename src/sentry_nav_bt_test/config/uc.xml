@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<root BTCPP_format="3" main_tree_to_execute="MainTree">
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <Fallback name="Root">
       <KeepRunningUntilFailure>
@@ -119,7 +119,7 @@
           <Sequence name="作战模式">
             <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
             <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
-            <Parallel success_threshold="-1" failure_threshold="1">
+            <Parallel success_count="-1" failure_count="1">
               <Fallback name="受击姿态辅助">
                 <Sequence name="打符阶段受击切防御">
                   <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
@@ -553,8 +553,8 @@
     <Decorator ID="Inverter"/>
     <Control ID="Fallback"/>
     <Control ID="Parallel">
-      <input_port name="success_threshold"/>
-      <input_port name="failure_threshold"/>
+      <input_port name="success_count"/>
+      <input_port name="failure_count"/>
     </Control>
     <Control ID="ReactiveSequence"/>
     <Control ID="ReactiveFallback"/>

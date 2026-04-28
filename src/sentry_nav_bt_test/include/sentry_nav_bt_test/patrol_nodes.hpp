@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "behaviortree_cpp_v3/action_node.h"
-#include "behaviortree_cpp_v3/condition_node.h"
+#include "behaviortree_cpp/action_node.h"
+#include "behaviortree_cpp/condition_node.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 
@@ -15,7 +15,7 @@ namespace sentry_nav_bt_test
 class PatrolGoalSelector : public BT::SyncActionNode
 {
 public:
-  PatrolGoalSelector(const std::string &name, const BT::NodeConfiguration &config);
+  PatrolGoalSelector(const std::string &name, const BT::NodeConfig &config);
 
   static BT::PortsList providedPorts();
 
@@ -30,7 +30,7 @@ private:
 class CheckGoalReached : public BT::ConditionNode
 {
 public:
-  CheckGoalReached(const std::string &name, const BT::NodeConfiguration &config);
+  CheckGoalReached(const std::string &name, const BT::NodeConfig &config);
 
   static BT::PortsList providedPorts();
 

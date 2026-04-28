@@ -3,7 +3,7 @@
 
 #include <string>
 #include "rclcpp/rclcpp.hpp"
-#include "behaviortree_cpp_v3/condition_node.h"
+#include "behaviortree_cpp/condition_node.h"
 #include "sentry_nav_bt_test/blackboard_utils.hpp"
 
 namespace sentry_nav_bt_test
@@ -14,7 +14,7 @@ namespace sentry_nav_bt_test
   public:
     CheckCondition(
         const std::string &name,
-        const BT::NodeConfiguration &config)
+        const BT::NodeConfig &config)
         : BT::ConditionNode(name, config)
     {
     }

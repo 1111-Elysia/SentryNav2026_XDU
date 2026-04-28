@@ -47,9 +47,8 @@ src/sentry_nav_bt_test
 - `rclcpp`
 - `rclcpp_action`
 - `nav2_msgs`
-- `nav2_behavior_tree`
 - `nav2_util`
-- `behaviortree_cpp_v3`
+- `behaviortree_cpp`
 - `geometry_msgs`
 - `nav_msgs`
 - `tf2`
@@ -398,14 +397,13 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
 | `AutoAimAndFire` | Action | 当前为 mock 节点，仅打印日志 |
 
-此外也注册了 Nav2 自带节点：
+此外也注册了本包内置的兼容节点：
 
-- `NavigateToPose`
 - `Wait`
 
 ## 与 Groot 联调
 
-节点启动后会创建 `BT::PublisherZMQ`，日志中会输出 Groot ZMQ Publisher 启动信息。可以直接用 Groot 打开：
+节点启动后会创建 `BT::Groot2Publisher`，日志中会输出 Groot2 Publisher 启动信息。可以直接用 Groot2 打开：
 
 - `bt.btproj`
 - `Project.btproj`

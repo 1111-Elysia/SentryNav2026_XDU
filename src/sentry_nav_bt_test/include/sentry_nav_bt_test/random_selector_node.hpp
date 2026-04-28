@@ -5,8 +5,8 @@
 #include <vector>
 #include <random>
 
-#include "behaviortree_cpp_v3/behavior_tree.h"
-#include "behaviortree_cpp_v3/bt_factory.h"
+#include "behaviortree_cpp/behavior_tree.h"
+#include "behaviortree_cpp/bt_factory.h"
 #include "nav2_util/geometry_utils.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -19,7 +19,7 @@ class RandomSelector : public BT::SyncActionNode
 public:
   RandomSelector(
     const std::string & xml_tag_name,
-    const BT::NodeConfiguration & conf);
+    const BT::NodeConfig & conf);
 
   static BT::PortsList providedPorts()
   {

@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "behaviortree_cpp_v3/action_node.h"
+#include "behaviortree_cpp/action_node.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -20,7 +20,7 @@ public:
 
   ReliableNavigateToPose(
     const std::string &name,
-    const BT::NodeConfiguration &config,
+    const BT::NodeConfig &config,
     const rclcpp::Node::SharedPtr &node);
 
   static BT::PortsList providedPorts();
