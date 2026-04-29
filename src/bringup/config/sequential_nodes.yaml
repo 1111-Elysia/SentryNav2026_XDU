@@ -4,10 +4,15 @@ sequential_nodes:
   #   cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
   #   wait_after: 0
 
-  - label: RM-messages
+  - label: Odin-Driver
     type: execute
-    cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
+    cmd: ["ros2", "launch", "odin_ros_driver", "odin1_ros2.launch.py"]
     wait_after: 0
+
+  # - label: RM-messages
+  #   type: execute
+  #   cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
+  #   wait_after: 0
 
   # - label: Lidar-Filter
   #   type: node
@@ -85,26 +90,26 @@ sequential_nodes:
   #     - livox_to_scan.yaml
   #   wait_after: 0
 
-  # - label: USB-Serial-Comm
-  #   type: execute
-  #   cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
-  #   wait_after: 0
+  - label: USB-Serial-Comm
+    type: execute
+    cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
+    wait_after: 0
 
   # - label: CmdVel-Process
   #   type: execute
   #   cmd: ["ros2", "launch", "cmd_vel_process", "cmd_vel_process.launch.py"]
   #   wait_after: 0
 
-  - label: Can-Comm
-    type: execute
-    cmd: ["ros2", "launch", "can_comm", "can_comm.launch.py"]
-    wait_after: 0
+  # - label: Can-Comm
+  #   type: execute
+  #   cmd: ["ros2", "launch", "can_comm", "can_comm.launch.py"]
+  #   wait_after: 0
 
   - label: Navigation-Stack
     type: execute
     cmd: [
       "ros2", "launch", "sentry_navigation", "navigation_launch.py",
-      "map:=/home/pgd/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
+      "map:=/home/nuc/Desktop/SentryNav2026_XDU/src/bringup/map/map.yaml", "use_rviz:=true"
     ]
     wait_after: 0
 
@@ -113,12 +118,12 @@ sequential_nodes:
   #   cmd: ["ros2", "launch", "sentry_eval_bt", "sentry_eval_bt.launch.py"]
   #   wait_after: 0
 
-  - label: Sentry-BT
-    type: execute
-    cmd: [
-      "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py"
-    ]
-    wait_after: 0
+  # - label: Sentry-BT
+  #   type: execute
+  #   cmd: [
+  #     "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py"
+  #   ]
+  #   wait_after: 0
 
   # - label: Rosbag-Record
   #   type: execute

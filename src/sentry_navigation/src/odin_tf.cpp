@@ -51,33 +51,33 @@ public:
 private:
     void game_status_callback(const rm_referee_msgs::msg::GameStatus::SharedPtr msg)
     {
-        if (msg->game_progress == 2)
-        {
-            std_msgs::msg::Bool scan_mode_msg;
-            scan_mode_msg.data = true;
-            scan_mode_pub_->publish(scan_mode_msg);
-            RCLCPP_INFO(this->get_logger(), "Game progress is 2, publishing /scan_mode = true");
-        }
-        else if (msg->game_progress == 4)
-        {
-            // Check if the transform exists in the buffer (non-blocking)
-            if (!tf_buffer_->canTransform("map", "odom", tf2::TimePointZero))
-            {
-                geometry_msgs::msg::TransformStamped static_transform_stamped;
-                static_transform_stamped.header.stamp = this->get_clock()->now();
-                static_transform_stamped.header.frame_id = "map";
-                static_transform_stamped.child_frame_id = "odom";
-                static_transform_stamped.transform.translation.x = 0.0;
-                static_transform_stamped.transform.translation.y = 0.0;
-                static_transform_stamped.transform.translation.z = 0.0;
-                tf2::Quaternion q;
-                q.setRPY(0, 0, 0);
-                q.setW(1);
-                static_transform_stamped.transform.rotation = tf2::toMsg(q);
-                static_tf_broadcaster_->sendTransform(static_transform_stamped);
-                RCLCPP_WARN(this->get_logger(), "Game progress is 4 and map->odom transform not available. Publishing static transform.");
-            }
-        }
+        // if (msg->game_progress == 2)
+        // {
+        //     std_msgs::msg::Bool scan_mode_msg;
+        //     scan_mode_msg.data = true;
+        //     scan_mode_pub_->publish(scan_mode_msg);
+        //     RCLCPP_INFO(this->get_logger(), "Game progress is 2, publishing /scan_mode = true");
+        // }
+        // else if (msg->game_progress == 4)
+        // {
+        //     // Check if the transform exists in the buffer (non-blocking)
+        //     if (!tf_buffer_->canTransform("map", "odom", tf2::TimePointZero))
+        //     {
+        //         geometry_msgs::msg::TransformStamped static_transform_stamped;
+        //         static_transform_stamped.header.stamp = this->get_clock()->now();
+        //         static_transform_stamped.header.frame_id = "map";
+        //         static_transform_stamped.child_frame_id = "odom";
+        //         static_transform_stamped.transform.translation.x = 0.0;
+        //         static_transform_stamped.transform.translation.y = 0.0;
+        //         static_transform_stamped.transform.translation.z = 0.0;
+        //         tf2::Quaternion q;
+        //         q.setRPY(0, 0, 0);
+        //         q.setW(1);
+        //         static_transform_stamped.transform.rotation = tf2::toMsg(q);
+        //         static_tf_broadcaster_->sendTransform(static_transform_stamped);
+        //         RCLCPP_WARN(this->get_logger(), "Game progress is 4 and map->odom transform not available. Publishing static transform.");
+        //     }
+        // }
     }
 
     void timer_callback()
@@ -120,7 +120,9 @@ private:
             tf2::Transform T_odom_base = T_map_odom.inverse() * T_map_base;
 
             geometry_msgs::msg::TransformStamped odom_to_base_transform;
-            odom_to_base_transform.header.stamp = this->get_clock()->now();
+            // Keep the output TF timestamp aligned with the source TF chain
+            // to avoid requesting map<->odom data from the future.
+            odom_to_base_transform.header.stamp = map_to_odom_transform.header.stamp;
             odom_to_base_transform.header.frame_id = "odom";
             odom_to_base_transform.child_frame_id = "base_link";
             odom_to_base_transform.transform = tf2::toMsg(T_odom_base);
