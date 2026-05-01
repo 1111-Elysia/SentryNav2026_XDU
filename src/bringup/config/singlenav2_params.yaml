@@ -3,7 +3,7 @@ bt_navigator:
     use_sim_time: false
     global_frame: map
     robot_base_frame: base_link
-    odom_topic: odin1/odometry_highfreq
+    odom_topic: odom
     bt_loop_duration: 10
     timeout: 100
     wait_for_service_timeout: 1000
@@ -84,9 +84,9 @@ controller_server:
     FollowPath:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 2.0  #距目标时开始限速
-      approach_velocity: 0.25
-      direct_approach_distance: 0.5  #进入直接驱动模式的距离，绕过MPPI防止画弧
+      approach_distance: 0.5  #距目标时开始限速
+      approach_velocity: 0.2
+      direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
       direct_approach_kp: 3.0  #直接驱动P控制增益
       time_steps: 80  #增加到80，预测时域4.8s，让MPPI能看到冲过目标的后果
       model_dt: 0.04  #稍微放大步长，配合time_steps延长预测时域
@@ -218,7 +218,7 @@ local_costmap:
         observation_sources: livox_source realsense_source
         livox_source:
           data_type: PointCloud2
-          topic:  /odin1/cloud_raw
+          topic:  /livox/lidar_filtered
           transport_type: "raw"        #default raw -No compression-, Options: zlib, draco, zstd
           marking: true
           clearing: true
@@ -308,7 +308,7 @@ global_costmap:
         observation_sources: livox_source realsense_source
         livox_source:
           data_type: PointCloud2
-          topic:  /odin1/cloud_raw
+          topic:  /livox/lidar_filtered
           transport_type: "raw"        #default raw -No compression-, Options: zlib, draco, zstd
           marking: true
           clearing: true
