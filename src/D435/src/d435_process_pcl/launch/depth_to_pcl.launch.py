@@ -41,13 +41,6 @@ def generate_launch_description():
         parameters=[config]
     )
     
-    tf_node = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='static_tf_pub',
-        arguments=[tf_x, tf_y, tf_z, tf_yaw, tf_pitch, tf_roll, 'base_link', 'd435_frame']
-    )
-    
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -58,6 +51,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         depth_to_pcl_node,
-        tf_node,
         rviz_node
     ])

@@ -17,6 +17,10 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+
 class DepthToPclStable : public rclcpp::Node {
 public:
     DepthToPclStable() : Node("depth_to_pcl_stable") {
@@ -49,6 +53,34 @@ public:
                     std::placeholders::_1,
                     std::placeholders::_2)
         );
+
+        // ===== Publish Static TF =====
+        tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+        
+        double tf_x = this->declare_parameter<double>("tf_x", 0.0);
+        double tf_y = this->declare_parameter<double>("tf_y", 0.0);
+        double tf_z = this->declare_parameter<double>("tf_z", 0.0);
+        double tf_yaw = this->declare_parameter<double>("tf_yaw_deg", 0.0) * M_PI / 180.0;
+        double tf_pitch = this->declare_parameter<double>("tf_pitch_deg", 0.0) * M_PI / 180.0;
+        double tf_roll = this->declare_parameter<double>("tf_roll_deg", 0.0) * M_PI / 180.0;
+        
+        geometry_msgs::msg::TransformStamped t;
+        t.header.stamp = this->get_clock()->now();
+        t.header.frame_id = "base_link";
+        t.child_frame_id = frame_id_;
+        
+        t.transform.translation.x = tf_x;
+        t.transform.translation.y = tf_y;
+        t.transform.translation.z = tf_z;
+        
+        tf2::Quaternion q;
+        q.setRPY(tf_roll, tf_pitch, tf_yaw);
+        t.transform.rotation.x = q.x();
+        t.transform.rotation.y = q.y();
+        t.transform.rotation.z = q.z();
+        t.transform.rotation.w = q.w();
+        
+        tf_broadcaster_->sendTransform(t);
 
         RCLCPP_INFO(this->get_logger(), "Stable Depth PCL node started.");
     }
@@ -204,6 +236,7 @@ private:
     > MySyncPolicy;
 
     std::shared_ptr<message_filters::Synchronizer<MySyncPolicy>> sync_;
+    std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_broadcaster_;
 };
 
 int main(int argc, char** argv) {
