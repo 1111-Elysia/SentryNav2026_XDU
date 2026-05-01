@@ -1,0 +1,13 @@
+/**:
+  ros__parameters:
+    output_topic: "d435_pointcloud"
+    frame_id: "d435_frame"
+    tf_x: 0.0
+    tf_y: 0.0
+    tf_z: 0.0
+    tf_roll_deg: 0.0
+    tf_pitch_deg: 0.0
+    tf_yaw_deg: 0.0
+    step: 2
+    min_distance: 0.1
+    max_distance: 4.0

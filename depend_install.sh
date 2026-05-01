@@ -6,3 +6,4 @@ sudo apt install -y ros-humble-spatio-temporal-voxel-layer
 sudo apt install -y ros-humble-behaviortree-cpp
 sudo apt-get install -y libboost-system-dev
 sudo apt install -y libyaml-cpp-dev libusb-1.0-0-dev libopencv-dev
+sudo apt install -y ros-humble-realsense2-camera ros-humble-realsense2-description
