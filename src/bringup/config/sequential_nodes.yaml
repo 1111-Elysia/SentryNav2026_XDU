@@ -1,36 +1,46 @@
 sequential_nodes:
-  # - label: Livox-Driver
-  #   type: execute
-  #   cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
-  #   wait_after: 0
-
-  - label: Odin-Driver
+  - label: Livox-Driver
     type: execute
-    cmd: ["ros2", "launch", "odin_ros_driver", "odin1_ros2.launch.py"]
+    cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
     wait_after: 0
 
-  # - label: RM-messages
+  - label: D435-Driver
+    type: execute
+    cmd: ["ros2", "run", "realsense2_camera", "realsense2_camera_node"]
+    wait_after: 0
+
+  - label: D435-Pointcloud
+    type: execute
+    cmd: ["ros2", "launch", "d435_process_pcl", "depth_to_pcl.launch.py"]
+    wait_after: 0
+
+  # - label: Odin-Driver
   #   type: execute
-  #   cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
+  #   cmd: ["ros2", "launch", "odin_ros_driver", "odin1_ros2.launch.py"]
   #   wait_after: 0
 
-  # - label: Lidar-Filter
-  #   type: node
-  #   package: cpp_lidar_filter
-  #   executable: lidar_filter_node
-  #   name: my_lidar_filter
-  #   parameters:
-  #     - input_topic: /livox/lidar/pointcloud
-  #       output_topic: /livox/lidar_filtered
-  #       min_x: -0.2
-  #       max_x: 0.2
-  #       min_y: -0.2
-  #       max_y: 0.4
-  #       min_z: -0.1
-  #       max_z: 0.2
-  #       negative: true
-  #       leaf_size: 0.05
-  #   wait_after: 0
+  - label: RM-messages
+    type: execute
+    cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
+    wait_after: 0
+
+  - label: Lidar-Filter
+    type: node
+    package: cpp_lidar_filter
+    executable: lidar_filter_node
+    name: my_lidar_filter
+    parameters:
+      - input_topic: /livox/lidar/pointcloud
+        output_topic: /livox/lidar_filtered
+        min_x: -0.2
+        max_x: 0.2
+        min_y: -0.2
+        max_y: 0.4
+        min_z: -0.1
+        max_z: 0.2
+        negative: true
+        leaf_size: 0.05
+    wait_after: 0
 
   # - label: Lightning-LM
   #   type: execute
@@ -46,10 +56,10 @@ sequential_nodes:
   #   cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
   #   wait_after: 0
 
-  # - label: Super-LIO
-  #   type: execute
-  #   cmd: ["ros2", "launch", "super_lio", "Livox_mid360.py"]
-  #   wait_after: 0
+  - label: Super-LIO
+    type: execute
+    cmd: ["ros2", "launch", "super_lio", "Livox_mid360.py"]
+    wait_after: 0
 
   # - label: TF-Odom-Publisher
   #   type: node
@@ -61,25 +71,25 @@ sequential_nodes:
   #   arguments: ["--ros-args"]
   #   wait_after: 0
 
-  # - label: TF-Only-Odom
-  #   type: node
-  #   package: sentry_navigation
-  #   executable: tf_only_odom
-  #   name: tf_only_odom
-  #   parameters:
-  #     - lidar.yaml
-  #   arguments: ["--ros-args"]
-  #   wait_after: 0
-
-  - label: Odin-TF
+  - label: TF-Only-Odom
     type: node
     package: sentry_navigation
-    executable: odin_tf
-    name: odin_tf
+    executable: tf_only_odom
+    name: tf_only_odom
     parameters:
-      - odin.yaml
+      - lidar.yaml
     arguments: ["--ros-args"]
     wait_after: 0
+
+  # - label: Odin-TF
+  #   type: node
+  #   package: sentry_navigation
+  #   executable: odin_tf
+  #   name: odin_tf
+  #   parameters:
+  #     - odin.yaml
+  #   arguments: ["--ros-args"]
+  #   wait_after: 0
 
   # - label: Livox-to-Scan
   #   type: node
@@ -90,20 +100,20 @@ sequential_nodes:
   #     - livox_to_scan.yaml
   #   wait_after: 0
 
-  - label: USB-Serial-Comm
-    type: execute
-    cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
-    wait_after: 0
+  # - label: USB-Serial-Comm
+  #   type: execute
+  #   cmd: ["ros2", "launch", "serial_comm", "serial_comm.launch.py"]
+  #   wait_after: 0
 
   # - label: CmdVel-Process
   #   type: execute
   #   cmd: ["ros2", "launch", "cmd_vel_process", "cmd_vel_process.launch.py"]
   #   wait_after: 0
 
-  # - label: Can-Comm
-  #   type: execute
-  #   cmd: ["ros2", "launch", "can_comm", "can_comm.launch.py"]
-  #   wait_after: 0
+  - label: Can-Comm
+    type: execute
+    cmd: ["ros2", "launch", "can_comm", "can_comm.launch.py"]
+    wait_after: 0
 
   - label: Navigation-Stack
     type: execute

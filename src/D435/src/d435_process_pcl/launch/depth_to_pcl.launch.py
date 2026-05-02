@@ -50,6 +50,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        depth_to_pcl_node,
-        rviz_node
+        depth_to_pcl_node
+        # rviz_node
     ])

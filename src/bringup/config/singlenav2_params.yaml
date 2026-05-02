@@ -104,9 +104,9 @@ controller_server:
       vy_min: -2.5
       wz_min: -1.5
 
-      ax_max: 1.5 #加速度提高，高速时能快速响应
-      ay_max: 1.5
-      az_max: 1.0
+      ax_max: 3.5 #加速度提高，高速时能快速响应
+      ay_max: 3.5
+      az_max: 3.0
 
       ax_min: -3.5 #关键：制动力必须对称，高速下刹得住
       ay_min: -3.5
@@ -145,7 +145,7 @@ controller_server:
         critical_weight: 20.0 #近距离障碍物惩罚
         consider_footprint: false #用圆形近似，omni机器人更高效
         collision_cost: 10000.0
-        collision_margin_distance: 0.2 #碰撞边界余量
+        collision_margin_distance: 0.25 #碰撞边界余量
         near_goal_distance: 0.5
 
       CostCritic: #通过 costmap 梯度引导避障
@@ -241,16 +241,16 @@ local_costmap:
         realsense_source:
           enabled: true
           data_type: PointCloud2
-          topic: /camera/camera/depth/color/points
+          topic: /d435_pointcloud
           transport_type: "raw"
           marking: true
           clearing: true
-          obstacle_range: 3.0          #meters, 424x240低分辨率有效探测距离
-          raytrace_range: 3.5          #meters, 清除射线范围略大于obstacle_range
-          min_z: 0.15                  #meters, 过滤地面
+          obstacle_range: 2.9         #meters, 424x240低分辨率有效探测距离
+          raytrace_range: 3.0          #meters, 清除射线范围略大于obstacle_range
+          min_z: -0.1                  #meters, 过滤地面
           max_z: 3.5                   #meters, 低分辨率超过3.5m精度差
-          min_obstacle_height: 0.18    #meters, 最低障碍物高度
-          max_obstacle_height: 1.5     #meters, 哨兵高度以上不关心
+          min_obstacle_height: -0.05    #meters, 最低障碍物高度
+          max_obstacle_height: 1.0     #meters, 哨兵高度以上不关心
           #expected_update_rate: 15.0    #相机掉线时及时告警
           clear_after_reading: true    #高频输入及时清除缓冲
           filter: "voxel"              #降采样减少处理量
@@ -316,7 +316,7 @@ global_costmap:
           obstacle_range: 8.0
           raytrace_range: 9.0
 
-          min_obstacle_height: 0.15     #default 0, meters
+          min_obstacle_height: -0.15     #default 0, meters
           max_obstacle_height: 1.0     #defaule 3, meters
           expected_update_rate: 0.0    #default 0, if not updating at this rate at least, remove from buffer
           observation_persistence: 0.0 #default 0, use all measurements taken during now-value, 0=latest
@@ -331,16 +331,16 @@ global_costmap:
         realsense_source:
           enabled: true
           data_type: PointCloud2
-          topic: /camera/camera/depth/color/points
+          topic: /d435_pointcloud
           transport_type: "raw"
           marking: true
           clearing: true
-          obstacle_range: 3.0          #meters, 424x240低分辨率有效探测距离
-          raytrace_range: 3.5          #meters, 清除射线范围略大于obstacle_range
-          min_z: 0.15                  #meters, 过滤地面
+          obstacle_range: 2.9          #meters, 424x240低分辨率有效探测距离
+          raytrace_range: 3.0          #meters, 清除射线范围略大于obstacle_range
+          min_z: -0.1                  #meters, 过滤地面
           max_z: 3.5                   #meters, 低分辨率超过3.5m精度差
-          min_obstacle_height: 0.18    #meters, 最低障碍物高度
-          max_obstacle_height: 1.5     #meters, 哨兵高度以上不关心
+          min_obstacle_height: -0.05    #meters, 最低障碍物高度
+          max_obstacle_height: 1.0     #meters, 哨兵高度以上不关心
           #expected_update_rate: 15.0    #相机掉线时及时告警
           clear_after_reading: true    #高频输入及时清除缓冲
           filter: "voxel"              #降采样减少处理量
