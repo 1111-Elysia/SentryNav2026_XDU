@@ -14,9 +14,6 @@
 #include <nlohmann/json.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
-#include <std_msgs/msg/bool.hpp>
-#include <std_msgs/msg/u_int8.hpp>
-#include <std_msgs/msg/u_int16.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -280,7 +277,7 @@ namespace sentry_nav_bt_test
                     // Bit 0-10: 成功兑换的发弹量
                     uint16_t exchanged_ammo = raw_info & 0x7FF;
                     // Bit 11-14 15-18 成功远程兑换的允许发弹量次数和远程兑换血量次数（暂时不用）
-                    //  Bit 19: 是否可以确认免费复活 (1=是)
+                    // Bit 19: 是否可以确认免费复活 (1=是)
                     bool can_confirm_resurrection = (raw_info >> 19) & 0x01;
                     // Bit 20: 是否可以兑换立即复活 (1=是)
                     bool can_buy_resurrection = (raw_info >> 20) & 0x01;
@@ -302,14 +299,6 @@ namespace sentry_nav_bt_test
 
                     bb->set("current_posture", static_cast<int>(current_posture));
                     bb->set("can_activate_rune", can_activate_rune);
-
-                    publishDecodedSentryInfo(
-                        exchanged_ammo,
-                        can_confirm_resurrection,
-                        can_buy_resurrection,
-                        buy_resurrection_cost,
-                        current_posture,
-                        can_activate_rune);
 
                     RCLCPP_DEBUG(node_->get_logger(),
                                  "哨兵信息: 姿态=%d, 可激活符=%d, 复活金币=%d",
@@ -355,20 +344,6 @@ namespace sentry_nav_bt_test
                         "/rm_referee/robot_status");
                 });
 
-            // 订阅空中支援数据
-            // this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::AirSupportData>(
-            //     "/rm_referee/air_support_data",
-            //     [this](const rm_referee_msgs::msg::AirSupportData::SharedPtr msg, BT::Blackboard::Ptr bb) {
-            //         bb->set("airforce_status", msg->airforce_status);
-            //         bb->set("time_remain", msg->time_remain);
-            //         RCLCPP_DEBUG(
-            //             node_->get_logger(),
-            //             "黑板更新: '%s' 从话题 '%s'",
-            //             "air_support_data",
-            //             "/rm_referee/air_support_data");
-            //     }
-            // );
-
             // 订阅弹丸允许信息  0x0208
             this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::ProjectileAllowance>(
                 "/rm_referee/projectile_allowance",
@@ -377,7 +352,6 @@ namespace sentry_nav_bt_test
                     bb->set("projectile_allowance_17mm", msg->projectile_allowance_17mm);
                     bb->set("projectile_allowance_42mm", msg->projectile_allowance_42mm);
                     bb->set("remaining_gold_coin", msg->remaining_gold_coin);
-                    // bb->set("projectile_allowance_fortress", msg->projectile_allowance_fortress); // 堡垒增益点提供的储备17mm弹丸允许发弹量
                     RCLCPP_DEBUG(
                         node_->get_logger(),
                         "黑板更新: '%s' 从话题 '%s'",
@@ -416,27 +390,6 @@ namespace sentry_nav_bt_test
                         supply_zone_detected);
                 });
 
-            // // 订阅自瞄目标信息（从自瞄系统获得）               ——还没沟通好
-            // this->subscribeWithProcessorBestEffort<rmos_interfaces::msg::Target>(
-            //     "/target",
-            //     [this](const rmos_interfaces::msg::Target::SharedPtr msg, BT::Blackboard::Ptr bb)
-            //     {
-            //         bb->set("aim_id", msg->id);
-            //         RCLCPP_DEBUG(
-            //             node_->get_logger(),
-            //             "黑板更新: '%s' 从话题 '%s'",
-            //             "aim_id",
-            //             "/target");
-            //     });
-
-            // 初始化调试发布者，便于直接 ros2 topic echo 查看解包结果
-            exchanged_ammo_pub_ = node_->create_publisher<std_msgs::msg::UInt16>("/sentry_nav_bt_test/decoded_sentry_info/exchanged_ammo", 10);
-            can_confirm_resurrection_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_confirm_resurrection", 10);
-            can_buy_resurrection_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_buy_resurrection", 10);
-            buy_resurrection_cost_pub_ = node_->create_publisher<std_msgs::msg::UInt16>("/sentry_nav_bt_test/decoded_sentry_info/buy_resurrection_cost", 10);
-            current_posture_pub_ = node_->create_publisher<std_msgs::msg::UInt8>("/sentry_nav_bt_test/decoded_sentry_info/current_posture", 10);
-            can_activate_rune_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/sentry_nav_bt_test/decoded_sentry_info/can_activate_rune", 10);
-
             center_hold_vw_controller_ =
                 std::make_shared<CenterHoldVwController>(node_, blackboard_);
             center_hold_vw_controller_->start();
@@ -469,28 +422,6 @@ namespace sentry_nav_bt_test
                         hurt_reset_timer_->reset();
                 });
 
-            // // 遥控器频道10订阅，用于模式切换  切换战术阶段的时间阈值   应该要删/改  旧协议
-            // this->subscribeWithProcessorBestEffort<sbus_interface::msg::Sbus>(
-            //     "/sbus",
-            //     [this](const sbus_interface::msg::Sbus::SharedPtr msg, BT::Blackboard::Ptr bb)
-            //     {
-            //         bb->set("channel_10", msg->mapped_channels[10]);
-            //         if (msg->mapped_channels[10] == 0)
-            //         {
-            //             bb->set("stage_one_time", 420);
-            //         }
-            //         else
-            //         {
-            //             bb->set("stage_one_time", 360);
-            //         }
-            //         RCLCPP_DEBUG(
-            //             node_->get_logger(),
-            //             "黑板更新: '%s' 从话题 '%s' : '%d'",
-            //             "sbus",
-            //             "/sbus",
-            //             msg->mapped_channels[10]);
-            //     });
-
             // 初始化 TF 组件
             tf_buffer_ = std::make_shared<tf2_ros::Buffer>(node_->get_clock());
             tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -514,12 +445,6 @@ namespace sentry_nav_bt_test
             {
                 RCLCPP_ERROR(node_->get_logger(), "加载目标点文件时出错: %s", e.what());
             }
-            // if (node_->get_parameter("waypoints_file", waypoints_file) && !waypoints_file.empty()) {
-            //     RCLCPP_INFO(node_->get_logger(), "从文件加载目标点: %s", waypoints_file.c_str());
-            //     this->load_waypoints_from_json(waypoints_file, blackboard_, node_);
-            // } else {
-            //     RCLCPP_WARN(node_->get_logger(), "未指定目标点文件，将使用默认目标点或行为树定义的目标点");
-            // }
         }
 
         // 从JSON文件加载路径点信息
@@ -555,13 +480,11 @@ namespace sentry_nav_bt_test
                     return;
                 }
 
-                // 将目标点转换为PoseStamped并写入黑板
-                std::vector<geometry_msgs::msg::PoseStamped> waypoints;
-                int counter = 0;
+                int loaded_count = 0;
 
                 for (const auto &wp : waypoints_array)
                 {
-                    if (!wp.is_object() || !wp.contains("x") || !wp.contains("y") || !wp.contains("yaw"))
+                    if (!wp.is_object() || !wp.contains("name") || !wp.contains("x") || !wp.contains("y") || !wp.contains("yaw"))
                     {
                         RCLCPP_WARN(node->get_logger(), "跳过格式不正确的目标点");
                         continue;
@@ -586,32 +509,12 @@ namespace sentry_nav_bt_test
                     pose.pose.orientation.z = q.z();
                     pose.pose.orientation.w = q.w();
 
-                    // 存储到向量和黑板中
-                    waypoints.push_back(pose);
-
-                    // 为每个目标点创建单独的黑板条目
-                    std::string wp_name = "waypoint_" + std::to_string(counter);
-                    blackboard->set(wp_name, pose);
-
-                    // 如果有名称，也存储名称
-                    if (wp.contains("name"))
-                    {
-                        std::string name = wp["name"];
-                        blackboard->set("waypoint_name_" + std::to_string(counter), name);
-                        // 同时添加按名称索引的目标点
-                        blackboard->set("waypoint_" + name, pose);
-                    }
-
-                    counter++;
+                    const std::string name = wp["name"];
+                    blackboard->set("waypoint_" + name, pose);
+                    loaded_count++;
                 }
 
-                // 存储目标点总数
-                blackboard->set("waypoints_count", counter);
-
-                // 同时存储完整的目标点数组
-                blackboard->set("waypoints", waypoints);
-
-                RCLCPP_INFO(node->get_logger(), "成功加载 %d 个目标点", counter);
+                RCLCPP_INFO(node->get_logger(), "成功加载 %d 个目标点", loaded_count);
             }
             catch (const std::exception &e)
             {
@@ -628,12 +531,6 @@ namespace sentry_nav_bt_test
         rclcpp::TimerBase::SharedPtr hurt_reset_timer_;
         std::mutex hurt_mutex_;
 
-        rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr exchanged_ammo_pub_;
-        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_confirm_resurrection_pub_;
-        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_buy_resurrection_pub_;
-        rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr buy_resurrection_cost_pub_;
-        rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr current_posture_pub_;
-        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr can_activate_rune_pub_;
         std::shared_ptr<CenterHoldVwController> center_hold_vw_controller_;
         // TF
         std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -646,7 +543,9 @@ namespace sentry_nav_bt_test
         double getBlackboardDouble(const std::string &key, double default_value) const
         {
             double value = default_value;
-            blackboard_->get(key, value);
+            if (!blackboard_->get(key, value)) {
+                return default_value;
+            }
             return value;
         }
 
@@ -675,51 +574,6 @@ namespace sentry_nav_bt_test
                 RCLCPP_WARN(node_->get_logger(), "当前位姿已过期，暂停中心相关点位判定与 /vw 驻守");
             }
             last_waypoint_now_valid_ = pose_valid;
-        }
-
-        void publishDecodedSentryInfo(
-            uint16_t exchanged_ammo,
-            bool can_confirm_resurrection,
-            bool can_buy_resurrection,
-            uint16_t buy_resurrection_cost,
-            uint8_t current_posture,
-            bool can_activate_rune)
-        {
-            if (exchanged_ammo_pub_) {
-                std_msgs::msg::UInt16 msg;
-                msg.data = exchanged_ammo;
-                exchanged_ammo_pub_->publish(msg);
-            }
-
-            if (can_confirm_resurrection_pub_) {
-                std_msgs::msg::Bool msg;
-                msg.data = can_confirm_resurrection;
-                can_confirm_resurrection_pub_->publish(msg);
-            }
-
-            if (can_buy_resurrection_pub_) {
-                std_msgs::msg::Bool msg;
-                msg.data = can_buy_resurrection;
-                can_buy_resurrection_pub_->publish(msg);
-            }
-
-            if (buy_resurrection_cost_pub_) {
-                std_msgs::msg::UInt16 msg;
-                msg.data = buy_resurrection_cost;
-                buy_resurrection_cost_pub_->publish(msg);
-            }
-
-            if (current_posture_pub_) {
-                std_msgs::msg::UInt8 msg;
-                msg.data = current_posture;
-                current_posture_pub_->publish(msg);
-            }
-
-            if (can_activate_rune_pub_) {
-                std_msgs::msg::Bool msg;
-                msg.data = can_activate_rune;
-                can_activate_rune_pub_->publish(msg);
-            }
         }
 
         // 更新当前位置的方法

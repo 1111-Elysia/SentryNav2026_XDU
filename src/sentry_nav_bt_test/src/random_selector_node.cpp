@@ -70,9 +70,3 @@ namespace sentry_nav_bt_test
     }
 
 } // namespace sentry_nav_bt_test
-
-// #include "behaviortree_cpp/bt_factory.h"
-// BT_REGISTER_NODES(factory)
-// {
-//     factory.registerNodeType<sentry_nav_bt_test::RandomSelector>("RandomSelector");
-// }

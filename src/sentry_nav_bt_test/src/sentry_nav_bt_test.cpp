@@ -318,6 +318,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     factory.registerNodeType<sentry_nav_bt_test::MaintainSentryPosture>("MaintainSentryPosture");
     factory.registerNodeType<sentry_nav_bt_test::ConfirmResurrection>("ConfirmResurrection");
     factory.registerNodeType<sentry_nav_bt_test::EngageRune>("EngageRune");
+    factory.registerNodeType<sentry_nav_bt_test::EngageOutpost>("EngageOutpost");
     // 注册自瞄节点
     factory.registerNodeType<sentry_nav_bt_test::AutoAimAndFire>("AutoAimAndFire");
     factory.registerBuilder<sentry_nav_bt_test::PrintBlackboardValue>("PrintBlackboardValue", print_blackboard_builder);
@@ -518,12 +519,6 @@ int main(int argc, char **argv)
         pose_found = true;
         RCLCPP_INFO(node->get_logger(), "找到指定的初始位姿 '%s'", init_pose_key.c_str());
     }
-    // 如果没有指定的初始位姿，尝试使用第一个路径点
-    else if (blackboard->get("waypoint_0", init_pose))
-    {
-        pose_found = true;
-        RCLCPP_INFO(node->get_logger(), "使用第一个路径点作为初始位姿");
-    }
     // 如果都没有，尝试使用起点
     else if (blackboard->get("waypoint_start", init_pose))
     {
@@ -533,7 +528,7 @@ int main(int argc, char **argv)
 
     if (pose_found)
     {
-        // [修复] 转换为 PoseWithCovarianceStamped 并设置协方差
+        // 转换为 PoseWithCovarianceStamped 并设置协方差
         geometry_msgs::msg::PoseWithCovarianceStamped init_pose_cov;
 
         // 复制 Header

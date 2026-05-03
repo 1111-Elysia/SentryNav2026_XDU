@@ -159,14 +159,15 @@
                              key_name="stage_remain_time"
                              comparison="gt"
                              threshold="360"/>
-                  <SubTree ID="GoWaitUntilTimeAbove"
-                               point_goal_name="outpost_point"
-                               point_reach_threshold="0.25"
-                               point_wait_time_threshold="360"
-                               point_move_posture="3"
-                               point_wait_posture="1"
-                               point_start_message="前往点位1"
-                               point_arrived_message="已到达点位1，等待阶段切换"
+                  <SubTree ID="OutpostTask"
+                               outpost_goal_name="outpost_point"
+                               outpost_reach_threshold="0.25"
+                               outpost_wait_time_threshold="360"
+                               outpost_move_posture="3"
+                               outpost_timeout_ms="70000"
+                               outpost_start_message="前往点位1"
+                               outpost_arrived_message="已到达点位1，开始打前哨站"
+                               outpost_done_message="点位1前哨站流程结束，等待阶段切换完成"
                                rune_phase_key="in_rune_phase"
                                fortress_active_key="uc_fortress_hold_active"
                                nav_resend_interval="0.30"
@@ -253,6 +254,10 @@
                   type="int">1:Attack, 2:Defend, 3:Move</input_port>
       <input_port name="cooldown_ms"
                   type="int">姿态切换冷却时间</input_port>
+    </Action>
+    <Action ID="EngageOutpost"
+            editable="true">
+      <input_port name="timeout_ms"/>
     </Action>
     <Action ID="PrintNode"
             editable="true">

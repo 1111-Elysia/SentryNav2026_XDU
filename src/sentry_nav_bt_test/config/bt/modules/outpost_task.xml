@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="OutpostTask">
+    <Sequence name="前哨站任务">
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
+      <PrintNode message="{outpost_start_message}"/>
+      <GoalSelector goal_name="{outpost_goal_name}" goal="{outpost_goal}"/>
+      <ReactiveSequence name="前往前哨站点并维持移动姿态">
+        <MaintainSentryPosture mode="{outpost_move_posture}"/>
+        <ReliableNavigateToPose
+          goal="{outpost_goal}"
+          goal_name="{outpost_goal_name}"
+          reach_threshold="{outpost_reach_threshold}"
+          resend_interval="{nav_resend_interval}"
+          response_timeout="{nav_response_timeout}"
+          result_retry_delay="{nav_result_retry_delay}"/>
+      </ReactiveSequence>
+      <PrintNode message="{outpost_arrived_message}"/>
+      <Parallel name="打前哨站并等待阶段切换" success_count="1" failure_count="1">
+        <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+        <KeepRunningUntilFailure>
+          <CheckCondition
+            key_name="stage_remain_time"
+            comparison="gt"
+            threshold="{outpost_wait_time_threshold}"/>
+        </KeepRunningUntilFailure>
+      </Parallel>
+      <PrintNode message="{outpost_done_message}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

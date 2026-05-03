@@ -39,7 +39,9 @@ private:
   double getBlackboardDouble(const std::string &key, double default_value) const
   {
     double value = default_value;
-    blackboard_->get(key, value);
+    if (!blackboard_->get(key, value)) {
+      return default_value;
+    }
     return value;
   }
 
@@ -74,7 +76,9 @@ private:
       getBlackboardDouble("ul_center_hold_distance_threshold", 0.50);
 
     std::string goal_name = "center_point";
-    blackboard_->get("ul_center_goal_name", goal_name);
+    if (!blackboard_->get("ul_center_goal_name", goal_name)) {
+      goal_name = "center_point";
+    }
     return isNearWaypoint(goal_name, threshold);
   }
 

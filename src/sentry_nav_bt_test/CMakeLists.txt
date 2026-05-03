@@ -43,7 +43,8 @@ add_library(sentry_nav_bt_test_nodes SHARED
   src/goal_selector_node.cpp
   src/patrol_nodes.cpp
   src/reliable_navigate_to_pose.cpp
-  src/referee_actions.cpp          
+  src/referee_actions_common.cpp
+  src/referee_engage_actions.cpp
 )
 
 # 库的依赖

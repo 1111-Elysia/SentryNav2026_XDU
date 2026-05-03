@@ -3,6 +3,7 @@
     <include path="5.3tree.xml"/>
     <include path="modules/fortress_hold.xml"/>
     <include path="modules/go_wait_until_time_above.xml"/>
+    <include path="modules/outpost_task.xml"/>
     <include path="modules/point_hold.xml"/>
     <include path="modules/resurrection.xml"/>
     <include path="modules/rune_task.xml"/>
@@ -38,6 +39,9 @@
             <input_port name="posture"/>
             <input_port name="timeout_ms"/>
             <input_port name="request_interval_ms"/>
+        </Action>
+        <Action ID="EngageOutpost" editable="true">
+            <input_port name="timeout_ms"/>
         </Action>
         <Action ID="GoalSelector" editable="true">
             <input_port name="goal_name"/>

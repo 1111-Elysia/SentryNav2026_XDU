@@ -30,7 +30,9 @@ public:
   {
     node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");
     if (config.blackboard) {
-      config.blackboard->get("bt_message_log_process_label", process_label_);
+      if (!config.blackboard->get("bt_message_log_process_label", process_label_)) {
+        process_label_.clear();
+      }
     }
   }
 

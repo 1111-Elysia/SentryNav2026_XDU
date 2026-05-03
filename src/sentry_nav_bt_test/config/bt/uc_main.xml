@@ -150,14 +150,15 @@
                 <Sequence name="前期_前哨站_Phase2">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="330"/>
                   <SubTree
-                    ID="GoWaitUntilTimeAbove"
-                    point_goal_name="outpost_point"
-                    point_reach_threshold="0.25"
-                    point_wait_time_threshold="330"
-                    point_move_posture="3"
-                    point_wait_posture="1"
-                    point_start_message="[Phase 2 | 6:30-5:30] 开局小符结束，前往前哨站点位等待阶段切换"
-                    point_arrived_message="[Phase 2 | 6:30-5:30] 已到达前哨站点位，等待阶段切换"
+                    ID="OutpostTask"
+                    outpost_goal_name="outpost_point"
+                    outpost_reach_threshold="0.25"
+                    outpost_wait_time_threshold="330"
+                    outpost_move_posture="3"
+                    outpost_timeout_ms="70000"
+                    outpost_start_message="[Phase 2 | 6:30-5:30] 开局小符结束，前往前哨站点位"
+                    outpost_arrived_message="[Phase 2 | 6:30-5:30] 已到达前哨站点位，开始打前哨站"
+                    outpost_done_message="[Phase 2 | 6:30-5:30] 前哨站流程结束，等待阶段切换完成"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     nav_resend_interval="0.30"
@@ -235,14 +236,15 @@
                     <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
                     <CheckCondition key_name="ally_outpost_hp" comparison="gt" threshold="0"/>
                     <SubTree
-                      ID="GoWaitUntilTimeAbove"
-                      point_goal_name="outpost_point"
-                      point_reach_threshold="0.25"
-                      point_wait_time_threshold="240"
-                      point_move_posture="3"
-                      point_wait_posture="1"
-                      point_start_message="[Phase 4 | 5:00-4:00] 若前哨站仍存活，前往前哨站点位"
-                      point_arrived_message="[Phase 4 | 5:00-4:00] 已到达前哨站点位，等待阶段切换"
+                      ID="OutpostTask"
+                      outpost_goal_name="outpost_point"
+                      outpost_reach_threshold="0.25"
+                      outpost_wait_time_threshold="240"
+                      outpost_move_posture="3"
+                      outpost_timeout_ms="70000"
+                      outpost_start_message="[Phase 4 | 5:00-4:00] 若前哨站仍存活，前往前哨站点位"
+                      outpost_arrived_message="[Phase 4 | 5:00-4:00] 已到达前哨站点位，开始打前哨站"
+                      outpost_done_message="[Phase 4 | 5:00-4:00] 前哨站流程结束，等待阶段切换完成"
                       rune_phase_key="in_rune_phase"
                       fortress_active_key="uc_fortress_hold_active"
                       nav_resend_interval="0.30"
@@ -454,6 +456,9 @@
       <input_port name="posture"/>
       <input_port name="timeout_ms"/>
       <input_port name="request_interval_ms"/>
+    </Action>
+    <Action ID="EngageOutpost" editable="true">
+      <input_port name="timeout_ms"/>
     </Action>
     <Condition ID="CheckCondition" editable="true">
       <input_port name="key_name"/>

@@ -13,9 +13,11 @@
 #include "sentry_msgs/msg/vw.hpp"
 #include "sentry_nav_bt_test/cmd_utils.hpp" 
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 namespace sentry_nav_bt_test
 {
+    // 统一管理裁判/底盘控制相关 topic 发布器，供多个动作节点复用。
     class ControlTopicPublishers
     {
     public:
@@ -66,7 +68,7 @@ namespace sentry_nav_bt_test
             return true;
         }
 
-        bool publishYawController(bool enabled)
+        bool publishYawController(int target)
         {
             ensureInitialized();
             if (!yaw_controller_pub_) {
@@ -74,9 +76,23 @@ namespace sentry_nav_bt_test
                 return false;
             }
 
+            std_msgs::msg::Int32 msg;
+            msg.data = target;
+            yaw_controller_pub_->publish(msg);
+            return true;
+        }
+
+        bool publishOutpostMode(bool enabled)
+        {
+            ensureInitialized();
+            if (!outpost_mode_pub_) {
+                logMissingPublisher("/outpost_mode_type");
+                return false;
+            }
+
             std_msgs::msg::Bool msg;
             msg.data = enabled;
-            yaw_controller_pub_->publish(msg);
+            outpost_mode_pub_->publish(msg);
             return true;
         }
 
@@ -90,7 +106,8 @@ namespace sentry_nav_bt_test
             vw_pub_ = node_->create_publisher<sentry_msgs::msg::Vw>("/vw", 10);
             scan_mode_pub_ = node_->create_publisher<sentry_msgs::msg::ScanMode>("/scan_mod_type", 10);
             auto_shoot_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/auto_shoot_type", 10);
-            yaw_controller_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/yaw_controller", 10);
+            yaw_controller_pub_ = node_->create_publisher<std_msgs::msg::Int32>("/yaw_controller", 10);
+            outpost_mode_pub_ = node_->create_publisher<std_msgs::msg::Bool>("/outpost_mode_type", 10);
             initialized_ = true;
         }
 
@@ -108,12 +125,11 @@ namespace sentry_nav_bt_test
         rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
         rclcpp::Publisher<sentry_msgs::msg::ScanMode>::SharedPtr scan_mode_pub_;
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr auto_shoot_pub_;
-        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr yaw_controller_pub_;
+        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr yaw_controller_pub_;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr outpost_mode_pub_;
     };
 
-    // ==========================================
-    // 基类：RefereeActionBase
-    // ==========================================
+    // 裁判系统动作基类：负责拿 robot_id、创建 /rm_referee/tx client、同步发送交互包。
     class RefereeActionBase : public BT::SyncActionNode
     {
     public:
@@ -133,8 +149,8 @@ namespace sentry_nav_bt_test
         std::shared_ptr<SentryRefereeUtils> utils_;
     };
 
-    // 动作 1: MaintainSentryPosture
-    // XML: <Action ID="MaintainSentryPosture" mode="3"/>
+    // 动作 1：维持哨兵姿态
+    // XML: <MaintainSentryPosture mode="3"/>
     class MaintainSentryPosture : public RefereeActionBase
     {
     public:
@@ -148,8 +164,8 @@ namespace sentry_nav_bt_test
         int last_confirmed_mode_{-1};
     };
 
-    // 动作 2: ConfirmResurrection
-    // XML: <Action ID="ConfirmResurrection" posture="0" burst_count="3" burst_interval_ms="20"/>
+    // 动作 2：确认免费复活
+    // XML: <ConfirmResurrection posture="0" burst_count="3" burst_interval_ms="20"/>
     class ConfirmResurrection : public RefereeActionBase
     {
     public:
@@ -163,6 +179,9 @@ namespace sentry_nav_bt_test
         std::chrono::steady_clock::time_point last_send_time_{};
     };
 
+    // 动作 3：打能量机关
+    // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 发送激活请求
+    // XML: <EngageRune rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
     class EngageRune : public BT::StatefulActionNode
     {
     public:
@@ -188,6 +207,8 @@ namespace sentry_nav_bt_test
         bool publishScanMode(bool enabled);
         bool publishAutoShoot(bool enabled);
         bool triggerYawController();
+        // 确保打符所需输出已经按顺序打开；已打开的输出不会重复发布。
+        bool ensureEngageOutputs();
         void cleanupOutputs();
         bool tryGetRuneStatus(int &status) const;
         bool tryGetCanActivateRune(int &can_activate) const;
@@ -209,8 +230,42 @@ namespace sentry_nav_bt_test
         std::chrono::steady_clock::time_point start_time_{};
         std::chrono::steady_clock::time_point last_request_time_{};
         bool scan_mode_disabled_{false};
+        bool yaw_controller_triggered_{false};
         bool auto_shoot_enabled_{false};
         bool saw_activating_state_{false};
+    };
+
+    // 动作 4：打前哨站
+    // 顺序：scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true
+    // XML: <EngageOutpost timeout_ms="70000"/>
+    class EngageOutpost : public BT::StatefulActionNode
+    {
+    public:
+        EngageOutpost(const std::string &name, const BT::NodeConfig &config);
+
+        static BT::PortsList providedPorts();
+
+        BT::NodeStatus onStart() override;
+        BT::NodeStatus onRunning() override;
+        void onHalted() override;
+
+    private:
+        bool publishScanMode(bool enabled);
+        bool triggerYawController();
+        bool publishOutpostMode(bool enabled);
+        // 确保打前哨站所需输出已经按顺序打开；已打开的输出不会重复发布。
+        bool ensureEngageOutputs();
+        void cleanupOutputs();
+        void setOutpostOutcome(bool success, const std::string &result) const;
+
+        rclcpp::Node::SharedPtr node_;
+        std::shared_ptr<ControlTopicPublishers> control_publishers_;
+
+        int timeout_ms_{45000};
+        std::chrono::steady_clock::time_point start_time_{};
+        bool scan_mode_disabled_{false};
+        bool yaw_controller_triggered_{false};
+        bool outpost_mode_enabled_{false};
     };
 
 } // namespace sentry_nav_bt_test
