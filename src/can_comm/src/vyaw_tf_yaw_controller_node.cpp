@@ -1,6 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
-#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/int32.hpp>
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -28,10 +28,15 @@ public:
     // 方向相关参数全部使用角度制
     this->declare_parameter<double>("yaw_tolerance_deg", 3.0);
 
-    // Pose of point a in map frame.
-    this->declare_parameter<double>("a_x", 0.0);
-    this->declare_parameter<double>("a_y", 0.0);
-    this->declare_parameter<double>("a_yaw_deg", 0.0);
+    // Pose of NLJG in map frame.
+    this->declare_parameter<double>("NLJG_pose_x", 0.0);
+    this->declare_parameter<double>("NLJG_pose_y", 0.0);
+    this->declare_parameter<double>("NLJG_pose_yaw_deg", 0.0);
+
+    // Pose of outpost in map frame.
+    this->declare_parameter<double>("outpost_pose_x", 0.0);
+    this->declare_parameter<double>("outpost_pose_y", 0.0);
+    this->declare_parameter<double>("outpost_pose_yaw_deg", 0.0);
 
     // 旋转速度约束（绝对值）
     this->declare_parameter<double>("min_abs_vyaw", 0.15);
@@ -47,9 +52,14 @@ public:
     base_frame_ = this->get_parameter("base_frame").as_string();
 
     yaw_tolerance_deg_ = std::abs(this->get_parameter("yaw_tolerance_deg").as_double());
-    a_x_ = this->get_parameter("a_x").as_double();
-    a_y_ = this->get_parameter("a_y").as_double();
-    a_yaw_deg_ = this->get_parameter("a_yaw_deg").as_double();
+    
+    NLJG_pose_x_ = this->get_parameter("NLJG_pose_x").as_double();
+    NLJG_pose_y_ = this->get_parameter("NLJG_pose_y").as_double();
+    NLJG_pose_yaw_deg_ = this->get_parameter("NLJG_pose_yaw_deg").as_double();
+
+    outpost_pose_x_ = this->get_parameter("outpost_pose_x").as_double();
+    outpost_pose_y_ = this->get_parameter("outpost_pose_y").as_double();
+    outpost_pose_yaw_deg_ = this->get_parameter("outpost_pose_yaw_deg").as_double();
 
     min_abs_vyaw_ = std::abs(this->get_parameter("min_abs_vyaw").as_double());
     max_abs_vyaw_ = std::abs(this->get_parameter("max_abs_vyaw").as_double());
@@ -64,7 +74,7 @@ public:
 
     cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
 
-    yaw_enable_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+    yaw_enable_sub_ = this->create_subscription<std_msgs::msg::Int32>(
       "/yaw_controller",
       10,
       std::bind(&VyawTfYawControllerNode::onYawEnable, this, std::placeholders::_1));
@@ -77,19 +87,24 @@ public:
 
     RCLCPP_INFO(
       this->get_logger(),
-      "Started. target_yaw will be computed from pose-a, tolerance=%.2f deg, vyaw[min,max]=[%.3f, %.3f]",
+      "Started. target_yaw will be computed from pose target, tolerance=%.2f deg, vyaw[min,max]=[%.3f, %.3f]",
       yaw_tolerance_deg_,
       min_abs_vyaw_,
       max_abs_vyaw_);
 
     RCLCPP_INFO(
       this->get_logger(),
-      "Pose-a: a_x=%.3f, a_y=%.3f, a_yaw_deg=%.2f",
-      a_x_, a_y_, a_yaw_deg_);
+      "NLJG_pose: x=%.3f, y=%.3f, yaw_deg=%.2f",
+      NLJG_pose_x_, NLJG_pose_y_, NLJG_pose_yaw_deg_);
 
     RCLCPP_INFO(
       this->get_logger(),
-      "Waiting for /yaw_controller=true to start one-shot yaw control.");
+      "outpost_pose: x=%.3f, y=%.3f, yaw_deg=%.2f",
+      outpost_pose_x_, outpost_pose_y_, outpost_pose_yaw_deg_);
+
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Waiting for /yaw_controller msg (0=NLJG, 1=outpost) to start one-shot yaw control.");
   }
 
   ~VyawTfYawControllerNode() override
@@ -157,12 +172,12 @@ private:
     double & target_yaw_rad_out)
   {
     // Compute target yaw from right-triangle geometry:
-    // A=(a_x,a_y), B=(base_x,base_y), C=(a_x,base_y)
-    // AC = |base_y - a_y|, BC = |a_x - base_x|
+    // A=(target_x_,target_y_), B=(base_x,base_y), C=(target_x_,base_y)
+    // AC = |base_y - target_y_|, BC = |target_x_ - base_x|
     // theta = atan(AC/BC) (angle at B, keep positive)
     // target_yaw = 180deg - theta
-    const double bc = std::abs(a_x_ - base_x_map);
-    const double ac = std::abs(base_y_map - a_y_);
+    const double bc = std::abs(target_x_ - base_x_map);
+    const double ac = std::abs(base_y_map - target_y_);
     if (bc < 1e-9) {
       // Degenerate (A and B share x); theta -> 90deg.
       target_yaw_rad_out = deg2rad(90.0);
@@ -175,17 +190,23 @@ private:
     return true;
   }
 
-  void onYawEnable(const std_msgs::msg::Bool::SharedPtr msg)
+  void onYawEnable(const std_msgs::msg::Int32::SharedPtr msg)
   {
-    if (!msg->data) {
-      return;
+    if (msg->data == 0) {
+      target_x_ = NLJG_pose_x_;
+      target_y_ = NLJG_pose_y_;
+      active_ = true;
+      reached_once_ = false;
+      has_target_yaw_ = false;
+      RCLCPP_INFO(this->get_logger(), "Triggered by /yaw_controller=0. Using NLJG_pose.");
+    } else if (msg->data == 1) {
+      target_x_ = outpost_pose_x_;
+      target_y_ = outpost_pose_y_;
+      active_ = true;
+      reached_once_ = false;
+      has_target_yaw_ = false;
+      RCLCPP_INFO(this->get_logger(), "Triggered by /yaw_controller=1. Using outpost_pose.");
     }
-
-    // Each 'true' message triggers one yaw-control execution.
-    active_ = true;
-    reached_once_ = false;
-    has_target_yaw_ = false;
-    RCLCPP_INFO(this->get_logger(), "Triggered by /yaw_controller=true. Start yaw control.");
   }
 
   void onTimer()
@@ -253,9 +274,16 @@ private:
   std::string base_frame_;
   double yaw_tolerance_deg_ = 3.0;
 
-  double a_x_ = 0.0;
-  double a_y_ = 0.0;
-  double a_yaw_deg_ = 0.0;
+  double target_x_ = 0.0;
+  double target_y_ = 0.0;
+
+  double NLJG_pose_x_ = 0.0;
+  double NLJG_pose_y_ = 0.0;
+  double NLJG_pose_yaw_deg_ = 0.0;
+
+  double outpost_pose_x_ = 0.0;
+  double outpost_pose_y_ = 0.0;
+  double outpost_pose_yaw_deg_ = 0.0;
 
   double min_abs_vyaw_ = 0.15;
   double max_abs_vyaw_ = 1.0;
@@ -273,7 +301,7 @@ private:
   tf2_ros::TransformListener tf_listener_;
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr yaw_enable_sub_;
+  rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr yaw_enable_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

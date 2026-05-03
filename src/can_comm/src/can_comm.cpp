@@ -34,7 +34,8 @@ public:
         this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
         this->declare_parameter<std::string>("vw_topic", "/vw");
         this->declare_parameter<std::string>("scan_mod_type_topic", "/scan_mod_type");
-        this->declare_parameter<std::string>("auto_shoot_type_topic", "/auto_shoot_type");
+        this->declare_parameter<std::string>("NLJG_mode_type_topic", "/NLJG_mode_type");
+        this->declare_parameter<std::string>("outpost_mode_type_topic", "/outpost_mode_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
         this->declare_parameter<std::string>("game_status_topic", "/rm_referee/game_status");
         this->declare_parameter<double>("cmd_vel_timeout_s", 0.1);
@@ -51,7 +52,8 @@ public:
         std::string cmd_vel_topic       = this->get_parameter("cmd_vel_topic").as_string();
         std::string vw_topic            = this->get_parameter("vw_topic").as_string();
         std::string scan_mod_type_topic = this->get_parameter("scan_mod_type_topic").as_string();
-        std::string auto_shoot_type_topic = this->get_parameter("auto_shoot_type_topic").as_string();
+        std::string NLJG_mode_type_topic = this->get_parameter("NLJG_mode_type_topic").as_string();
+        std::string outpost_mode_type_topic = this->get_parameter("outpost_mode_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string game_status_topic   = this->get_parameter("game_status_topic").as_string();
         cmd_vel_timeout_s_ = this->get_parameter("cmd_vel_timeout_s").as_double();
@@ -92,11 +94,18 @@ public:
                 scan_mod_type_topic_received_ = true;
             });
 
-        auto_shoot_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-            auto_shoot_type_topic, 10,
+        NLJG_mode_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            NLJG_mode_type_topic, 10,
             [this](const std_msgs::msg::Bool::SharedPtr m) {
                 std::lock_guard<std::mutex> lk(mutex_);
-                auto_shoot_ = m->data;
+                NLJG_mode_ = m->data;
+            });
+
+        outpost_mode_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            outpost_mode_type_topic, 10,
+            [this](const std_msgs::msg::Bool::SharedPtr m) {
+                std::lock_guard<std::mutex> lk(mutex_);
+                outpost_mode_ = m->data;
             });
 
         game_status_sub_ = this->create_subscription<rm_referee_msgs::msg::GameStatus>(
@@ -156,7 +165,8 @@ private:
 
         float vx, vy, vyaw, vw;
         bool scan;
-        bool auto_shoot;
+        bool NLJG_mode;
+        bool outpost_mode;
         uint8_t left = 0;
         uint8_t behind = 0;
         uint8_t right = 0;
@@ -167,7 +177,8 @@ private:
             vyaw  = vyaw_;
             vw    = vw_;
             scan  = scan_mod_type_;
-            auto_shoot = auto_shoot_;
+            NLJG_mode = NLJG_mode_;
+            outpost_mode = outpost_mode_;
             left   = armor_left_;
             behind = armor_behind_;
             right  = armor_right_;
@@ -228,11 +239,12 @@ private:
         can_->Write(id_xyz_, data_xyz, sizeof(data_xyz));
 
         // 发送 scan mode + ArmorPresence + auto shoot 
-        uint8_t data_scan[8] = {0};
-        data_scan[0] = scan ? 1 : 0;
-        data_scan[1] = left | (behind << 1) | (right << 2);
-        data_scan[2] = auto_shoot ? 1 : 0;
-        can_->Write(id_scan_, data_scan, sizeof(data_scan));
+        uint8_t data_mode[8] = {0};
+        data_mode[0] = scan ? 1 : 0;
+        data_mode[1] = left | (behind << 1) | (right << 2);
+        data_mode[2] = NLJG_mode ? 1 : 0;   //0为打装甲板，1为打符
+        data_mode[3] = outpost_mode ? 1 : 0; // 预留给前哨站
+        can_->Write(id_scan_, data_mode, sizeof(data_mode));
 
         // 频率日志
         send_count_++;
@@ -241,10 +253,11 @@ private:
         if (dt >= 1.0) {
             double freq = send_count_ / dt;
             RCLCPP_INFO(this->get_logger(),
-                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u auto_shoot=%u left=%u behind=%u right=%u",
+                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u NLJG_mode=%u outpost_mode=%u left=%u behind=%u right=%u",
                         freq, vx, vy, vyaw, vw,
                         static_cast<unsigned>(scan),
-                        static_cast<unsigned>(auto_shoot),
+                        static_cast<unsigned>(NLJG_mode),
+                        static_cast<unsigned>(outpost_mode),
                         static_cast<unsigned>(left),
                         static_cast<unsigned>(behind),
                         static_cast<unsigned>(right));
@@ -259,7 +272,8 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr       cmd_vel_sub_;
     rclcpp::Subscription<sentry_msgs::msg::Vw>::SharedPtr            vw_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ScanMode>::SharedPtr      scan_mod_sub_;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr             auto_shoot_sub_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr             NLJG_mode_sub_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr             outpost_mode_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::GameStatus>::SharedPtr game_status_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
     // 受击旋转逻辑已迁移至 hurt_spin_vw_node；此处不再订阅 hurt_data
@@ -272,7 +286,8 @@ private:
     uint8_t game_progress_ = 0;
     bool scan_mod_type_ = false;
     bool scan_mod_type_topic_received_ = false;
-    bool auto_shoot_ = false;
+    bool NLJG_mode_ = false;
+    bool outpost_mode_ = false;
     uint8_t armor_left_ = 0, armor_behind_ = 0, armor_right_ = 0;
 
     bool cmd_vel_received_once_ = false;
