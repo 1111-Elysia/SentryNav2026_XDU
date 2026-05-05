@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 全局清理函数 - 核弹级
+# 全局清理函数 
 # 作用：无论进程在哪个终端运行，只要匹配名字，全部强制杀死 (SIGKILL -9)
 # ==============================================================================
 function nuclear_cleanup() {
@@ -43,10 +43,22 @@ function nuclear_cleanup() {
 # 主逻辑
 # ==============================================================================
 
-# 源环境
-source ./install/setup.bash
+# ==============================================================================
+# 脚本自定位：确保无论从哪里调用，都以此为工作目录
+# ==============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
+# 源环境（强制使用本目录下的 install）
+if [ -f "$SCRIPT_DIR/install/setup.bash" ]; then
+    source "$SCRIPT_DIR/install/setup.bash"
+else
+    echo "[FATAL] 找不到 $SCRIPT_DIR/install/setup.bash，请先 colcon build"
+    exit 1
+fi
+
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-echo "导航系统主控脚本启动..."
+echo "导航系统主控脚本启动... (工作目录: $SCRIPT_DIR)"
 
 # 捕获 Ctrl+C，退出时也执行清理
 trap 'echo "[INFO] 用户手动终止，正在清理..."; nuclear_cleanup; exit 0' SIGINT
