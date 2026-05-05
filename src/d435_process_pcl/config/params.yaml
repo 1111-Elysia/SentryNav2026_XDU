@@ -1,13 +1,37 @@
 /**:
   ros__parameters:
+    # ----- 话题 -----
     output_topic: "d435_pointcloud"
+    depth_image_topic: "/camera/camera/depth/image_rect_raw"
+    camera_info_topic: "/camera/camera/depth/camera_info"
+
+    # ----- 坐标系 -----
     frame_id: "d435_frame"
+
+    # ----- 静态 TF (base_link -> d435_frame) -----
     tf_x: -0.12
     tf_y: 0.0
     tf_z: 0.0
     tf_roll_deg: -90.0
     tf_pitch_deg: 0.0
     tf_yaw_deg: 90.0
+
+    # ----- 下采样步长 -----
     step: 2
+
+    # ----- 深度距离过滤 (m) -----
     min_distance: 0.2
     max_distance: 3.0
+
+    # ----- 空间滤波 (中值滤波去散粒噪点) -----
+    median_kernel_size: 5
+
+    # ----- 时域滤波 (多帧中值去水面波动, 1=禁用) -----
+    temporal_frames: 5
+
+    # ----- 体素滤波 (稳定墙面) -----
+    voxel_leaf_size: 0.03
+
+    # ----- 统计滤波 (去离群飞点) -----
+    sor_mean_k: 20
+    sor_stddev_thresh: 1.0

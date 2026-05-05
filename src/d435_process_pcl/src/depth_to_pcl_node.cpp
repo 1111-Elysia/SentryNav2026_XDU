@@ -10,6 +10,9 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_geometry/pinhole_camera_model.h>
 
+#include <algorithm>
+#include <vector>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -26,21 +29,36 @@ public:
     DepthToPclStable() : Node("depth_to_pcl_stable") {
 
         this->declare_parameter<std::string>("output_topic", "d435_pointcloud");
+        this->declare_parameter<std::string>("depth_image_topic", "/camera/camera/depth/image_rect_raw");
+        this->declare_parameter<std::string>("camera_info_topic", "/camera/camera/depth/camera_info");
         this->declare_parameter<std::string>("frame_id", "d435_frame");
         this->declare_parameter<int>("step", 2);
-        this->declare_parameter<float>("min_distance", 0.3f);
-        this->declare_parameter<float>("max_distance", 6.0f);
+        this->declare_parameter<float>("min_distance", 0.2f);
+        this->declare_parameter<float>("max_distance", 3.0f);
+
+        this->declare_parameter<int>("median_kernel_size", 5);
+        this->declare_parameter<int>("temporal_frames", 5);
+        this->declare_parameter<double>("voxel_leaf_size", 0.03);
+        this->declare_parameter<int>("sor_mean_k", 20);
+        this->declare_parameter<double>("sor_stddev_thresh", 1.0);
 
         this->get_parameter("output_topic", output_topic_);
+        this->get_parameter("depth_image_topic", depth_image_topic_);
+        this->get_parameter("camera_info_topic", camera_info_topic_);
         this->get_parameter("frame_id", frame_id_);
         this->get_parameter("step", step_);
         this->get_parameter("min_distance", min_distance_);
         this->get_parameter("max_distance", max_distance_);
+        this->get_parameter("median_kernel_size", median_kernel_size_);
+        this->get_parameter("temporal_frames", temporal_frames_);
+        this->get_parameter("voxel_leaf_size", voxel_leaf_size_);
+        this->get_parameter("sor_mean_k", sor_mean_k_);
+        this->get_parameter("sor_stddev_thresh", sor_stddev_thresh_);
 
         pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_topic_, 10);
 
-        depth_sub_.subscribe(this, "/camera/camera/depth/image_rect_raw");
-        info_sub_.subscribe(this, "/camera/camera/depth/camera_info");
+        depth_sub_.subscribe(this, depth_image_topic_);
+        info_sub_.subscribe(this, camera_info_topic_);
 
         typedef message_filters::Synchronizer<MySyncPolicy> Sync;
         sync_ = std::make_shared<Sync>(MySyncPolicy(10));
@@ -111,7 +129,7 @@ private:
         // ===== 1. Spatial Filter (空间滤波，去散粒噪点) =====
         cv::Mat depth_filtered;
         if (depth.type() == CV_16U || depth.type() == CV_8U) {
-            cv::medianBlur(depth, depth_filtered, 5);
+            cv::medianBlur(depth, depth_filtered, median_kernel_size_);
         } else {
             depth_filtered = depth;
         }
@@ -126,30 +144,38 @@ private:
             current_float = depth_filtered.clone();
         }
 
-        // ===== 1.5 Temporal Filter (时域平滑，解决水面波动) =====
-        if (history_depth_.empty() || history_depth_.size() != current_float.size()) {
-            history_depth_ = current_float.clone();
+        // ===== 1.5 Temporal Median Filter (多帧中值去水面波动) =====
+        int N = temporal_frames_;
+        if (N < 1) N = 1;
+
+        // 帧数或尺寸变化时重建历史队列
+        if (history_frames_.empty() || history_frames_.front().size() != current_float.size()) {
+            history_frames_.clear();
+            for (int k = 0; k < N; ++k) {
+                history_frames_.push_back(current_float.clone());
+            }
         } else {
-            float alpha = 0.4f;        // 当前帧权重：越小抗水波纹能力越强，会有类似残影的效应
-            float delta_thresh = 0.05f; // 阈值5cm：深度变化大于此值说明是物体真实移动
+            // 滑动窗口：丢弃最老帧，压入最新帧
+            history_frames_.erase(history_frames_.begin());
+            history_frames_.push_back(current_float.clone());
 
+            // 逐像素取中值
+            std::vector<float> vals(N);
             for (int i = 0; i < current_float.rows; ++i) {
-                float* curr_row = current_float.ptr<float>(i);
-                float* hist_row = history_depth_.ptr<float>(i);
+                float* out_row = current_float.ptr<float>(i);
                 for (int j = 0; j < current_float.cols; ++j) {
-                    float c = curr_row[j];
-                    float h = hist_row[j];
-
-                    if (c > 0.1f && c < 10.0f) { 
-                        if (h > 0.1f && std::abs(c - h) < delta_thresh) {
-                            float smoothed = alpha * c + (1.0f - alpha) * h;
-                            curr_row[j] = smoothed;
-                            hist_row[j] = smoothed;
-                        } else {
-                            hist_row[j] = c;
+                    int valid = 0;
+                    for (int k = 0; k < N; ++k) {
+                        float v = history_frames_[k].at<float>(i, j);
+                        if (v > 0.05f && v < 15.0f) {
+                            vals[valid++] = v;
                         }
+                    }
+                    if (valid > 0) {
+                        std::nth_element(vals.begin(), vals.begin() + valid / 2, vals.begin() + valid);
+                        out_row[j] = vals[valid / 2];
                     } else {
-                        hist_row[j] = 0.0f;
+                        out_row[j] = 0.0f;  // 无有效值则清零
                     }
                 }
             }
@@ -194,7 +220,8 @@ private:
 
         pcl::VoxelGrid<pcl::PointXYZ> vg;
         vg.setInputCloud(cloud);
-        vg.setLeafSize(0.03f, 0.03f, 0.03f);
+        float vls = static_cast<float>(voxel_leaf_size_);
+        vg.setLeafSize(vls, vls, vls);
         vg.filter(*voxel);
 
         // ===== 6. statistical outlier removal（去飞点）=====
@@ -202,8 +229,8 @@ private:
 
         pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
         sor.setInputCloud(voxel);
-        sor.setMeanK(20);
-        sor.setStddevMulThresh(1.0);
+        sor.setMeanK(sor_mean_k_);
+        sor.setStddevMulThresh(sor_stddev_thresh_);
         sor.filter(*filtered);
 
         // ===== 7. publish =====
@@ -218,12 +245,19 @@ private:
 
 private:
     std::string output_topic_;
+    std::string depth_image_topic_;
+    std::string camera_info_topic_;
     std::string frame_id_;
     int step_;
     float min_distance_;
     float max_distance_;
+    int median_kernel_size_;
+    int temporal_frames_;
+    double voxel_leaf_size_;
+    int sor_mean_k_;
+    double sor_stddev_thresh_;
     
-    cv::Mat history_depth_;
+    std::vector<cv::Mat> history_frames_;
 
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
 
