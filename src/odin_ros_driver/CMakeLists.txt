@@ -140,6 +140,7 @@ message(STATUS "Configuring for ROS2 build")
     find_package(tf2_ros REQUIRED)
     find_package(geometry_msgs REQUIRED)
     find_package(tf2_geometry_msgs REQUIRED)
+    find_package(rm_referee_msgs REQUIRED)
     
     # Create executable
     add_executable(host_sdk_sample 
@@ -169,6 +170,7 @@ message(STATUS "Configuring for ROS2 build")
         tf2_ros
         geometry_msgs
         tf2_geometry_msgs
+        rm_referee_msgs
     )
     
     add_library(pointcloud_depth_converter_ros2 src/pointcloud_depth_converter.cpp)

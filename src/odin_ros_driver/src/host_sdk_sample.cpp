@@ -45,10 +45,14 @@ limitations under the License.
 #ifdef ROS2
     #include <ament_index_cpp/get_package_share_directory.hpp>
     #include <rclcpp/rclcpp.hpp>
+    #include "rm_referee_msgs/msg/robot_status.hpp"
 #else
     #include <ros/package.h>
-    #include <ros/ros.h> 
+    #include <ros/ros.h>
+    // #include "rm_referee_msgs/RobotStatus.h" // Optional for ROS1 since not fully defined
 #endif
+#include <future>
+
 #define ros_driver_version "0.10.0"
 #define required_firmware_version_major 0
 #define required_firmware_version_minor 10
@@ -1862,6 +1866,46 @@ int main(int argc, char *argv[])
         };
 
         g_relocalization_map_abs_path = get_key_str_value("relocalization_map_abs_path", "");
+
+        #ifdef ROS2
+        if (!g_relocalization_map_abs_path.empty() && std::filesystem::is_directory(g_relocalization_map_abs_path)) {
+            auto status_prom = std::make_shared<std::promise<rm_referee_msgs::msg::RobotStatus::SharedPtr>>();
+            auto status_fut = status_prom->get_future();
+            
+            auto status_sub = node->create_subscription<rm_referee_msgs::msg::RobotStatus>(
+                "/rm_referee/robot_status", rclcpp::QoS(10),
+                [status_prom](const rm_referee_msgs::msg::RobotStatus::SharedPtr msg) {
+                    try { status_prom->set_value(msg); } catch (...) {}
+                });
+
+            RCLCPP_INFO(node->get_logger(), "Waiting for /rm_referee/robot_status to determine map color...");
+            const auto status_timeout = std::chrono::milliseconds(3000);
+            const auto status_start = std::chrono::steady_clock::now();
+            while (status_fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+                rclcpp::spin_some(node);
+                if (std::chrono::steady_clock::now() - status_start > status_timeout) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            
+            int robot_id = -1;
+            if (status_fut.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+                auto status_msg = status_fut.get();
+                robot_id = static_cast<int>(status_msg->robot_id);
+                RCLCPP_INFO(node->get_logger(), "Received robot_status, robot_id=%d", robot_id);
+            } else {
+                RCLCPP_WARN(node->get_logger(), "Timeout waiting for robot_status. Defaulting to red.");
+                robot_id = 7; // default red
+            }
+            
+            std::string file_name = (robot_id == 107) ? "blue.bin" : "red.bin";
+            if (g_relocalization_map_abs_path.back() != '/') {
+                g_relocalization_map_abs_path += "/";
+            }
+            g_relocalization_map_abs_path += file_name;
+            RCLCPP_INFO(node->get_logger(), "Selected relocalization map: %s", g_relocalization_map_abs_path.c_str());
+        }
+        #endif
+
         g_mapping_result_dest_dir = get_key_str_value("mapping_result_dest_dir", "");
         g_mapping_result_file_name = get_key_str_value("mapping_result_file_name", "");
         g_image_mask_abs_path = get_key_str_value("image_mask_abs_path", "");
