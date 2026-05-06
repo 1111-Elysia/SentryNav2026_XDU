@@ -477,6 +477,12 @@
     <Action ID="NavigateToPose" editable="true">
       <input_port name="goal"/>
     </Action>
+    <Action ID="RandomSelector" editable="true">
+      <input_port name="goal_names"/>
+      <input_port name="avoid_repeat"/>
+      <output_port name="goal"/>
+      <output_port name="goal_name"/>
+    </Action>
     <Action ID="ReliableNavigateToPose" editable="true">
       <input_port name="goal"/>
       <input_port name="goal_name"/>

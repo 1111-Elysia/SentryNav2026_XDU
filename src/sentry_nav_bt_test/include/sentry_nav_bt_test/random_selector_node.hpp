@@ -7,7 +7,6 @@
 
 #include "behaviortree_cpp/behavior_tree.h"
 #include "behaviortree_cpp/bt_factory.h"
-#include "nav2_util/geometry_utils.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 
@@ -24,20 +23,22 @@ public:
   static BT::PortsList providedPorts()
   {
     return {
-      BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal")
+      BT::InputPort<std::string>("goal_names", "逗号分隔的目标点名称列表"),
+      BT::InputPort<bool>("avoid_repeat", true, "是否避免连续选择同一个目标点"),
+      BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal", "随机选中的目标位置"),
+      BT::OutputPort<std::string>("goal_name", "随机选中的目标点名称")
     };
   }
 
   BT::NodeStatus tick() override;
 
 private:
-  std::vector<geometry_msgs::msg::PoseStamped> goals_;
+  std::vector<std::string> parseGoalNames(const std::string &goal_names) const;
+
   std::random_device rd_;
   std::mt19937 gen_;
   rclcpp::Logger logger_;
-  int last_index = -1;
-  
-  void loadGoals();
+  std::string last_goal_name_;
 };
 
 }  // namespace sentry_nav_bt_test

@@ -5,9 +5,11 @@
     <include path="modules/go_wait_until_time_above.xml"/>
     <include path="modules/outpost_task.xml"/>
     <include path="modules/point_hold.xml"/>
+    <include path="modules/random_waypoint_navigate.xml"/>
     <include path="modules/resurrection.xml"/>
     <include path="modules/rune_task.xml"/>
     <include path="modules/supply_return.xml"/>
+    <include path="train.xml"/>
     <include path="uc_main.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>
@@ -57,6 +59,12 @@
         <Action ID="PrintNode" editable="true">
             <input_port name="message"/>
             <input_port name="throttle_ms"/>
+        </Action>
+        <Action ID="RandomSelector" editable="true">
+            <input_port name="goal_names"/>
+            <input_port name="avoid_repeat"/>
+            <output_port name="goal"/>
+            <output_port name="goal_name"/>
         </Action>
         <Action ID="ReliableNavigateToPose" editable="true">
             <input_port name="goal"/>

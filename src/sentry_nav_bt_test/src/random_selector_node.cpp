@@ -1,72 +1,117 @@
 #include "sentry_nav_bt_test/random_selector_node.hpp"
 
+#include <sstream>
+#include <utility>
+
 namespace sentry_nav_bt_test
 {
 
-    RandomSelector::RandomSelector(
-        const std::string &xml_tag_name,
-        const BT::NodeConfig &conf)
-        : BT::SyncActionNode(xml_tag_name, conf),
-          gen_(rd_()),
-          logger_(rclcpp::get_logger("RandomSelector"))
-    {
-        loadGoals();
+namespace
+{
+
+std::string trim(const std::string &value)
+{
+    const auto begin = value.find_first_not_of(" \t");
+    if (begin == std::string::npos) {
+        return "";
     }
 
-    void RandomSelector::loadGoals()
-    {
-        // 这里为了简单直接硬编码目标点
-        // 实际应用中应该从参数文件加载这些目标点
+    const auto end = value.find_last_not_of(" \t");
+    return value.substr(begin, end - begin + 1);
+}
 
-        goals_.clear();
+}  // namespace
 
-        auto createPose = [](double x, double y, double z, double yaw)
-        {
-            geometry_msgs::msg::PoseStamped pose;
-            pose.header.frame_id = "map";
-            pose.pose.position.x = x;
-            pose.pose.position.y = y;
-            pose.pose.position.z = z;
-            pose.pose.orientation = nav2_util::geometry_utils::orientationAroundZAxis(yaw);
-            return pose;
-        };
+RandomSelector::RandomSelector(
+    const std::string &xml_tag_name,
+    const BT::NodeConfig &conf)
+: BT::SyncActionNode(xml_tag_name, conf),
+  gen_(rd_()),
+  logger_(rclcpp::get_logger("RandomSelector"))
+{
+}
 
-        // 添加几个示例目标点
-        goals_.push_back(createPose(4.0, -5.0, 0.0, 0.0));
-        goals_.push_back(createPose(4.0, -7.0, 0.0, 0.0));
-        goals_.push_back(createPose(2.0, -3.5, 0.0, 0.0));
-        goals_.push_back(createPose(2.0, 0.0, 0.0, 0.0));
+std::vector<std::string> RandomSelector::parseGoalNames(const std::string &goal_names) const
+{
+    std::vector<std::string> names;
+    std::stringstream ss(goal_names);
+    std::string item;
 
-        RCLCPP_INFO(logger_, "已加载 %zu 个目标点用于随机导航", goals_.size());
+    while (std::getline(ss, item, ',')) {
+        const auto name = trim(item);
+        if (!name.empty()) {
+            names.push_back(name);
+        }
     }
 
-    BT::NodeStatus RandomSelector::tick()
-    {
-        if (goals_.empty())
-        {
-            RCLCPP_ERROR(logger_, "没有可用的目标点进行随机选择");
+    return names;
+}
+
+BT::NodeStatus RandomSelector::tick()
+{
+    auto blackboard = config().blackboard;
+    if (!blackboard) {
+        RCLCPP_ERROR(logger_, "无法获取黑板");
+        return BT::NodeStatus::FAILURE;
+    }
+
+    std::string goal_names_raw;
+    if (!getInput("goal_names", goal_names_raw)) {
+        RCLCPP_ERROR(logger_, "缺少必要参数 'goal_names'");
+        return BT::NodeStatus::FAILURE;
+    }
+
+    const auto goal_names = parseGoalNames(goal_names_raw);
+    if (goal_names.empty()) {
+        RCLCPP_ERROR(logger_, "'goal_names' 中没有可用的目标点");
+        return BT::NodeStatus::FAILURE;
+    }
+
+    std::vector<std::pair<std::string, geometry_msgs::msg::PoseStamped>> candidates;
+    candidates.reserve(goal_names.size());
+
+    for (const auto &goal_name : goal_names) {
+        const std::string waypoint_key = "waypoint_" + goal_name;
+        geometry_msgs::msg::PoseStamped goal_pose;
+        if (!blackboard->get(waypoint_key, goal_pose)) {
+            RCLCPP_ERROR(
+                logger_,
+                "找不到随机目标点 '%s'（黑板键 '%s'）",
+                goal_name.c_str(),
+                waypoint_key.c_str());
             return BT::NodeStatus::FAILURE;
         }
-
-        // 生成随机索引
-        std::uniform_int_distribution<> dis(0, goals_.size() - 1);
-        int index =  dis(gen_);
-        while(last_index == index){
-            index =  dis(gen_);
-        }
-        last_index = index;
-
-        // 获取随机选择的目标点
-        geometry_msgs::msg::PoseStamped selected_goal = goals_[index];
-        selected_goal.header.stamp = rclcpp::Clock().now();
-
-        // 设置输出端口
-        setOutput("goal", selected_goal);
-
-        RCLCPP_INFO(logger_, "随机选择了目标点 %d，位置(%.2f, %.2f)",
-                    index, selected_goal.pose.position.x, selected_goal.pose.position.y);
-
-        return BT::NodeStatus::SUCCESS;
+        candidates.emplace_back(goal_name, goal_pose);
     }
+
+    bool avoid_repeat = true;
+    getInput("avoid_repeat", avoid_repeat);
+
+    std::uniform_int_distribution<size_t> dis(0, candidates.size() - 1);
+    size_t index = dis(gen_);
+
+    if (avoid_repeat && candidates.size() > 1) {
+        while (candidates[index].first == last_goal_name_) {
+            index = dis(gen_);
+        }
+    }
+
+    auto selected_goal = candidates[index].second;
+    selected_goal.header.stamp = rclcpp::Clock().now();
+    const auto &selected_name = candidates[index].first;
+    last_goal_name_ = selected_name;
+
+    setOutput("goal", selected_goal);
+    setOutput("goal_name", selected_name);
+
+    RCLCPP_INFO(
+        logger_,
+        "随机选择目标点 '%s'，位置(%.2f, %.2f)",
+        selected_name.c_str(),
+        selected_goal.pose.position.x,
+        selected_goal.pose.position.y);
+
+    return BT::NodeStatus::SUCCESS;
+}
 
 } // namespace sentry_nav_bt_test

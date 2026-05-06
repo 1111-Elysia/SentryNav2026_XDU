@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="RandomWaypointNavigate">
+    <KeepRunningUntilFailure>
+      <Sequence name="随机点导航循环">
+        <RandomSelector
+          goal_names="{random_goal_names}"
+          avoid_repeat="{random_avoid_repeat}"
+          goal="{random_goal}"
+          goal_name="{random_goal_name}"/>
+        <ReliableNavigateToPose
+          goal="{random_goal}"
+          goal_name="{random_goal_name}"
+          reach_threshold="{random_reach_threshold}"
+          resend_interval="{nav_resend_interval}"
+          response_timeout="{nav_response_timeout}"
+          result_retry_delay="{nav_result_retry_delay}"/>
+      </Sequence>
+    </KeepRunningUntilFailure>
+  </BehaviorTree>
+</root>
