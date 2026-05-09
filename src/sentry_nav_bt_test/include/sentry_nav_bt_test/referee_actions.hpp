@@ -180,7 +180,7 @@ namespace sentry_nav_bt_test
     };
 
     // 动作 3：打能量机关
-    // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 发送激活请求
+    // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 等待短延时 -> 发送激活请求
     // XML: <EngageRune rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
     class EngageRune : public BT::StatefulActionNode
     {
@@ -210,12 +210,10 @@ namespace sentry_nav_bt_test
         // 确保打符所需输出已经按顺序打开；已打开的输出不会重复发布。
         bool ensureEngageOutputs();
         void cleanupOutputs();
-        bool tryGetRuneStatus(int &status) const;
         bool tryGetCanActivateRune(int &can_activate) const;
         int resolveRequestedPosture() const;
         rm_protocol::SentryPosture resolvePostureEnum() const;
         const char *runeTypeName() const;
-        const char *runeStatusKey() const;
         void setRuneOutcome(bool success, const std::string &result) const;
 
         rclcpp::Node::SharedPtr node_;
@@ -229,10 +227,12 @@ namespace sentry_nav_bt_test
         int request_interval_ms_{1000};
         std::chrono::steady_clock::time_point start_time_{};
         std::chrono::steady_clock::time_point last_request_time_{};
+        std::chrono::steady_clock::time_point yaw_controller_trigger_time_{};
         bool scan_mode_disabled_{false};
         bool yaw_controller_triggered_{false};
         bool auto_shoot_enabled_{false};
         bool saw_activating_state_{false};
+        std::string active_rune_status_key_;
     };
 
     // 动作 4：打前哨站

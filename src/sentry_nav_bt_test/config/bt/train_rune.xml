@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4"
+      main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="Root">
+      <KeepRunningUntilFailure>
+        <Sequence name="裁判系统连接判定">
+          <Inverter>
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1"/>
+          </Inverter>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <ForceFailure>
+        <Fallback name="裁判系统连接成功日志">
+          <CheckCondition key_name="game_status_connected_logged"
+                          comparison="eq"
+                          threshold="1"/>
+          <Sequence name="首次裁判系统连接成功">
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1"/>
+            <PrintNode message="[TrainRune] 裁判系统已连接，等待比赛开始"/>
+            <SetBlackboardValue key="game_status_connected_logged"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
+      </ForceFailure>
+
+      <KeepRunningUntilFailure>
+        <Sequence name="开始比赛检测">
+          <CheckCondition key_name="game_progress"
+                          comparison="lte"
+                          threshold="3"/>
+          <Fallback name="赛前状态复位">
+            <Sequence name="赛前状态已复位">
+              <CheckCondition key_name="uc_initialized"
+                              comparison="eq"
+                              threshold="0"/>
+              <CheckCondition key_name="in_rune_phase"
+                              comparison="eq"
+                              threshold="0"/>
+              <CheckCondition key_name="uc_supply_active"
+                              comparison="eq"
+                              threshold="0"/>
+              <CheckCondition key_name="uc_fortress_hold_active"
+                              comparison="eq"
+                              threshold="0"/>
+            </Sequence>
+            <Sequence name="执行赛前复位">
+              <PrintNode message="[TrainRune] 比赛未开始，重置局内状态"/>
+              <SetBlackboardValue key="uc_initialized"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="in_rune_phase"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="uc_supply_active"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="uc_fortress_hold_active"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="uc_fortress_goal_name"
+                                  value="fortress"
+                                  type="string"/>
+            </Sequence>
+          </Fallback>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <ForceFailure>
+        <Fallback name="初始化">
+          <CheckCondition key_name="uc_initialized"
+                          comparison="eq"
+                          threshold="1"/>
+          <Sequence name="初始化状态">
+            <PrintNode message="[TrainRune] 比赛开始，初始化局内状态"/>
+            <SetBlackboardValue key="in_rune_phase"
+                                value="0"
+                                type="int"/>
+            <SetBlackboardValue key="uc_supply_active"
+                                value="0"
+                                type="int"/>
+            <SetBlackboardValue key="uc_fortress_hold_active"
+                                value="0"
+                                type="int"/>
+            <SetBlackboardValue key="uc_fortress_goal_name"
+                                value="fortress"
+                                type="string"/>
+            <SetBlackboardValue key="uc_initialized"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
+      </ForceFailure>
+
+      <ReactiveSequence name="主循环_Root">
+        <Sequence name="前置检查">
+          <CheckCondition key_name="game_status_received"
+                          comparison="eq"
+                          threshold="1"/>
+          <CheckCondition key_name="game_progress"
+                          comparison="eq"
+                          threshold="4"/>
+        </Sequence>
+
+        <ReactiveFallback name="主逻辑_MainLogic">
+          <SubTree ID="Resurrection"
+                   _autoremap="true"/>
+
+          <Sequence name="作战模式">
+            <CheckCondition key_name="uc_supply_active"
+                            comparison="eq"
+                            threshold="0"/>
+            <Parallel success_count="-1"
+                      failure_count="1">
+              <ReactiveFallback name="全场策略机">
+                <SubTree ID="RuneTask"
+                         rune_type="small"
+                         rune_goal_name="small_rune_point"
+                         rune_reach_threshold="0.10"
+                         rune_posture="1"
+                         rune_timeout_ms="30000"
+                         rune_request_interval_ms="1000"
+                         rune_start_message="[TrainRune] 能量机关可激活，前往小符点位"
+                         rune_arrived_message="[TrainRune] 到达小符点位，准备请求能量机关"
+                         rune_done_message="[TrainRune] 能量机关流程结束"
+                         rune_phase_key="in_rune_phase"
+                         fortress_active_key="uc_fortress_hold_active"
+                         nav_resend_interval="0.30"
+                         nav_response_timeout="0.80"
+                         nav_result_retry_delay="0.30"
+                         _autoremap="true"/>
+
+                <SubTree ID="RandomWaypointNavigate"
+                         random_goal_names="point1,point2,point3,point4,point5"
+                         random_avoid_repeat="true"
+                         random_reach_threshold="0.25"
+                         nav_resend_interval="0.30"
+                         nav_response_timeout="0.80"
+                         nav_result_retry_delay="0.30"
+                         _autoremap="true"/>
+              </ReactiveFallback>
+            </Parallel>
+          </Sequence>
+        </ReactiveFallback>
+      </ReactiveSequence>
+    </Fallback>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <Action ID="SetSentryPosture" editable="true">
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="timeout_ms" type="int">姿态切换等待超时</input_port>
+      <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
+    </Action>
+    <Action ID="MaintainSentryPosture" editable="true">
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
+    </Action>
+    <Action ID="RequestActivateRune" editable="true">
+      <input_port name="posture" type="int">请求时保持的姿态</input_port>
+      <input_port name="protocol_ver" type="string">old or new</input_port>
+    </Action>
+    <Action ID="ConfirmResurrection" editable="true">
+      <input_port name="posture"/>
+      <input_port name="burst_count"/>
+      <input_port name="burst_interval_ms"/>
+      <input_port name="min_interval_ms"/>
+    </Action>
+    <Action ID="EngageRune" editable="true">
+      <input_port name="rune_type"/>
+      <input_port name="posture"/>
+      <input_port name="timeout_ms"/>
+      <input_port name="request_interval_ms"/>
+    </Action>
+    <Action ID="EngageOutpost" editable="true">
+      <input_port name="timeout_ms"/>
+    </Action>
+    <Condition ID="CheckCondition" editable="true">
+      <input_port name="key_name"/>
+      <input_port name="comparison"/>
+      <input_port name="threshold"/>
+    </Condition>
+    <Condition ID="CompareValues" editable="true">
+      <input_port name="first_key"/>
+      <input_port name="second_key"/>
+      <input_port name="comparison"/>
+    </Condition>
+    <Action ID="GoalSelector" editable="true">
+      <input_port name="goal_name"/>
+      <output_port name="goal"/>
+    </Action>
+    <Action ID="NavigateToPose" editable="true">
+      <input_port name="goal"/>
+    </Action>
+    <Action ID="RandomSelector" editable="true">
+      <input_port name="goal_names"/>
+      <input_port name="avoid_repeat"/>
+      <output_port name="goal"/>
+      <output_port name="goal_name"/>
+    </Action>
+    <Action ID="ReliableNavigateToPose" editable="true">
+      <input_port name="goal"/>
+      <input_port name="goal_name"/>
+      <input_port name="reach_threshold"/>
+      <input_port name="resend_interval"/>
+      <input_port name="response_timeout"/>
+      <input_port name="result_retry_delay"/>
+      <input_port name="success_condition_key"/>
+      <input_port name="success_condition_comparison"/>
+      <input_port name="success_condition_threshold"/>
+    </Action>
+    <Condition ID="CheckGoalReached" editable="true">
+      <input_port name="goal"/>
+      <input_port name="threshold"/>
+    </Condition>
+    <Action ID="PrintNode" editable="true">
+      <input_port name="message"/>
+      <input_port name="throttle_ms"/>
+    </Action>
+    <Action ID="SetBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="value"/>
+      <input_port name="type"/>
+    </Action>
+    <Action ID="Wait" editable="true">
+      <input_port name="wait_duration"/>
+    </Action>
+    <Action ID="AutoAimAndFire" editable="true">
+      <input_port name="target_type"/>
+    </Action>
+    <Decorator ID="RetryUntilSuccessful">
+      <input_port name="num_attempts"/>
+    </Decorator>
+    <Decorator ID="KeepRunningUntilFailure"/>
+    <Decorator ID="ForceFailure"/>
+    <Decorator ID="Inverter"/>
+    <Control ID="Sequence"/>
+    <Control ID="Fallback"/>
+    <Control ID="Parallel">
+      <input_port name="success_count"/>
+      <input_port name="failure_count"/>
+    </Control>
+    <Control ID="ReactiveSequence"/>
+    <Control ID="ReactiveFallback"/>
+  </TreeNodesModel>
+</root>

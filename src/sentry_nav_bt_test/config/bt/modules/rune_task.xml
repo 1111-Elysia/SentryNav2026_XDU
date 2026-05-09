@@ -3,9 +3,13 @@
   <BehaviorTree ID="RuneTask">
     <Sequence name="能量机关任务">
       <Fallback name="符任务允许">
-        <CheckCondition key_name="{rune_status_key}" comparison="eq" threshold="2"/>
+        <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+        <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
         <Sequence>
-          <CheckCondition key_name="{rune_status_key}" comparison="eq" threshold="0"/>
+          <Fallback name="能量机关未激活">
+            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
+          </Fallback>
           <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
         </Sequence>
       </Fallback>

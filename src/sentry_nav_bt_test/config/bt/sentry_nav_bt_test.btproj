@@ -11,6 +11,7 @@
     <include path="modules/supply_return.xml"/>
     <include path="train.xml"/>
     <include path="uc_main.xml"/>
+    <include path="train_tune.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>
         <Action ID="AutoAimAndFire" editable="true">
