@@ -60,8 +60,8 @@ fi
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 echo "导航系统主控脚本启动... (工作目录: $SCRIPT_DIR)"
 
-# 捕获 Ctrl+C，退出时也执行清理
-trap 'echo "[INFO] 用户手动终止，正在清理..."; nuclear_cleanup; exit 0' SIGINT
+# 捕获终止信号（Ctrl+C / systemctl stop / kill 均生效）
+trap 'echo "[INFO] 收到终止信号，正在清理..."; nuclear_cleanup; exit 0' SIGINT SIGTERM
 
 while true; do
     echo "=========================================="
