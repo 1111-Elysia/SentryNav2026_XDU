@@ -5,7 +5,7 @@ import os
 
 
 def generate_launch_description():
-    can_comm_share = get_package_share_directory('can_comm')
+    can_comm_share = get_package_share_directory('bringup')
     config_file = os.path.join(can_comm_share, 'config', 'can_params.yaml')
 
     return LaunchDescription([
