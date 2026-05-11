@@ -84,10 +84,10 @@ controller_server:
     FollowPath:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 0.5  #距目标时开始限速
+      approach_distance: 1.5  #距目标时开始限速
       approach_velocity: 0.2
       direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
-      direct_approach_kp: 3.0  #直接驱动P控制增益
+      direct_approach_kp: 10.0  #直接驱动P控制增益
       time_steps: 80  #增加到80，预测时域4.8s，让MPPI能看到冲过目标的后果
       model_dt: 0.04  #稍微放大步长，配合time_steps延长预测时域
       batch_size: 1500 #控制器的采样数。
