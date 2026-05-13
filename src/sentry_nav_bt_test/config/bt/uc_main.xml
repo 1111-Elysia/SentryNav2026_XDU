@@ -68,7 +68,8 @@
 
           <SubTree
             ID="SupplyReturn"
-            supply_goal_name="supply_point"
+            supply_goal_names="supply_point,supply_point_2"
+            supply_goal_index_key="uc_supply_goal_index"
             supply_low_hp_threshold="150"
             supply_low_ammo_threshold="50"
             supply_ready_ammo_threshold="100"
@@ -471,6 +472,12 @@
     <Action ID="RandomSelector" editable="true">
       <input_port name="goal_names"/>
       <input_port name="avoid_repeat"/>
+      <output_port name="goal"/>
+      <output_port name="goal_name"/>
+    </Action>
+    <Action ID="PatrolGoalSelector" editable="true">
+      <input_port name="goal_names"/>
+      <input_port name="index_key"/>
       <output_port name="goal"/>
       <output_port name="goal_name"/>
     </Action>

@@ -14,13 +14,13 @@
               <CheckCondition key_name="projectile_allowance_17mm" comparison="lte" threshold="{supply_low_ammo_threshold}"/>
             </Sequence>
           </Fallback>
+          <SetBlackboardValue key="{supply_goal_index_key}" value="0" type="int"/>
           <SetBlackboardValue key="{supply_active_key}" value="1" type="int"/>
           <PrintNode message="{supply_start_message}"/>
         </Sequence>
       </Fallback>
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
-      <GoalSelector goal_name="{supply_goal_name}" goal="{supply_goal}"/>
       <Inverter>
         <KeepRunningUntilFailure>
           <Sequence name="回补_未补满时持续回补闭环">
@@ -37,27 +37,31 @@
                 <MaintainSentryPosture mode="2"/>
                 <Wait wait_duration="0.20"/>
               </Sequence>
-              <RetryUntilSuccessful num_attempts="100">
-                <ReactiveSequence name="回补_RFID丢失_重新发补给点">
-                  <PrintNode message="[回补] 未读到补给区 RFID，重新发补给点" throttle_ms="2000"/>
-                  <MaintainSentryPosture mode="3"/>
-                  <ReliableNavigateToPose
-                    goal="{supply_goal}"
-                    goal_name="{supply_goal_name}"
-                    reach_threshold="{supply_reach_threshold}"
-                    resend_interval="{nav_resend_interval}"
-                    response_timeout="{nav_response_timeout}"
-                    result_retry_delay="{nav_result_retry_delay}"
-                    success_condition_key="{supply_rfid_detected_key}"
-                    success_condition_comparison="eq"
-                    success_condition_threshold="1"/>
-                </ReactiveSequence>
-              </RetryUntilSuccessful>
+              <Sequence name="回补_RFID丢失_两点往返找补给区">
+                <PrintNode message="[回补] 未读到补给区 RFID，按两个补给点往返寻找" throttle_ms="2000"/>
+                <MaintainSentryPosture mode="3"/>
+                <PatrolGoalSelector
+                  goal_names="{supply_goal_names}"
+                  index_key="{supply_goal_index_key}"
+                  goal="{supply_goal}"
+                  goal_name="{supply_selected_goal_name}"/>
+                <ReliableNavigateToPose
+                  goal="{supply_goal}"
+                  goal_name="{supply_selected_goal_name}"
+                  reach_threshold="{supply_reach_threshold}"
+                  resend_interval="{nav_resend_interval}"
+                  response_timeout="{nav_response_timeout}"
+                  result_retry_delay="{nav_result_retry_delay}"/>
+                <Inverter>
+                  <CheckCondition key_name="{supply_rfid_detected_key}" comparison="eq" threshold="1"/>
+                </Inverter>
+              </Sequence>
             </ReactiveFallback>
           </Sequence>
         </KeepRunningUntilFailure>
       </Inverter>
       <PrintNode message="{supply_done_message}"/>
+      <SetBlackboardValue key="{supply_goal_index_key}" value="0" type="int"/>
       <SetBlackboardValue key="{supply_active_key}" value="0" type="int"/>
     </Sequence>
   </BehaviorTree>
