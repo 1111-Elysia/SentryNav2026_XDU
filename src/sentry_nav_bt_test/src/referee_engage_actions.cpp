@@ -457,6 +457,25 @@ bool EngageOutpost::publishOutpostMode(bool enabled)
     return control_publishers_ && control_publishers_->publishOutpostMode(enabled);
 }
 
+bool EngageOutpost::publishVw(float value)
+{
+    return control_publishers_ && control_publishers_->publishVw(value);
+}
+
+bool EngageOutpost::publishOutpostVw()
+{
+    if (!publishVw(1.0f)) {
+        return false;
+    }
+
+    if (!outpost_vw_active_) {
+        outpost_vw_active_ = true;
+        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: 开始持续发布 /vw = 1");
+    }
+
+    return true;
+}
+
 bool EngageOutpost::ensureEngageOutputs()
 {
     if (!scan_mode_disabled_) {
@@ -488,6 +507,12 @@ bool EngageOutpost::ensureEngageOutputs()
 
 void EngageOutpost::cleanupOutputs()
 {
+    if (outpost_vw_active_) {
+        publishVw(0.0f);
+        outpost_vw_active_ = false;
+        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: 退出流程，已向 /vw 发送 0");
+    }
+
     if (outpost_mode_enabled_) {
         publishOutpostMode(false);
         outpost_mode_enabled_ = false;
@@ -522,13 +547,14 @@ BT::NodeStatus EngageOutpost::onStart()
     scan_mode_disabled_ = false;
     yaw_controller_triggered_ = false;
     outpost_mode_enabled_ = false;
+    outpost_vw_active_ = false;
     setOutpostOutcome(false, "running");
 
     RCLCPP_INFO(
         node_->get_logger(),
-        "EngageOutpost: 进入打前哨站流程，等待按顺序发送 scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true");
+        "EngageOutpost: 进入打前哨站流程，等待按顺序发送 scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true，并持续发布 /vw=1");
 
-    if (!ensureEngageOutputs()) {
+    if (!ensureEngageOutputs() || !publishOutpostVw()) {
         cleanupOutputs();
         return BT::NodeStatus::FAILURE;
     }
@@ -550,7 +576,7 @@ BT::NodeStatus EngageOutpost::onRunning()
         return BT::NodeStatus::FAILURE;
     }
 
-    if (!ensureEngageOutputs()) {
+    if (!ensureEngageOutputs() || !publishOutpostVw()) {
         cleanupOutputs();
         return BT::NodeStatus::FAILURE;
     }

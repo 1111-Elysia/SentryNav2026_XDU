@@ -318,7 +318,9 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `/initialpose`
   - 启动时自动发布初始位姿
 - `/vw`
-  - 在 `ul.xml` 的中心驻守和 `uc.xml` 的堡垒驻守中持续发布
+  - 在 `ul.xml` 的中心驻守中持续发布
+  - `EngageOutpost` 打前哨站期间会持续发布 `1`
+  - `EngageOutpost` 退出、超时或被外层打断时会补发一次 `0`
 - `/scan_mod_type`
   - 这是 topic 名，不是消息类型名
   - 消息类型实际是 `sentry_msgs/msg/ScanMode`
@@ -330,6 +332,9 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
   - 流程结束时会恢复 `false`
 - `/yaw_controller`
   - `EngageRune` 在准备发送激活请求时发送一次 `true`，触发云台转向能量机关
+- `/outpost_mode_type`
+  - `EngageOutpost` 进入打前哨站流程时发送 `true`
+  - `EngageOutpost` 退出、超时或被外层打断时恢复 `false`
 - `/sentry_nav_bt_test/decoded_sentry_info/*`
   - 调试用的解包结果发布
 
@@ -395,6 +400,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `MaintainSentryPosture` | Action | 通过裁判系统维持哨兵姿态，优先读当前姿态并结合全局冷却去重 |
 | `ConfirmResurrection` | Action | 连发确认复活指令 |
 | `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
+| `EngageOutpost` | Stateful Action | 管理 scan mode、yaw、outpost mode 和 `/vw` 的前哨站进攻流程 |
 | `AutoAimAndFire` | Action | 当前为 mock 节点，仅打印日志 |
 
 此外也注册了本包内置的兼容节点：
@@ -452,6 +458,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 当前位置由 TF 定时写入黑板键 `waypoint_now`
 - 中心驻守激活时会持续发布 `/vw = 1`
 - 退出中心驻守后会停止继续发布 `/vw`
+- 打前哨站期间会持续发布 `/vw = 1`，退出、超时或被打断时会补发一次 `/vw = 0`
 - `PrintNode` 消息默认会同时写入累计历史日志 `/tmp/sentry_nav_bt_messages.log`
 - `PrintNode` 消息也会额外写入按启动时间命名的独立日志文件，例如 `/tmp/sentry_nav_bt_messages_2026-03-27_21-05-33_pid12345.log`
 - 每次启动都会保留自己的独立日志，同时固定路径也能看到完整运行历史
