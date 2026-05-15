@@ -48,6 +48,8 @@ ament_target_dependencies(hurt_spin_vw_node
   rclcpp
   sentry_msgs
   rm_referee_msgs
+  tf2
+  tf2_ros
 )
 
 ament_target_dependencies(vyaw_tf_yaw_controller_node
