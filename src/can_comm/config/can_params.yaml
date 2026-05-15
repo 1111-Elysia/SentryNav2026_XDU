@@ -14,7 +14,7 @@ can_comm_node:
     cmd_vel_topic: "/cmd_vel"
     vw_topic: "/vw"
     scan_mod_type_topic: "/scan_mod_type"
-    NLJG_mode_type_topic: "/autoshoot_type"
+    NLJG_mode_type_topic: "/auto_shoot_type"
     outpost_mode_type_topic: "/outpost_mode_type"
     all_detect_topic: "/detector/armor_presence"
     game_status_topic: "/rm_referee/game_status"
