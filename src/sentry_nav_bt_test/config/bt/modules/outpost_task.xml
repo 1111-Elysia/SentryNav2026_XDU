@@ -4,21 +4,27 @@
     <Sequence name="前哨站任务">
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
-      <PrintNode message="{outpost_start_message}"/>
-      <GoalSelector goal_name="{outpost_goal_name}" goal="{outpost_goal}"/>
-      <ReactiveSequence name="前往前哨站点并维持移动姿态">
-        <MaintainSentryPosture mode="{outpost_move_posture}"/>
-        <ReliableNavigateToPose
-          goal="{outpost_goal}"
-          goal_name="{outpost_goal_name}"
-          reach_threshold="{outpost_reach_threshold}"
-          resend_interval="{nav_resend_interval}"
-          response_timeout="{nav_response_timeout}"
-          result_retry_delay="{nav_result_retry_delay}"/>
-      </ReactiveSequence>
-      <PrintNode message="{outpost_arrived_message}"/>
-      <Parallel name="打前哨站并等待阶段切换" success_count="1" failure_count="1">
-        <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+      <Parallel name="打前哨站并驻守直到阶段切换" success_count="1" failure_count="1">
+        <ReactiveSequence name="驻守前哨站点并打击">
+          <SubTree
+            ID="PointHold"
+            point_hold_goal_name="{outpost_goal_name}"
+            point_hold_arrive_threshold="{outpost_reach_threshold}"
+            point_hold_exit_threshold="{outpost_reach_threshold}"
+            point_hold_move_posture="{outpost_move_posture}"
+            point_hold_posture="1"
+            point_hold_wait_duration="0"
+            point_hold_log_throttle_ms="10000"
+            point_hold_message="{outpost_start_message}"
+            rune_phase_key="{rune_phase_key}"
+            fortress_active_key="{fortress_active_key}"
+            nav_resend_interval="{nav_resend_interval}"
+            nav_response_timeout="{nav_response_timeout}"
+            nav_result_retry_delay="{nav_result_retry_delay}"
+            _autoremap="true"/>
+          <PrintNode message="{outpost_arrived_message}" throttle_ms="10000"/>
+          <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+        </ReactiveSequence>
         <KeepRunningUntilFailure>
           <CheckCondition
             key_name="stage_remain_time"

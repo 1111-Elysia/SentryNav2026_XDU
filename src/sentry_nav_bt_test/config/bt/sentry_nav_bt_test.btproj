@@ -11,7 +11,7 @@
     <include path="modules/supply_return.xml"/>
     <include path="train.xml"/>
     <include path="uc_main.xml"/>
-    <include path="train_tune.xml"/>
+    <include path="train_rune.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>
         <Action ID="AutoAimAndFire" editable="true">
@@ -64,6 +64,12 @@
         <Action ID="RandomSelector" editable="true">
             <input_port name="goal_names"/>
             <input_port name="avoid_repeat"/>
+            <output_port name="goal"/>
+            <output_port name="goal_name"/>
+        </Action>
+        <Action ID="PatrolGoalSelector" editable="true">
+            <input_port name="goal_names"/>
+            <input_port name="index_key"/>
             <output_port name="goal"/>
             <output_port name="goal_name"/>
         </Action>

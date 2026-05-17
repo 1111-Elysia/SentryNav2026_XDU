@@ -208,48 +208,25 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <Fallback name="中期_前哨站_Phase4">
-                  <Sequence name="Phase4_退守堡垒驻守">
-                    <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                    <CheckCondition key_name="ally_outpost_hp" comparison="lte" threshold="0"/>
-                    <SubTree
-                      ID="FortressHold"
-                      fortress_goal_name="fortress"
-                      fortress_arrive_threshold="0.25"
-                      fortress_hold_exit_threshold="0.30"
-                      fortress_move_posture="3"
-                      fortress_hold_posture="1"
-                      fortress_wait_duration="0.5"
-                      fortress_move_message="[Phase 4 | 5:00-4:00] 前哨站已失，退守堡垒点位并驻守"
-                      rune_phase_key="in_rune_phase"
-                      fortress_active_key="uc_fortress_hold_active"
-                      fortress_goal_name_key="uc_fortress_goal_name"
-                      nav_resend_interval="0.30"
-                      nav_response_timeout="0.80"
-                      nav_result_retry_delay="0.30"
-                      _autoremap="1"/>
-                  </Sequence>
-                  <Sequence name="Phase4_防守前哨站点位">
-                    <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                    <CheckCondition key_name="ally_outpost_hp" comparison="gt" threshold="0"/>
-                    <SubTree
-                      ID="OutpostTask"
-                      outpost_goal_name="outpost_point"
-                      outpost_reach_threshold="0.25"
-                      outpost_wait_time_threshold="240"
-                      outpost_move_posture="3"
-                      outpost_timeout_ms="70000"
-                      outpost_start_message="[Phase 4 | 5:00-4:00] 若前哨站仍存活，前往前哨站点位"
-                      outpost_arrived_message="[Phase 4 | 5:00-4:00] 已到达前哨站点位，开始打前哨站"
-                      outpost_done_message="[Phase 4 | 5:00-4:00] 前哨站流程结束，等待阶段切换完成"
-                      rune_phase_key="in_rune_phase"
-                      fortress_active_key="uc_fortress_hold_active"
-                      nav_resend_interval="0.30"
-                      nav_response_timeout="0.80"
-                      nav_result_retry_delay="0.30"
-                      _autoremap="1"/>
-                  </Sequence>
-                </Fallback>
+                <Sequence name="中期_堡垒_Phase4">
+                  <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
+                  <SubTree
+                    ID="FortressHold"
+                    fortress_goal_name="fortress"
+                    fortress_arrive_threshold="0.25"
+                    fortress_hold_exit_threshold="0.30"
+                    fortress_move_posture="3"
+                    fortress_hold_posture="1"
+                    fortress_wait_duration="0.5"
+                    fortress_move_message="[Phase 4 | 5:00-4:00] 不需要打符，回堡垒点位持续驻守"
+                    rune_phase_key="in_rune_phase"
+                    fortress_active_key="uc_fortress_hold_active"
+                    fortress_goal_name_key="uc_fortress_goal_name"
+                    nav_resend_interval="0.30"
+                    nav_response_timeout="0.80"
+                    nav_result_retry_delay="0.30"
+                    _autoremap="1"/>
+                </Sequence>
 
                 <Sequence name="中期_大符_Phase5">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="210"/>
@@ -397,19 +374,19 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <Sequence name="后期_守家_Phase10">
+                <Sequence name="全局_堡垒驻守">
                   <SubTree
-                    ID="PointHold"
-                    point_hold_goal_name="base_defense_point"
-                    point_hold_arrive_threshold="0.25"
-                    point_hold_exit_threshold="0.25"
-                    point_hold_move_posture="3"
-                    point_hold_posture="2"
-                    point_hold_wait_duration="0.5"
-                    point_hold_log_throttle_ms="10000"
-                    point_hold_message="[Phase 10 | 1:00-0:00] 后期，守护基地"
+                    ID="FortressHold"
+                    fortress_goal_name="fortress"
+                    fortress_arrive_threshold="0.25"
+                    fortress_hold_exit_threshold="0.30"
+                    fortress_move_posture="3"
+                    fortress_hold_posture="1"
+                    fortress_wait_duration="0.5"
+                    fortress_move_message="[Fallback] 不需要打符，回堡垒点位持续驻守"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
+                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"

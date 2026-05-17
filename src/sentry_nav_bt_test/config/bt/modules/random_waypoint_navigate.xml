@@ -2,20 +2,26 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="RandomWaypointNavigate">
     <KeepRunningUntilFailure>
-      <Sequence name="随机点导航循环">
-        <RandomSelector
-          goal_names="{random_goal_names}"
-          avoid_repeat="{random_avoid_repeat}"
-          goal="{random_goal}"
-          goal_name="{random_goal_name}"/>
-        <ReliableNavigateToPose
-          goal="{random_goal}"
-          goal_name="{random_goal_name}"
-          reach_threshold="{random_reach_threshold}"
-          resend_interval="{nav_resend_interval}"
-          response_timeout="{nav_response_timeout}"
-          result_retry_delay="{nav_result_retry_delay}"/>
-      </Sequence>
+      <ReactiveSequence name="随机巡逻直到阶段切换">
+        <CheckCondition
+          key_name="stage_remain_time"
+          comparison="gt"
+          threshold="{random_wait_time_threshold}"/>
+        <Sequence name="随机点导航循环">
+          <RandomSelector
+            goal_names="{random_goal_names}"
+            avoid_repeat="{random_avoid_repeat}"
+            goal="{random_goal}"
+            goal_name="{random_goal_name}"/>
+          <ReliableNavigateToPose
+            goal="{random_goal}"
+            goal_name="{random_goal_name}"
+            reach_threshold="{random_reach_threshold}"
+            resend_interval="{nav_resend_interval}"
+            response_timeout="{nav_response_timeout}"
+            result_retry_delay="{nav_result_retry_delay}"/>
+        </Sequence>
+      </ReactiveSequence>
     </KeepRunningUntilFailure>
   </BehaviorTree>
 </root>

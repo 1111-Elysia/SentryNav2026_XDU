@@ -140,6 +140,7 @@
                          random_goal_names="point1,point2,point3,point4,point5"
                          random_avoid_repeat="true"
                          random_reach_threshold="0.25"
+                         random_wait_time_threshold="0"
                          nav_resend_interval="0.30"
                          nav_response_timeout="0.80"
                          nav_result_retry_delay="0.30"
