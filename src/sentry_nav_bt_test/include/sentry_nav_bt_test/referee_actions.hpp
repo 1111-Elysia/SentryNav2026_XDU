@@ -236,7 +236,7 @@ namespace sentry_nav_bt_test
     };
 
     // 动作 4：打前哨站
-    // 顺序：scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true，然后持续发布 /vw=1
+    // 顺序：scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true
     // XML: <EngageOutpost timeout_ms="70000"/>
     class EngageOutpost : public BT::StatefulActionNode
     {
@@ -253,8 +253,6 @@ namespace sentry_nav_bt_test
         bool publishScanMode(bool enabled);
         bool triggerYawController();
         bool publishOutpostMode(bool enabled);
-        bool publishVw(float value);
-        bool publishOutpostVw();
         // 确保打前哨站所需输出已经按顺序打开；已打开的输出不会重复发布。
         bool ensureEngageOutputs();
         void cleanupOutputs();
@@ -268,7 +266,6 @@ namespace sentry_nav_bt_test
         bool scan_mode_disabled_{false};
         bool yaw_controller_triggered_{false};
         bool outpost_mode_enabled_{false};
-        bool outpost_vw_active_{false};
     };
 
 } // namespace sentry_nav_bt_test
