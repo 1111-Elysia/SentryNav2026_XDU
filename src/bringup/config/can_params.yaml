@@ -57,13 +57,13 @@ vyaw_tf_yaw_controller:
     yaw_tolerance_deg: 3.0
 
     # Pose of NLJG in map frame
-    NLJG_pose_x: 7.0
+    NLJG_pose_x: 10.44
     NLJG_pose_y: 0.0
     NLJG_pose_yaw_deg: 0.0
 
     # Pose of outpost in map frame
-    outpost_pose_x: 7.0
-    outpost_pose_y: 3.2
+    outpost_pose_x: 13.48
+    outpost_pose_y: 3.92
     outpost_pose_yaw_deg: 0.0
 
     # 旋转速度约束（绝对值）

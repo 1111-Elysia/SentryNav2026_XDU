@@ -11,8 +11,6 @@ def generate_launch_description():
     pkg_dir = get_package_share_directory('sentry_nav_bt_test')
     
     # 行为树XML文件路径
-    # bt_xml_path = os.path.join(pkg_dir, 'config', 'ul_3.21.xml')
-    # bt_xml_path = os.path.join(pkg_dir, 'config', 'uc.xml')
     bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_main.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'train_rune.xml')
     bt_subtree_dir = os.path.join(pkg_dir, 'config', 'bt', 'modules')

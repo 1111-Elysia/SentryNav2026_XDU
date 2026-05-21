@@ -24,6 +24,11 @@ sequential_nodes:
     cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
     wait_after: 0
 
+  - label: RM-messages-pos
+    type: execute
+    cmd: ["ros2", "launch", "rm_referee", "referee_node_pos.launch.py"]
+    wait_after: 0
+
   - label: Lidar-Filter
     type: node
     package: cpp_lidar_filter
@@ -128,12 +133,12 @@ sequential_nodes:
   #   cmd: ["ros2", "launch", "sentry_eval_bt", "sentry_eval_bt.launch.py"]
   #   wait_after: 0
 
-  # - label: Sentry-BT
-  #   type: execute
-  #   cmd: [
-  #     "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py"
-  #   ]
-  #   wait_after: 0
+  - label: Sentry-BT
+    type: execute
+    cmd: [
+      "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py"
+    ]
+    wait_after: 0
 
   # - label: Rosbag-Record
   #   type: execute
