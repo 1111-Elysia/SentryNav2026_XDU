@@ -201,15 +201,15 @@ private:
             }
 
             // 运动和装甲检测位门控直接依据 game_status 话题内容
-            if (game_progress_ != 4) {
-                vx = 0.0f;
-                vy = 0.0f;
-                vyaw = 0.0f;
-                vw = 0.0f;
-                left = 0;
-                behind = 0;
-                right = 0;
-            }
+            // if (game_progress_ != 4) {
+            //     vx = 0.0f;
+            //     vy = 0.0f;
+            //     vyaw = 0.0f;
+            //     vw = 0.0f;
+            //     left = 0;
+            //     behind = 0;
+            //     right = 0;
+            // }
         }
 
         // 限幅 lambda

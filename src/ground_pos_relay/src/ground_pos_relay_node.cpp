@@ -13,6 +13,7 @@
 #include <rm_referee_msgs/msg/robot_status.hpp>
 #include <rm_referee_msgs/srv/tx.hpp>
 
+#include <atomic>
 #include <cstring>
 #include <vector>
 
@@ -127,6 +128,14 @@ class GroundPosRelayNode : public rclcpp::Node {
     tx_client_ = create_client<rm_referee_msgs::srv::Tx>("/rm_referee/tx");
 
     RCLCPP_INFO(get_logger(), "GroundPosRelayNode started, waiting for /rm_referee/tx service...");
+    while (!tx_client_->wait_for_service(std::chrono::seconds(1))) {
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(get_logger(), "Interrupted while waiting for the service. Exiting.");
+        return;
+      }
+      RCLCPP_INFO(get_logger(), "service not available, waiting again...");
+    }
+    RCLCPP_INFO(get_logger(), "Service /rm_referee/tx is available.");
   }
 
  private:
@@ -136,12 +145,6 @@ class GroundPosRelayNode : public rclcpp::Node {
       RCLCPP_INFO_ONCE(get_logger(),
                        "robot_id=%d, not 7 or 107, skipping relay (waiting for valid id)",
                        robot_id_);
-      return;
-    }
-
-    if (!tx_client_->wait_for_service(std::chrono::seconds(1))) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                           "/rm_referee/tx service not available");
       return;
     }
 
@@ -216,9 +219,13 @@ class GroundPosRelayNode : public rclcpp::Node {
     request->header.stamp = now();
     request->data = std::move(frame);
 
+    const bool log_this_time = first_tx_log_.exchange(false);
+    if (log_this_time) {
+      RCLCPP_INFO(get_logger(), "start relaying position data to 0x0301...");
+    }
     tx_client_->async_send_request(
         request,
-        [this](rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedFuture future) {
+        [this, log_this_time](rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedFuture future) {
           auto response = future.get();
           if (!response->ok) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
@@ -238,6 +245,7 @@ class GroundPosRelayNode : public rclcpp::Node {
   // ---- 状态 ----
   uint8_t robot_id_{0};
   uint8_t seq_{0};
+  std::atomic_bool first_tx_log_{true};
 };
 
 // ============================================================================

@@ -41,12 +41,6 @@ hurt_spin_vw_node:
     # 定时发布频率 (Hz)
     publish_rate_hz: 50.0
 
-    # 坡度检测：读取 map->base_link 的 roll/pitch
-    # 超过 max_slope_angle_deg 时强制 vw=0，避免坡道旋转侧翻
-    map_frame: "map"
-    base_frame: "base_link"
-    max_slope_angle_deg: 10.0
-
 vxvy_to_vw_node:
   ros__parameters:
     cmd_vel_topic: "/cmd_vel_good"
@@ -63,18 +57,18 @@ vyaw_tf_yaw_controller:
     yaw_tolerance_deg: 3.0
 
     # Pose of NLJG in map frame
-    NLJG_pose_x: 0.0
+    NLJG_pose_x: 7.0
     NLJG_pose_y: 0.0
     NLJG_pose_yaw_deg: 0.0
 
     # Pose of outpost in map frame
-    outpost_pose_x: 0.0
-    outpost_pose_y: 0.0
+    outpost_pose_x: 7.0
+    outpost_pose_y: 1.6
     outpost_pose_yaw_deg: 0.0
 
     # 旋转速度约束（绝对值）
-    min_abs_vyaw: 0.15
-    max_abs_vyaw: 1.0
+    min_abs_vyaw: 0.25
+    max_abs_vyaw: 0.5
 
     # 简单比例控制增益（基于弧度误差）
     k_p: 1.2
