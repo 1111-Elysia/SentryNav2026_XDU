@@ -163,6 +163,8 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("ul_retreat_active", 0);
             blackboard_->set<int>("ul_center_ready", 0);
             blackboard_->set<int>("uc_supply_active", 0);
+            blackboard_->set<int>("uc_outpost_active", 0);
+            blackboard_->set<int>("uc_normal_posture", 3);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
             blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);
@@ -189,7 +191,7 @@ namespace sentry_nav_bt_test
 
             // 初始化定时器
             hurt_reset_timer_ = node_->create_wall_timer(
-                std::chrono::seconds(2),
+                std::chrono::seconds(5),
                 [this]()
                 {
                     std::lock_guard<std::mutex> lock(hurt_mutex_);
@@ -198,7 +200,7 @@ namespace sentry_nav_bt_test
                     // 读取当前状态，如果是 1 则打印日志
                     if (blackboard_->get("is_under_attack", attack_status) && attack_status == 1)
                     {
-                        RCLCPP_INFO(node_->get_logger(), "攻击停止 (2s超时)，受击状态复位");
+                        RCLCPP_INFO(node_->get_logger(), "攻击停止 (5s超时)，受击状态复位");
                     }
 
                     blackboard_->set("is_under_attack", 0); 
@@ -417,7 +419,7 @@ namespace sentry_nav_bt_test
                     bb->set("hurt_armor_id", (int)id);
                     bb->set("is_under_attack", 1); 
 
-                    // 重置定时器 (续命 2秒)
+                    // 重置定时器
                     if (hurt_reset_timer_)
                         hurt_reset_timer_->reset();
                 });

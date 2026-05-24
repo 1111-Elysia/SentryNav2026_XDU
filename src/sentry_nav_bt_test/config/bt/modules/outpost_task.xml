@@ -4,6 +4,7 @@
     <Sequence name="前哨站任务">
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
       <Parallel name="打前哨站并驻守直到阶段切换" success_count="1" failure_count="1">
         <ReactiveSequence name="驻守前哨站点并打击">
           <SubTree
@@ -22,8 +23,11 @@
             nav_response_timeout="{nav_response_timeout}"
             nav_result_retry_delay="{nav_result_retry_delay}"
             _autoremap="true"/>
-          <PrintNode message="{outpost_arrived_message}" throttle_ms="10000"/>
-          <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+          <ReactiveSequence name="打前哨站并维持激活标志">
+            <SetBlackboardValue key="{outpost_active_key}" value="1" type="int"/>
+            <PrintNode message="{outpost_arrived_message}" throttle_ms="10000"/>
+            <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+          </ReactiveSequence>
         </ReactiveSequence>
         <KeepRunningUntilFailure>
           <CheckCondition
@@ -33,6 +37,7 @@
         </KeepRunningUntilFailure>
       </Parallel>
       <PrintNode message="{outpost_done_message}"/>
+      <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
     </Sequence>
   </BehaviorTree>
 </root>

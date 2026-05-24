@@ -164,6 +164,7 @@
                                outpost_reach_threshold="0.25"
                                outpost_wait_time_threshold="360"
                                outpost_move_posture="3"
+                               outpost_active_key="uc_outpost_active"
                                outpost_timeout_ms="70000"
                                outpost_start_message="前往点位1"
                                outpost_arrived_message="已到达点位1，开始打前哨站"
