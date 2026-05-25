@@ -426,4 +426,180 @@ BT::NodeStatus ConfirmResurrection::tick()
     return any_send_ok ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
 }
 
+BuySentryProjectile::BuySentryProjectile(const std::string &name, const BT::NodeConfig &config)
+    : RefereeActionBase(name, config)
+{
+}
+
+BT::PortsList BuySentryProjectile::providedPorts()
+{
+    return {
+        BT::InputPort<int>("target_allowance", 150, "回补完成所需的 17mm 允许发弹量"),
+        BT::InputPort<int>("max_exchange_projectile", 300, "哨兵补血点补弹累计兑换上限"),
+        BT::InputPort<int>("reserve_gold", 300, "买弹后需要严格高于该值的剩余金币"),
+        BT::InputPort<int>("buy_step", 10, "补血点买弹粒度"),
+        BT::InputPort<int>("min_interval_ms", 30000, "两次买弹请求的最小间隔"),
+        BT::InputPort<int>("posture", 0, "买弹请求附带姿态 (0 表示自动读取当前姿态)"),
+        BT::InputPort<int>("response_timeout_ms", 200, "Tx.srv 响应超时")};
+}
+
+int BuySentryProjectile::resolveRequestedPosture(int requested_posture) const
+{
+    if (requested_posture >= 1 && requested_posture <= 3) {
+        return requested_posture;
+    }
+
+    int current_val = 3;
+    if (getBlackboardIntLike(config().blackboard, "current_posture", current_val) &&
+        current_val >= 1 && current_val <= 3) {
+        return current_val;
+    }
+    return 3;
+}
+
+void BuySentryProjectile::setBuyStatus(
+    const std::string &result,
+    int buy_amount,
+    int exchange_target,
+    bool tx_ok) const
+{
+    if (!config().blackboard) {
+        return;
+    }
+
+    config().blackboard->set("last_sentry_projectile_buy_result", result);
+    config().blackboard->set("last_sentry_projectile_buy_amount", buy_amount);
+    config().blackboard->set("last_sentry_projectile_exchange_target", exchange_target);
+    config().blackboard->set("last_sentry_projectile_buy_tx_ok", tx_ok);
+    config().blackboard->set("last_sentry_projectile_buy_time_s", steadyNowSeconds());
+}
+
+BT::NodeStatus BuySentryProjectile::tick()
+{
+    int target_allowance = 150;
+    int max_exchange_projectile = 300;
+    int reserve_gold = 300;
+    int buy_step = 10;
+    int min_interval_ms = 30000;
+    int requested_posture = 0;
+    int response_timeout_ms = 200;
+
+    getInput("target_allowance", target_allowance);
+    getInput("max_exchange_projectile", max_exchange_projectile);
+    getInput("reserve_gold", reserve_gold);
+    getInput("buy_step", buy_step);
+    getInput("min_interval_ms", min_interval_ms);
+    getInput("posture", requested_posture);
+    getInput("response_timeout_ms", response_timeout_ms);
+
+    target_allowance = std::max(target_allowance, 0);
+    max_exchange_projectile = std::max(max_exchange_projectile, 0);
+    reserve_gold = std::max(reserve_gold, 0);
+    buy_step = std::max(buy_step, 1);
+    min_interval_ms = std::max(min_interval_ms, 0);
+    response_timeout_ms = std::max(response_timeout_ms, 1);
+
+    int current_allowance = 0;
+    if (!getBlackboardIntLike(config().blackboard, "projectile_allowance_17mm", current_allowance)) {
+        setBuyStatus("allowance_unavailable", 0, 0, false);
+        return BT::NodeStatus::FAILURE;
+    }
+
+    if (current_allowance >= target_allowance) {
+        setBuyStatus("already_enough", 0, 0, true);
+        return BT::NodeStatus::SUCCESS;
+    }
+
+    bool sentry_info_received = false;
+    if (!config().blackboard->get("sentry_info_received", sentry_info_received) ||
+        !sentry_info_received) {
+        setBuyStatus("sentry_info_unavailable", 0, 0, false);
+        RCLCPP_WARN_THROTTLE(
+            node_->get_logger(),
+            *node_->get_clock(),
+            1000,
+            "BuySentryProjectile: 尚未收到 0x020D sentry_info，暂不发送买弹请求");
+        return BT::NodeStatus::FAILURE;
+    }
+
+    int remaining_gold_coin = 0;
+    int exchanged_ammo = 0;
+    if (!getBlackboardIntLike(config().blackboard, "remaining_gold_coin", remaining_gold_coin) ||
+        !getBlackboardIntLike(config().blackboard, "exchanged_ammo", exchanged_ammo)) {
+        setBuyStatus("gold_or_exchange_unavailable", 0, 0, false);
+        return BT::NodeStatus::FAILURE;
+    }
+
+    if (!initUtils()) {
+        setBuyStatus("robot_id_unavailable", 0, 0, false);
+        return BT::NodeStatus::FAILURE;
+    }
+
+    const auto now_tp = std::chrono::steady_clock::now();
+    if (last_send_time_.time_since_epoch().count() != 0 &&
+        std::chrono::duration_cast<std::chrono::milliseconds>(now_tp - last_send_time_).count() <
+            min_interval_ms) {
+        setBuyStatus("cooldown", 0, 0, true);
+        return BT::NodeStatus::SUCCESS;
+    }
+
+    const int amount_to_target = std::max(0, target_allowance - current_allowance);
+    const int amount_needed_by_step =
+        ((amount_to_target + buy_step - 1) / buy_step) * buy_step;
+    const int exchange_capacity =
+        std::max(0, max_exchange_projectile - exchanged_ammo);
+    const int spendable_gold =
+        std::max(0, remaining_gold_coin - reserve_gold - 1);
+    const int affordable_by_step = (spendable_gold / buy_step) * buy_step;
+    const int buy_amount = std::min({amount_needed_by_step, exchange_capacity, affordable_by_step});
+
+    if (buy_amount < buy_step) {
+        const char *reason = "cannot_buy";
+        if (exchange_capacity < buy_step) {
+            reason = "exchange_limit_reached";
+        } else if (affordable_by_step < buy_step) {
+            reason = "gold_reserve_protected";
+        }
+        setBuyStatus(reason, 0, exchanged_ammo, false);
+        RCLCPP_WARN_THROTTLE(
+            node_->get_logger(),
+            *node_->get_clock(),
+            2000,
+            "BuySentryProjectile: 当前允许发弹量=%d，目标=%d，金币=%d，累计已兑=%d，暂不能买弹(%s)",
+            current_allowance,
+            target_allowance,
+            remaining_gold_coin,
+            exchanged_ammo,
+            reason);
+        return BT::NodeStatus::SUCCESS;
+    }
+
+    const int exchange_target = exchanged_ammo + buy_amount;
+    const int posture_int = resolveRequestedPosture(requested_posture);
+    auto posture_enum = static_cast<rm_protocol::SentryPosture>(posture_int);
+    auto packet = utils_->buildSentryCmdPacket(
+        posture_enum,
+        false,
+        false,
+        false,
+        static_cast<uint16_t>(exchange_target));
+
+    const bool tx_ok = send_packet(packet, std::chrono::milliseconds(response_timeout_ms));
+    if (tx_ok) {
+        last_send_time_ = now_tp;
+        RCLCPP_INFO(
+            node_->get_logger(),
+            "BuySentryProjectile: 当前允许=%d，目标=%d，本次买=%d，累计兑换目标=%d，金币=%d(保留>%d)",
+            current_allowance,
+            target_allowance,
+            buy_amount,
+            exchange_target,
+            remaining_gold_coin,
+            reserve_gold);
+    }
+
+    setBuyStatus(tx_ok ? "sent" : "tx_failed", buy_amount, exchange_target, tx_ok);
+    return tx_ok ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
+}
+
 } // namespace sentry_nav_bt_test

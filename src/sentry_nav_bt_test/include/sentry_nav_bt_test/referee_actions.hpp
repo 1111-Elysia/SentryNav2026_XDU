@@ -179,7 +179,29 @@ namespace sentry_nav_bt_test
         std::chrono::steady_clock::time_point last_send_time_{};
     };
 
-    // 动作 3：打能量机关
+    // 动作 3：补血点兑换 17mm 允许发弹量
+    // XML: <BuySentryProjectile target_allowance="150" max_exchange_projectile="300"/>
+    class BuySentryProjectile : public RefereeActionBase
+    {
+    public:
+        BuySentryProjectile(const std::string &name, const BT::NodeConfig &config);
+
+        static BT::PortsList providedPorts();
+
+        BT::NodeStatus tick() override;
+
+    private:
+        int resolveRequestedPosture(int requested_posture) const;
+        void setBuyStatus(
+            const std::string &result,
+            int buy_amount,
+            int exchange_target,
+            bool tx_ok) const;
+
+        std::chrono::steady_clock::time_point last_send_time_{};
+    };
+
+    // 动作 4：打能量机关
     // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 等待短延时 -> 发送激活请求
     // XML: <EngageRune rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
     class EngageRune : public BT::StatefulActionNode
@@ -235,7 +257,7 @@ namespace sentry_nav_bt_test
         std::string active_rune_status_key_;
     };
 
-    // 动作 4：打前哨站
+    // 动作 5：打前哨站
     // 顺序：scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true
     // XML: <EngageOutpost timeout_ms="70000"/>
     class EngageOutpost : public BT::StatefulActionNode

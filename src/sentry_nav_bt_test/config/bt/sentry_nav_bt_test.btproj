@@ -37,6 +37,15 @@
             <input_port name="burst_interval_ms"/>
             <input_port name="min_interval_ms"/>
         </Action>
+        <Action ID="BuySentryProjectile" editable="true">
+            <input_port name="target_allowance"/>
+            <input_port name="max_exchange_projectile"/>
+            <input_port name="reserve_gold"/>
+            <input_port name="buy_step"/>
+            <input_port name="min_interval_ms"/>
+            <input_port name="posture"/>
+            <input_port name="response_timeout_ms"/>
+        </Action>
         <Action ID="EngageRune" editable="true">
             <input_port name="rune_type"/>
             <input_port name="posture"/>

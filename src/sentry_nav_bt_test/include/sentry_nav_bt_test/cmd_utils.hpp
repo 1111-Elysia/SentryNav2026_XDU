@@ -139,6 +139,7 @@ namespace rm_protocol {
 
     // 0x0120 value 的 bit0，表示发送给裁判系统的“确认免费复活”指令位
     constexpr uint32_t BIT_CONFIRM_RESURRECTION = 0;
+    constexpr uint32_t BIT_CONFIRM_BUY_RESURRECTION = 1;
 }
 
 class SentryRefereeUtils {
@@ -149,10 +150,17 @@ public:
     std::vector<uint8_t> buildSentryCmdPacket(
         rm_protocol::SentryPosture posture,
         bool activate_energy,
-        bool confirm_resurrection = false) {
+        bool confirm_resurrection = false,
+        bool confirm_buy_resurrection = false,
+        uint16_t exchange_projectile = 0,
+        uint8_t remote_projectile_exchange_count = 0,
+        uint8_t remote_hp_exchange_count = 0) {
         uint32_t decision_val = 0;
 
-        // 决策位：确认免费复活 bit0，姿态 bit21-22，激活能量机关 bit23
+        // 决策位：复活 bit0-1，补血点补弹 bit2-12，远程补给 bit13-20，姿态 bit21-22，激活能量机关 bit23
+        decision_val |= (static_cast<uint32_t>(exchange_projectile) & 0x7FFu) << 2;
+        decision_val |= (static_cast<uint32_t>(remote_projectile_exchange_count) & 0x0Fu) << 13;
+        decision_val |= (static_cast<uint32_t>(remote_hp_exchange_count) & 0x0Fu) << 17;
         decision_val |= (static_cast<uint32_t>(posture) & 0x3) << 21;
 
         if (activate_energy) {
@@ -161,6 +169,10 @@ public:
 
         if (confirm_resurrection) {
             decision_val |= (1u << rm_protocol::BIT_CONFIRM_RESURRECTION);
+        }
+
+        if (confirm_buy_resurrection) {
+            decision_val |= (1u << rm_protocol::BIT_CONFIRM_BUY_RESURRECTION);
         }
 
         // Header(5) + CmdID(2) + InteractionHeader(6) + Decision(4) + CRC16(2)

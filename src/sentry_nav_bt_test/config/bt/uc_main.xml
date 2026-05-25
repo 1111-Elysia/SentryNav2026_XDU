@@ -78,10 +78,10 @@
             supply_goal_index_key="uc_supply_goal_index"
             supply_low_hp_threshold="150"
             supply_low_ammo_threshold="50"
-            supply_ready_ammo_threshold="100"
+            supply_ready_ammo_threshold="150"
             supply_reach_threshold="0.25"
             supply_start_message="[回补] 低血或没弹，回补给区休整"
-            supply_done_message="[回补] 血量和弹量已恢复，退出回补状态"
+            supply_done_message="[回补] 血量已满且允许发弹量不低于150，退出回补状态"
             supply_active_key="uc_supply_active"
             supply_rfid_detected_key="rfid_supply_zone_detected"
             rune_phase_key="in_rune_phase"
@@ -221,12 +221,14 @@
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="base_front"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
                     fortress_hold_posture="1"
                     fortress_wait_duration="0.5"
                     fortress_move_message="[Phase 4 | 5:00-4:00] 不需要打符，回堡垒点位持续驻守"
+                    fortress_enemy_move_message="[Phase 4 | 5:00-4:00] 堡垒被敌方占领，转守基地前点位"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     fortress_goal_name_key="uc_fortress_goal_name"
@@ -285,12 +287,14 @@
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="base_front"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
                     fortress_hold_posture="1"
                     fortress_wait_duration="0.5"
                     fortress_move_message="[Phase 6 | 3:30-2:45] 前往堡垒点位并进入驻守"
+                    fortress_enemy_move_message="[Phase 6 | 3:30-2:45] 堡垒被敌方占领，转守基地前点位"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     fortress_goal_name_key="uc_fortress_goal_name"
@@ -349,12 +353,14 @@
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="base_front"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
                     fortress_hold_posture="1"
                     fortress_wait_duration="0.5"
                     fortress_move_message="[Phase 8 | 2:15-1:30] 后期回到堡垒点位持续驻守"
+                    fortress_enemy_move_message="[Phase 8 | 2:15-1:30] 堡垒被敌方占领，转守基地前点位"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     fortress_goal_name_key="uc_fortress_goal_name"
@@ -391,12 +397,14 @@
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="base_front"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
                     fortress_hold_posture="1"
                     fortress_wait_duration="0.5"
                     fortress_move_message="[Fallback] 不需要打符，回堡垒点位持续驻守"
+                    fortress_enemy_move_message="[Fallback] 堡垒被敌方占领，转守基地前点位"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     fortress_goal_name_key="uc_fortress_goal_name"
@@ -407,12 +415,14 @@
                 </Sequence>
               </ReactiveFallback>
 
-              <Sequence name="普通姿态维持">
-                <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
-                <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
-                <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
-                <MaintainSentryPosture mode="{uc_normal_posture}"/>
-              </Sequence>
+              <ForceSuccess>
+                <Sequence name="普通姿态维持">
+                  <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
+                  <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
+                  <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
+                  <MaintainSentryPosture mode="{uc_normal_posture}"/>
+                </Sequence>
+              </ForceSuccess>
             </Parallel>
           </Sequence>
         </ReactiveFallback>
@@ -439,6 +449,15 @@
       <input_port name="burst_count"/>
       <input_port name="burst_interval_ms"/>
       <input_port name="min_interval_ms"/>
+    </Action>
+    <Action ID="BuySentryProjectile" editable="true">
+      <input_port name="target_allowance"/>
+      <input_port name="max_exchange_projectile"/>
+      <input_port name="reserve_gold"/>
+      <input_port name="buy_step"/>
+      <input_port name="min_interval_ms"/>
+      <input_port name="posture"/>
+      <input_port name="response_timeout_ms"/>
     </Action>
     <Action ID="EngageRune" editable="true">
       <input_port name="rune_type"/>

@@ -27,7 +27,20 @@
             <Inverter>
               <Sequence name="回补已完成">
                 <CompareValues first_key="current_hp" second_key="maximum_hp" comparison="gte"/>
-                <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="{supply_ready_ammo_threshold}"/>
+                <Fallback name="弹量满足或补给区买弹后满足">
+                  <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="{supply_ready_ammo_threshold}"/>
+                  <Sequence name="血满后补给区买弹">
+                    <CheckCondition key_name="{supply_rfid_detected_key}" comparison="eq" threshold="1"/>
+                    <BuySentryProjectile
+                      target_allowance="{supply_ready_ammo_threshold}"
+                      max_exchange_projectile="300"
+                      reserve_gold="300"
+                      buy_step="10"
+                      min_interval_ms="30000"
+                      posture="2"/>
+                    <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="{supply_ready_ammo_threshold}"/>
+                  </Sequence>
+                </Fallback>
               </Sequence>
             </Inverter>
             <ReactiveFallback name="回补_RFID保持或重发补给点">

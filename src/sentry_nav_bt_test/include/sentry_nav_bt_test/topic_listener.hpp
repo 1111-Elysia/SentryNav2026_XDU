@@ -174,6 +174,10 @@ namespace sentry_nav_bt_test
             blackboard_->set<std::string>("uc_fortress_goal_name", "fortress");
             blackboard_->set<double>("uc_fortress_hold_distance_threshold", 0.25);
             blackboard_->set<double>("uc_fortress_hold_exit_distance_threshold", 0.30);
+            blackboard_->set<int>("fortress_gain_point_occupancy_status", 0);
+            blackboard_->set<int>("outpost_gain_point_occupancy_status", 0);
+            blackboard_->set<int>("base_gain_point_occupied", 0);
+            blackboard_->set<bool>("sentry_info_received", false);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
             blackboard_->set<uint32_t>("rfid_status", 0U);
@@ -240,18 +244,32 @@ namespace sentry_nav_bt_test
                     uint8_t small_rune_status = (event_data >> 3) & 0x03;
                     // 解析中心增益点占领状态 (Bit 23-24, 仅 RMUL 适用)
                     uint8_t center_gain_point_occupancy_status = (event_data >> 23) & 0x03;
+                    // 解析堡垒/前哨站/基地增益点占领状态 (Bit 25-29)
+                    uint8_t fortress_gain_point_occupancy_status = (event_data >> 25) & 0x03;
+                    uint8_t outpost_gain_point_occupancy_status = (event_data >> 27) & 0x03;
+                    uint8_t base_gain_point_occupied = (event_data >> 29) & 0x01;
 
                     bb->set("large_rune_status", large_rune_status);
                     bb->set("small_rune_status", small_rune_status);
                     bb->set(
                         "center_gain_point_occupancy_status",
                         static_cast<int>(center_gain_point_occupancy_status));
+                    bb->set(
+                        "fortress_gain_point_occupancy_status",
+                        static_cast<int>(fortress_gain_point_occupancy_status));
+                    bb->set(
+                        "outpost_gain_point_occupancy_status",
+                        static_cast<int>(outpost_gain_point_occupancy_status));
+                    bb->set("base_gain_point_occupied", static_cast<int>(base_gain_point_occupied));
                     RCLCPP_DEBUG(
                         node_->get_logger(),
-                        "黑板更新: 大符状态=%d, 小符状态=%d, 中心增益点占领状态=%d",
+                        "黑板更新: 大符状态=%d, 小符状态=%d, 中心增益点=%d, 堡垒增益点=%d, 前哨增益点=%d, 基地增益点=%d",
                         large_rune_status,
                         small_rune_status,
-                        center_gain_point_occupancy_status);
+                        center_gain_point_occupancy_status,
+                        fortress_gain_point_occupancy_status,
+                        outpost_gain_point_occupancy_status,
+                        base_gain_point_occupied);
                 });
 
             // 订阅机器人位置数据
@@ -301,6 +319,7 @@ namespace sentry_nav_bt_test
 
                     bb->set("current_posture", static_cast<int>(current_posture));
                     bb->set("can_activate_rune", can_activate_rune);
+                    bb->set("sentry_info_received", true);
 
                     RCLCPP_DEBUG(node_->get_logger(),
                                  "哨兵信息: 姿态=%d, 可激活符=%d, 复活金币=%d",

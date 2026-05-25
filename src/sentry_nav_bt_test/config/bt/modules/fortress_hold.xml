@@ -4,8 +4,19 @@
     <Sequence name="堡垒驻守">
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="1" type="int"/>
-      <SetBlackboardValue key="{fortress_goal_name_key}" value="{fortress_goal_name}" type="string"/>
-      <GoalSelector goal_name="{fortress_goal_name}" goal="{fortress_goal}"/>
+      <Fallback name="堡垒目标选择">
+        <Sequence name="堡垒被敌方占领_转守基地前">
+          <CheckCondition key_name="fortress_gain_point_occupancy_status" comparison="gte" threshold="2"/>
+          <SetBlackboardValue key="{fortress_goal_name_key}" value="{fortress_enemy_goal_name}" type="string"/>
+          <SetBlackboardValue key="fortress_selected_goal_name" value="{fortress_enemy_goal_name}" type="string"/>
+          <GoalSelector goal_name="{fortress_enemy_goal_name}" goal="{fortress_goal}"/>
+        </Sequence>
+        <Sequence name="堡垒正常驻守点">
+          <SetBlackboardValue key="{fortress_goal_name_key}" value="{fortress_goal_name}" type="string"/>
+          <SetBlackboardValue key="fortress_selected_goal_name" value="{fortress_goal_name}" type="string"/>
+          <GoalSelector goal_name="{fortress_goal_name}" goal="{fortress_goal}"/>
+        </Sequence>
+      </Fallback>
       <Fallback name="堡垒驻守维持">
         <ReactiveSequence name="已在堡垒驻守半径内">
           <CheckGoalReached goal="{fortress_goal}" threshold="{fortress_hold_exit_threshold}"/>
@@ -13,12 +24,18 @@
           <Wait wait_duration="{fortress_wait_duration}"/>
         </ReactiveSequence>
         <Sequence name="回堡垒点位">
-          <PrintNode message="{fortress_move_message}"/>
+          <Fallback name="堡垒移动日志">
+            <Sequence name="堡垒被占_打印基地前转守日志">
+              <CheckCondition key_name="fortress_gain_point_occupancy_status" comparison="gte" threshold="2"/>
+              <PrintNode message="{fortress_enemy_move_message}"/>
+            </Sequence>
+            <PrintNode message="{fortress_move_message}"/>
+          </Fallback>
           <ReactiveSequence name="回堡垒并维持移动姿态">
             <MaintainSentryPosture mode="{fortress_move_posture}"/>
             <ReliableNavigateToPose
               goal="{fortress_goal}"
-              goal_name="{fortress_goal_name}"
+              goal_name="{fortress_selected_goal_name}"
               reach_threshold="{fortress_arrive_threshold}"
               resend_interval="{nav_resend_interval}"
               response_timeout="{nav_response_timeout}"

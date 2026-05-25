@@ -161,6 +161,15 @@ class MatchControlPlugin(Plugin):
             if not can_continue:
                 return
 
+            exchange_projectile_target = int(sentry_cmd.get("exchange_projectile", 0))
+            if exchange_projectile_target > 0:
+                success, message = self._widget.confirm_projectile_exchange(exchange_projectile_target)
+                if success:
+                    self._node.get_logger().info(f">>> [UI-Success] {message}")
+                else:
+                    self._node.get_logger().warn(f">>> [UI-Fail] {message}")
+                    return
+
             posture_val = int(sentry_cmd.get("posture", 0))
             if posture_val in (1, 2, 3):
                 now_sec = time()

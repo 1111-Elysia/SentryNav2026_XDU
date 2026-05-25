@@ -937,6 +937,31 @@ class MatchControlWidget(QtWidgets.QWidget):
         self._update_resurrection_label()
         return True, f"金币复活成功，哨兵血量恢复至 {self.spinBox_hp_7.value()}"
 
+    def confirm_projectile_exchange(self, exchange_target):
+        exchange_target = int(exchange_target)
+        current_exchange = self.spinBox_sentry_exchange_projectile.value()
+        if exchange_target <= current_exchange:
+            return True, f"补弹目标未增加，保持累计补弹 {current_exchange}"
+        if exchange_target > 300:
+            return False, f"补血点买弹上限为 300，收到目标 {exchange_target}"
+
+        delta = exchange_target - current_exchange
+        if delta % 10 != 0:
+            return False, f"补给区买弹必须以 10 发为单位，收到增量 {delta}"
+
+        remaining_gold_coin = self.spinBox_gold_coin.value() if self.spinBox_gold_coin else 0
+        if remaining_gold_coin < delta:
+            return False, f"剩余金币不足，当前 {remaining_gold_coin}，需要 {delta}"
+
+        if self.spinBox_gold_coin:
+            self.spinBox_gold_coin.setValue(max(0, remaining_gold_coin - delta))
+        self.spinBox_ammo.setValue(min(self.spinBox_ammo.maximum(), self.spinBox_ammo.value() + delta))
+        self.spinBox_sentry_exchange_projectile.setValue(exchange_target)
+        return True, (
+            f"补弹成功，累计补弹 {exchange_target}，"
+            f"当前 17mm 允许发弹量 {self.spinBox_ammo.value()}"
+        )
+
     def _check_rune_refresh(self, remain_seconds):
         """
         根据比赛剩余时间，自动刷新能量机关状态，增加激活机会次数
