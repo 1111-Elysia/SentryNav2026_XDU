@@ -19,6 +19,13 @@ constexpr const char *kLastPostureRequestResultKey = "last_posture_request_resul
 constexpr const char *kLastPostureRequestTimeKey = "last_posture_request_time_s";
 constexpr const char *kPostureSwitchCooldownKey = "posture_switch_cooldown_ms";
 
+struct SentryDecisionFeedback
+{
+    uint16_t exchanged_ammo{0};
+    uint8_t remote_projectile_exchange_count{0};
+    uint8_t remote_hp_exchange_count{0};
+};
+
 bool getBlackboardIntLike(const BT::Blackboard::Ptr &blackboard, const std::string &key, int &value)
 {
     if (!blackboard) {
@@ -48,6 +55,27 @@ bool getBlackboardIntLike(const BT::Blackboard::Ptr &blackboard, const std::stri
     }
 
     return false;
+}
+
+SentryDecisionFeedback getSentryDecisionFeedback(const BT::Blackboard::Ptr &blackboard)
+{
+    SentryDecisionFeedback feedback;
+    if (!blackboard) {
+        return feedback;
+    }
+
+    int value = 0;
+    if (getBlackboardIntLike(blackboard, "exchanged_ammo", value)) {
+        feedback.exchanged_ammo = static_cast<uint16_t>(std::clamp(value, 0, 0x7FF));
+    }
+    if (getBlackboardIntLike(blackboard, "remote_projectile_exchange_count", value)) {
+        feedback.remote_projectile_exchange_count =
+            static_cast<uint8_t>(std::clamp(value, 0, 0x0F));
+    }
+    if (getBlackboardIntLike(blackboard, "remote_hp_exchange_count", value)) {
+        feedback.remote_hp_exchange_count = static_cast<uint8_t>(std::clamp(value, 0, 0x0F));
+    }
+    return feedback;
 }
 
 bool getBlackboardDoubleLike(const BT::Blackboard::Ptr &blackboard, const std::string &key, double &value)
@@ -316,7 +344,15 @@ BT::NodeStatus MaintainSentryPosture::tick()
     }
 
     auto posture_enum = static_cast<rm_protocol::SentryPosture>(target_mode_int);
-    auto packet = utils_->buildSentryCmdPacket(posture_enum, false);
+    const auto feedback = getSentryDecisionFeedback(config().blackboard);
+    auto packet = utils_->buildSentryCmdPacket(
+        posture_enum,
+        false,
+        false,
+        false,
+        feedback.exchanged_ammo,
+        feedback.remote_projectile_exchange_count,
+        feedback.remote_hp_exchange_count);
     const bool tx_ok = send_packet(packet);
     updatePostureRequestStatus(
         config().blackboard,
@@ -411,7 +447,15 @@ BT::NodeStatus ConfirmResurrection::tick()
     }
 
     auto posture_enum = static_cast<rm_protocol::SentryPosture>(req_posture_int);
-    auto packet = utils_->buildSentryCmdPacket(posture_enum, false, true);
+    const auto feedback = getSentryDecisionFeedback(config().blackboard);
+    auto packet = utils_->buildSentryCmdPacket(
+        posture_enum,
+        false,
+        true,
+        false,
+        feedback.exchanged_ammo,
+        feedback.remote_projectile_exchange_count,
+        feedback.remote_hp_exchange_count);
 
     bool any_send_ok = false;
     last_send_time_ = now_tp;
@@ -436,7 +480,7 @@ BT::PortsList BuySentryProjectile::providedPorts()
     return {
         BT::InputPort<int>("target_allowance", 150, "回补完成所需的 17mm 允许发弹量"),
         BT::InputPort<int>("max_exchange_projectile", 300, "哨兵补血点补弹累计兑换上限"),
-        BT::InputPort<int>("reserve_gold", 300, "买弹后需要严格高于该值的剩余金币"),
+        BT::InputPort<int>("reserve_gold", 300, "买弹后需要大于等于该值的剩余金币"),
         BT::InputPort<int>("buy_step", 10, "补血点买弹粒度"),
         BT::InputPort<int>("min_interval_ms", 30000, "两次买弹请求的最小间隔"),
         BT::InputPort<int>("posture", 0, "买弹请求附带姿态 (0 表示自动读取当前姿态)"),
@@ -549,7 +593,7 @@ BT::NodeStatus BuySentryProjectile::tick()
     const int exchange_capacity =
         std::max(0, max_exchange_projectile - exchanged_ammo);
     const int spendable_gold =
-        std::max(0, remaining_gold_coin - reserve_gold - 1);
+        std::max(0, remaining_gold_coin - reserve_gold);
     const int affordable_by_step = (spendable_gold / buy_step) * buy_step;
     const int buy_amount = std::min({amount_needed_by_step, exchange_capacity, affordable_by_step});
 
@@ -577,19 +621,22 @@ BT::NodeStatus BuySentryProjectile::tick()
     const int exchange_target = exchanged_ammo + buy_amount;
     const int posture_int = resolveRequestedPosture(requested_posture);
     auto posture_enum = static_cast<rm_protocol::SentryPosture>(posture_int);
+    const auto feedback = getSentryDecisionFeedback(config().blackboard);
     auto packet = utils_->buildSentryCmdPacket(
         posture_enum,
         false,
         false,
         false,
-        static_cast<uint16_t>(exchange_target));
+        static_cast<uint16_t>(exchange_target),
+        feedback.remote_projectile_exchange_count,
+        feedback.remote_hp_exchange_count);
 
     const bool tx_ok = send_packet(packet, std::chrono::milliseconds(response_timeout_ms));
     if (tx_ok) {
         last_send_time_ = now_tp;
         RCLCPP_INFO(
             node_->get_logger(),
-            "BuySentryProjectile: 当前允许=%d，目标=%d，本次买=%d，累计兑换目标=%d，金币=%d(保留>%d)",
+            "BuySentryProjectile: 当前允许=%d，目标=%d，本次买=%d，累计兑换目标=%d，金币=%d(保留>=%d)",
             current_allowance,
             target_allowance,
             buy_amount,

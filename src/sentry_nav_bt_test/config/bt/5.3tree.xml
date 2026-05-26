@@ -219,7 +219,7 @@
                 <Sequence name="堡垒">
                   <SubTree ID="FortressHold"
                                fortress_goal_name="fortress"
-                               fortress_enemy_goal_name="base_front"
+                               fortress_enemy_goal_name="init"
                                fortress_arrive_threshold="0.25"
                                fortress_hold_exit_threshold="0.30"
                                fortress_move_posture="3"

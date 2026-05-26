@@ -84,8 +84,8 @@ controller_server:
     FollowPath:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 0.88  #距目标时开始限速
-      approach_velocity: 0.2
+      approach_distance: 1.5  #距目标时开始限速
+      approach_velocity: 0.5
       direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
       direct_approach_kp: 10.0  #直接驱动P控制增益
       time_steps: 80  #增加到80，预测时域4.8s，让MPPI能看到冲过目标的后果
@@ -96,16 +96,16 @@ controller_server:
       vy_std: 0.3
       wz_std: 0.2
 
-      vx_max: 2.5
-      vy_max: 2.5
+      vx_max: 2.0
+      vy_max: 2.0
       wz_max: 1.5
 
-      vx_min: -2.5
-      vy_min: -2.5
+      vx_min: -2.0
+      vy_min: -2.0
       wz_min: -1.5
 
-      ax_max: 3.5 #加速度提高，高速时能快速响应
-      ay_max: 3.5
+      ax_max: 1.5 #加速度提高，高速时能快速响应
+      ay_max: 1.5
       az_max: 3.0
 
       ax_min: -3.5 #关键：制动力必须对称，高速下刹得住
@@ -316,7 +316,7 @@ global_costmap:
           obstacle_range: 8.0
           raytrace_range: 9.0
 
-          min_obstacle_height: -0.15     #default 0, meters
+          min_obstacle_height: -0.1     #default 0, meters
           max_obstacle_height: 1.0     #defaule 3, meters
           expected_update_rate: 0.0    #default 0, if not updating at this rate at least, remove from buffer
           observation_persistence: 0.0 #default 0, use all measurements taken during now-value, 0=latest

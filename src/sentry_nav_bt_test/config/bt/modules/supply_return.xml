@@ -36,7 +36,7 @@
                       max_exchange_projectile="300"
                       reserve_gold="300"
                       buy_step="10"
-                      min_interval_ms="30000"
+                      min_interval_ms="5000"
                       posture="2"/>
                     <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="{supply_ready_ammo_threshold}"/>
                   </Sequence>

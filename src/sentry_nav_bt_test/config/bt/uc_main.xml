@@ -216,12 +216,12 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <Sequence name="中期_堡垒_Phase4">
+                <ReactiveSequence name="中期_堡垒_Phase4">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="base_front"
+                    fortress_enemy_goal_name="init"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
@@ -236,7 +236,7 @@
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
                     _autoremap="1"/>
-                </Sequence>
+                </ReactiveSequence>
 
                 <Sequence name="中期_大符_Phase5">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="210"/>
@@ -282,12 +282,12 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <Sequence name="中期_堡垒_Phase6">
+                <ReactiveSequence name="中期_堡垒_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="base_front"
+                    fortress_enemy_goal_name="init"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
@@ -302,7 +302,7 @@
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
                     _autoremap="1"/>
-                </Sequence>
+                </ReactiveSequence>
 
                 <Sequence name="中期_大符_Phase7">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="135"/>
@@ -348,12 +348,12 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <Sequence name="后期_堡垒_Phase8">
+                <ReactiveSequence name="后期_堡垒_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="base_front"
+                    fortress_enemy_goal_name="init"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
@@ -368,7 +368,7 @@
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
                     _autoremap="1"/>
-                </Sequence>
+                </ReactiveSequence>
 
                 <Sequence name="后期_条件大符_Phase9">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="60"/>
@@ -393,11 +393,11 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <Sequence name="全局_堡垒驻守">
+                <ReactiveSequence name="全局_堡垒驻守">
                   <SubTree
                     ID="FortressHold"
                     fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="base_front"
+                    fortress_enemy_goal_name="init"
                     fortress_arrive_threshold="0.25"
                     fortress_hold_exit_threshold="0.30"
                     fortress_move_posture="3"
@@ -412,7 +412,7 @@
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
                     _autoremap="1"/>
-                </Sequence>
+                </ReactiveSequence>
               </ReactiveFallback>
 
               <ForceSuccess>

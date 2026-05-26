@@ -15,10 +15,10 @@ public:
     this->declare_parameter("input_topic", "/livox/lidar");
     this->declare_parameter("output_topic", "/livox/lidar_filtered");
     // 裁剪参数 (CropBox)
-    this->declare_parameter("min_x", -0.4);
-    this->declare_parameter("max_x", 0.4);
-    this->declare_parameter("min_y", -0.4);
-    this->declare_parameter("max_y", 0.4);
+    this->declare_parameter("min_x", -0.5);
+    this->declare_parameter("max_x", 0.5);
+    this->declare_parameter("min_y", -0.5);
+    this->declare_parameter("max_y", 0.5);
     this->declare_parameter("min_z", -0.5);
     this->declare_parameter("max_z", 0.6);
     this->declare_parameter("negative", true); // true = 挖掉中间
@@ -53,7 +53,7 @@ private:
     double max_z = this->get_parameter("max_z").as_double();
 
     visualization_msgs::msg::Marker marker;
-    marker.header.frame_id = "base_link";
+    marker.header.frame_id = "livox_frame";
     marker.header.stamp = this->now();
     marker.ns = "vehicle_body";
     marker.id = 0;

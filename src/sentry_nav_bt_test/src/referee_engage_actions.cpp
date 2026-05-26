@@ -1,5 +1,6 @@
 #include "sentry_nav_bt_test/referee_actions.hpp"
 
+#include <algorithm>
 #include <chrono>
 
 namespace sentry_nav_bt_test
@@ -9,6 +10,13 @@ namespace
 {
 
 constexpr auto kRuneActivationDelayAfterYaw = std::chrono::milliseconds(1000);
+
+struct SentryDecisionFeedback
+{
+    uint16_t exchanged_ammo{0};
+    uint8_t remote_projectile_exchange_count{0};
+    uint8_t remote_hp_exchange_count{0};
+};
 
 bool getBlackboardIntLike(const BT::Blackboard::Ptr &blackboard, const std::string &key, int &value)
 {
@@ -39,6 +47,27 @@ bool getBlackboardIntLike(const BT::Blackboard::Ptr &blackboard, const std::stri
     }
 
     return false;
+}
+
+SentryDecisionFeedback getSentryDecisionFeedback(const BT::Blackboard::Ptr &blackboard)
+{
+    SentryDecisionFeedback feedback;
+    if (!blackboard) {
+        return feedback;
+    }
+
+    int value = 0;
+    if (getBlackboardIntLike(blackboard, "exchanged_ammo", value)) {
+        feedback.exchanged_ammo = static_cast<uint16_t>(std::clamp(value, 0, 0x7FF));
+    }
+    if (getBlackboardIntLike(blackboard, "remote_projectile_exchange_count", value)) {
+        feedback.remote_projectile_exchange_count =
+            static_cast<uint8_t>(std::clamp(value, 0, 0x0F));
+    }
+    if (getBlackboardIntLike(blackboard, "remote_hp_exchange_count", value)) {
+        feedback.remote_hp_exchange_count = static_cast<uint8_t>(std::clamp(value, 0, 0x0F));
+    }
+    return feedback;
 }
 
 } // namespace
@@ -408,7 +437,15 @@ BT::NodeStatus EngageRune::onRunning()
         return BT::NodeStatus::RUNNING;
     }
 
-    auto packet = utils_->buildSentryCmdPacket(resolvePostureEnum(), true);
+    const auto feedback = getSentryDecisionFeedback(config().blackboard);
+    auto packet = utils_->buildSentryCmdPacket(
+        resolvePostureEnum(),
+        true,
+        false,
+        false,
+        feedback.exchanged_ammo,
+        feedback.remote_projectile_exchange_count,
+        feedback.remote_hp_exchange_count);
     last_request_time_ = now_tp;
     if (send_packet(packet)) {
         RCLCPP_INFO(

@@ -297,6 +297,8 @@ namespace sentry_nav_bt_test
                     // Bit 0-10: 成功兑换的发弹量
                     uint16_t exchanged_ammo = raw_info & 0x7FF;
                     // Bit 11-14 15-18 成功远程兑换的允许发弹量次数和远程兑换血量次数（暂时不用）
+                    uint8_t remote_projectile_exchange_count = (raw_info >> 11) & 0x0F;
+                    uint8_t remote_hp_exchange_count = (raw_info >> 15) & 0x0F;
                     // Bit 19: 是否可以确认免费复活 (1=是)
                     bool can_confirm_resurrection = (raw_info >> 19) & 0x01;
                     // Bit 20: 是否可以兑换立即复活 (1=是)
@@ -313,6 +315,8 @@ namespace sentry_nav_bt_test
 
                     // 写入黑板
                     bb->set("exchanged_ammo", exchanged_ammo);
+                    bb->set("remote_projectile_exchange_count", remote_projectile_exchange_count);
+                    bb->set("remote_hp_exchange_count", remote_hp_exchange_count);
                     bb->set("can_confirm_resurrection", can_confirm_resurrection);
                     bb->set("can_buy_resurrection", can_buy_resurrection);
                     bb->set("buy_resurrection_cost", buy_resurrection_cost);

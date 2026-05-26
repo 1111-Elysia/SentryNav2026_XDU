@@ -35,7 +35,7 @@ hurt_spin_vw_node:
     hurt_reason_value: 0
 
     # 触发后持续输出 spin_vw，持续 spin_duration_s 秒
-    spin_vw: 1.0
+    spin_vw: 0.7
     spin_duration_s: 5.0
 
     # 定时发布频率 (Hz)
