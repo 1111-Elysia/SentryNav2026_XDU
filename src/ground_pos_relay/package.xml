@@ -2,7 +2,7 @@
 <package format="3">
   <name>ground_pos_relay</name>
   <version>0.1.0</version>
-  <description>Relay ground robot position (0x020B) to custom protocol command 0x0301</description>
+  <description>Relay ground robot position (0x020B) from sentry to radar via 0x0301/0x0200 robot interaction data</description>
   <maintainer email="user@example.com">user</maintainer>
   <license>MIT</license>
 

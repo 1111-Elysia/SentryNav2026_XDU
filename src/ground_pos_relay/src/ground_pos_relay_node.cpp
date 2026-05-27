@@ -1,7 +1,7 @@
 /**
  * @file ground_pos_relay_node.cpp
- * @brief 监听 /rm_referee/ground_robot_position (0x020B)，将其前28字节
- *        通过 /rm_referee/tx 发送到 0x0301（子内容ID=200）
+ * @brief 监听 /rm_referee/ground_robot_position (0x020B)，将完整 40 字节
+ *        通过 /rm_referee/tx 发送到 0x0301 / 0x0200 机器人间通信
  *
  *        监听 /rm_referee/robot_status 获取本机器人ID：
  *        - robot_id == 7   → sender=7,   receiver=9
@@ -14,6 +14,9 @@
 #include <rm_referee_msgs/srv/tx.hpp>
 
 #include <atomic>
+#include <array>
+#include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -27,7 +30,10 @@ constexpr uint8_t kCrc16Len = 2;
 constexpr uint8_t kAllMetadataLen = kHeaderLen + kCmdIdLen + kCrc16Len;  // 9
 
 constexpr uint16_t kTargetCmdId = 0x0301;
-constexpr uint16_t kSubContentId = 200;  // 0x00C8
+constexpr uint16_t kSubContentId = 0x0200;
+constexpr size_t kInteractionHeaderLen = 6;
+constexpr size_t kGroundRobotPositionPayloadLen = 40;
+constexpr size_t kInteractionDataLen = kInteractionHeaderLen + kGroundRobotPositionPayloadLen;
 
 constexpr uint8_t kCrc8Init = 0xFF;
 constexpr uint16_t kCrc16Init = 0xFFFF;
@@ -101,6 +107,22 @@ static uint16_t crc16(const uint8_t *data, size_t len) {
   return crc;
 }
 
+static void append_u16_le(std::vector<uint8_t> &buffer, uint16_t value) {
+  buffer.push_back(static_cast<uint8_t>(value & 0xFF));
+  buffer.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+}
+
+static void append_float32_le(std::vector<uint8_t> &buffer, float value) {
+  static_assert(sizeof(float) == sizeof(uint32_t), "float32 must be 4 bytes");
+
+  uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  buffer.push_back(static_cast<uint8_t>(bits & 0xFF));
+  buffer.push_back(static_cast<uint8_t>((bits >> 8) & 0xFF));
+  buffer.push_back(static_cast<uint8_t>((bits >> 16) & 0xFF));
+  buffer.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
+}
+
 // ============================================================================
 // 主节点类
 // ============================================================================
@@ -144,7 +166,7 @@ class GroundPosRelayNode : public rclcpp::Node {
     if (robot_id_ != 7 && robot_id_ != 107) {
       RCLCPP_INFO_ONCE(get_logger(),
                        "robot_id=%d, not 7 or 107, skipping relay (waiting for valid id)",
-                       robot_id_);
+                       static_cast<int>(robot_id_));
       return;
     }
 
@@ -152,61 +174,56 @@ class GroundPosRelayNode : public rclcpp::Node {
     uint16_t sender_id = robot_id_;
     uint16_t receiver_id = (robot_id_ == 7) ? 9 : 109;
 
-    // 取 0x020B 前 32 字节: 8 个 float32
-    // hero_x(4) + hero_y(4) + engineer_x(4) + engineer_y(4)
-    // + standard_3_x(4) + standard_3_y(4) + standard_4_x(4) + standard_4_y(4) = 32 bytes
-    float payload_floats[8] = {
+    // 0x020B 完整内容：10 个 float32，共 40 字节。
+    const std::array<float, 10> payload_floats = {
         msg->hero_x, msg->hero_y,
         msg->engineer_x, msg->engineer_y,
         msg->standard_3_x, msg->standard_3_y,
         msg->standard_4_x, msg->standard_4_y,
+        msg->reserved, msg->reserved_2,
     };
 
-    // 构造数据段: sub_cmd_id(2B) + sender_id(2B) + receiver_id(2B) + payload(32B) = 38B
+    for (const float value : payload_floats) {
+      if (!std::isfinite(value)) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                             "GroundRobotPosition contains non-finite value, skipping relay");
+        return;
+      }
+    }
+
+    // 构造数据段: data_cmd_id(2B) + sender_id(2B) + receiver_id(2B) + payload(40B) = 46B
     std::vector<uint8_t> data_segment;
-    data_segment.reserve(38);
+    data_segment.reserve(kInteractionDataLen);
 
-    // sub_cmd_id (uint16_t, little-endian)
-    data_segment.push_back(kSubContentId & 0xFF);
-    data_segment.push_back((kSubContentId >> 8) & 0xFF);
+    append_u16_le(data_segment, kSubContentId);
+    append_u16_le(data_segment, sender_id);
+    append_u16_le(data_segment, receiver_id);
 
-    // sender_id (uint16_t, little-endian)
-    data_segment.push_back(sender_id & 0xFF);
-    data_segment.push_back((sender_id >> 8) & 0xFF);
+    for (const float value : payload_floats) {
+      append_float32_le(data_segment, value);
+    }
 
-    // receiver_id (uint16_t, little-endian)
-    data_segment.push_back(receiver_id & 0xFF);
-    data_segment.push_back((receiver_id >> 8) & 0xFF);
-
-    // payload: 32 bytes (8 floats)
-    const uint8_t *payload_bytes = reinterpret_cast<const uint8_t *>(payload_floats);
-    data_segment.insert(data_segment.end(), payload_bytes, payload_bytes + 32);
-
-    // data_len = data_segment(38)，不含 CmdID（与行为树帧构造一致）
+    // data_len = data_segment(46)，不含 CmdID（与行为树帧构造一致）
     uint16_t data_len = static_cast<uint16_t>(data_segment.size());
 
-    // 构造完整帧: Header(5) + CmdID(2) + data_segment(38) + CRC16(2) = 47 bytes
+    // 构造完整帧: Header(5) + CmdID(2) + data_segment(46) + CRC16(2) = 55 bytes
     std::vector<uint8_t> frame;
-    frame.reserve(kAllMetadataLen + data_len);  // 9 + 38 = 47
+    frame.reserve(kAllMetadataLen + data_len);  // 9 + 46 = 55
 
     // [0] SOF
     frame.push_back(kSof);
-    // [1] DataLen LSB
-    frame.push_back(data_len & 0xFF);
-    // [2] DataLen MSB
-    frame.push_back((data_len >> 8) & 0xFF);
+    // [1..2] DataLen
+    append_u16_le(frame, data_len);
     // [3] Seq
     frame.push_back(seq_++);
 
     // [4] CRC8 (over bytes [0..3])
     frame.push_back(crc8(frame.data(), kHeaderLen - 1));
 
-    // [5] CmdID LSB (0x0301)
-    frame.push_back(kTargetCmdId & 0xFF);
-    // [6] CmdID MSB
-    frame.push_back((kTargetCmdId >> 8) & 0xFF);
+    // [5..6] CmdID (0x0301)
+    append_u16_le(frame, kTargetCmdId);
 
-    // [7..44] Data segment (38 bytes)
+    // [7..52] Data segment (46 bytes)
     frame.insert(frame.end(), data_segment.begin(), data_segment.end());
 
     // CRC16 over entire frame so far
@@ -221,11 +238,11 @@ class GroundPosRelayNode : public rclcpp::Node {
 
     const bool log_this_time = first_tx_log_.exchange(false);
     if (log_this_time) {
-      RCLCPP_INFO(get_logger(), "start relaying position data to 0x0301...");
+      RCLCPP_INFO(get_logger(), "start relaying 0x020B position data to 0x0301/0x0200...");
     }
     tx_client_->async_send_request(
         request,
-        [this, log_this_time](rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedFuture future) {
+        [this](rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedFuture future) {
           auto response = future.get();
           if (!response->ok) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
@@ -233,7 +250,7 @@ class GroundPosRelayNode : public rclcpp::Node {
           }
         });
 
-    RCLCPP_DEBUG(get_logger(), "Relayed 0x020B->0x0301 (sender=%d, receiver=%d, seq=%d)",
+    RCLCPP_DEBUG(get_logger(), "Relayed 0x020B->0x0301/0x0200 (sender=%d, receiver=%d, seq=%d)",
                  sender_id, receiver_id, (seq_ - 1) & 0xFF);
   }
 

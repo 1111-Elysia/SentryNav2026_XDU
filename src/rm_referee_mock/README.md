@@ -1,6 +1,6 @@
 # rm_referee_mock
 
-这是 `rm_referee_ros2` 所属的一个子模块，提供了一些用于测试的 Mock 组件，用来模拟裁判系统的数据发送行为，方便在没有真实裁判系统或者不便搭建环境的情况下进行开发和测试。当前文档以《RoboMaster 2026 机甲大师高校系列赛通信协议 V1.3.0（20260327）》为准。
+这是 `rm_referee_ros2` 所属的一个子模块，提供了一些用于测试的 Mock 组件，用来模拟裁判系统的数据发送行为，方便在没有真实裁判系统或者不便搭建环境的情况下进行开发和测试。当前文档以《RoboMaster 2026 机甲大师高校系列赛通信协议 V1.3.1（20260519）》为准。
 
 目前为止所有的 Mock 组件均以 rqt 插件的形式实现，编译并 source 工作空间后，在 rqt 中启动对应的插件即可使用。
 
@@ -73,7 +73,10 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 > [!NOTE]  
 > 根据裁判系统协议定义，只有“本机器人位置”(`rm_referee_msgs/RobotPos`)消息包含朝向信息。
 
-> TODO: 通过 0x0301 多机通信消息模拟雷达发送的敌方机器人位置数据
+> [!NOTE]
+> `ground_pos_relay` 会按协议把哨兵收到的 `0x020B` 完整 40 字节封装进 `0x0301 / 0x0200` 机器人间通信，发送给同阵营雷达；当前 Match Control 的 `/rm_referee/tx` mock 仍只解析 `0x0301 / 0x0120` 哨兵自主决策指令。
+
+> TODO: 通过 `0x0305` 小地图接收数据模拟雷达发送的敌方机器人位置数据
 
 ## Match Control [WIP!]
 
