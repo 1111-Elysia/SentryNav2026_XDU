@@ -88,11 +88,26 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 - `0x0202` `rm_referee_msgs/PowerHeatData`：缓冲能量和射击热量
 - `0x0206` `rm_referee_msgs/HurtData`：扣血信息
 - `0x0208` `rm_referee_msgs/ProjectileAllowance`：允许发弹量和剩余金币
+- `0x0209` `rm_referee_msgs/RFIDStatus`：RFID 模块状态
 - `0x020D` `rm_referee_msgs/SentryInfo`：哨兵兑换、复活、姿态与能量机关激活状态
 
 可以接收并回显的发送数据：
 
 - 目前支持解析哨兵发送的 `0x0120` 子内容部分字段
+
+补给区规则模拟：
+
+- Match Control 会尝试读取 `sentry_nav_bt_test/config/waypoints.json` 里的 `supply_point` 和 `supply_point_2`，并通过 TF `map -> base_link` 或 `/rm_referee/robot_pos` 判断是否到达补给点。
+- 到达补给点后发布 `RFIDStatus` 补给区 bit，`sentry_nav_bt_test` 会将其识别为 `rfid_supply_zone_detected=1`。
+- 处于比赛中且占领补给区时，mock 按当前简化策略每秒恢复哨兵 `100 HP`，并按规则结算哨兵每分钟可领取的 `100` 发 17mm 允许发弹量；未领取的分钟数会累积，进补给区后一次性领取。
+- 金币按规则低保模拟：初始至少 `400`，随后在 `05:59/04:59/03:59/02:59/01:59` 各加 `50`，`00:59` 加 `150`。
+
+协议链路说明：
+
+- 当前 Match Control 接收的是 `/rm_referee/tx` 已经成帧后的 ROS service 请求，并不模拟规则手册附录里的空口 15 字节分片、重复 Payload Length 校验或图传链路重复下发机制。
+- 不建议在 `/rm_referee/tx` 层直接比较前后两包是否一致；哨兵姿态、买弹、复活确认本来就会连续发送不同内容，强行截断会误伤正常指令。
+- mock 会按 `0x0120` 协议校验累计字段：补血点补弹累计值不能回退，远程补弹/回血请求次数不能回退且每次最多增加 1。不合法时会按协议只处理该字段前面的低位指令，并忽略该字段及其后面的高位指令。
+- 如果需要测试“前后分片/重复包不一致时只接受问题字节前内容”这类抗干扰策略，建议新增一个原始字节流或图传链路 mock，并把校验逻辑放在字节流解析层，而不是放在当前语义层 service 回调里。
 
 复活规则模拟：
 

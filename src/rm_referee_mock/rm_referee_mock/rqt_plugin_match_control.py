@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
+import json
+from os import path
 from time import time
 
 from rqt_gui_py.plugin import Plugin
 # [新增] 引入 Qt 信号机制，解决多线程报错问题
 from python_qt_binding.QtCore import QObject, pyqtSignal
+from ament_index_python.packages import get_package_share_directory
 
 from rm_referee_msgs.msg import (
     GameStatus, 
@@ -12,10 +15,22 @@ from rm_referee_msgs.msg import (
     EventData, 
     RobotStatus, 
     ProjectileAllowance, 
+    RFIDStatus,
     PowerHeatData,
     HurtData,
+    RobotPos,
     SentryInfo 
 )
+
+try:
+    from rclpy.time import Time
+    from tf2_ros import Buffer, TransformListener
+    from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
+except ImportError:
+    Time = None
+    Buffer = None
+    TransformListener = None
+    LookupException = ConnectivityException = ExtrapolationException = Exception
 
 try:
     from rm_referee_msgs.srv import Tx
@@ -50,6 +65,7 @@ class MatchControlPlugin(Plugin):
         context.add_widget(self._widget)
         self._node = context.node
         self._publisher_pool = PublisherPool(self._node)
+        self._load_supply_points()
 
         # [关键] 初始化信号桥接，绑定 UI 更新函数
         # 这样可以将 ROS 线程收到的数据安全地传给主线程进行 UI 更新
@@ -67,7 +83,142 @@ class MatchControlPlugin(Plugin):
                 self._handle_sentry_cmd
             )
             
+        self._robot_pos_subscriptions = [
+            self._node.create_subscription(
+                RobotPos,
+                '/rm_referee/robot_pos',
+                self._handle_robot_pos,
+                10,
+            ),
+            self._node.create_subscription(
+                RobotPos,
+                '/rm_referee/mock/robot_pos',
+                self._handle_robot_pos,
+                10,
+            ),
+        ]
+        self._tf_buffer = None
+        self._tf_listener = None
+        self._init_tf_listener()
+
         self._timer = self._node.create_timer(0.1, self._timer_callback)
+
+    def _load_supply_points(self):
+        try:
+            waypoint_path = path.join(
+                get_package_share_directory("sentry_nav_bt_test"),
+                "config",
+                "waypoints.json",
+            )
+            with open(waypoint_path, "r", encoding="utf-8") as waypoint_file:
+                waypoint_data = json.load(waypoint_file)
+
+            wanted_names = {"supply_point", "supply_point_2"}
+            points = []
+            for waypoint in waypoint_data.get("waypoints", []):
+                name = waypoint.get("name")
+                if name in wanted_names:
+                    points.append((name, waypoint["x"], waypoint["y"]))
+
+            if points:
+                self._widget.set_auto_supply_points(points)
+                self._node.get_logger().info(
+                    f"[Supply] 已加载补给点: {', '.join(point[0] for point in points)}"
+                )
+        except Exception as exc:
+            self._node.get_logger().warn(
+                f"[Supply] 未能从 sentry_nav_bt_test 加载补给点，使用 mock 默认值: {exc}"
+            )
+
+    def _init_tf_listener(self):
+        if Buffer is None or TransformListener is None:
+            self._node.get_logger().warn("[Supply] tf2_ros 不可用，补给区自动检测仅使用 RobotPos")
+            return
+
+        try:
+            self._tf_buffer = Buffer()
+            self._tf_listener = TransformListener(self._tf_buffer, self._node)
+        except Exception as exc:
+            self._tf_buffer = None
+            self._tf_listener = None
+            self._node.get_logger().warn(f"[Supply] TF 监听初始化失败: {exc}")
+
+    def _handle_robot_pos(self, msg):
+        self._widget.update_auto_supply_pose(msg.x, msg.y, "robot_pos")
+
+    def _update_auto_supply_pose_from_tf(self):
+        if self._tf_buffer is None or Time is None:
+            return
+
+        try:
+            transform = self._tf_buffer.lookup_transform("map", "base_link", Time())
+        except (LookupException, ConnectivityException, ExtrapolationException):
+            return
+        except Exception:
+            return
+
+        translation = transform.transform.translation
+        self._widget.update_auto_supply_pose(translation.x, translation.y, "tf")
+
+    def _truncate_sentry_cmd_for_protocol(self, parsed_cmd):
+        truncated_cmd = dict(parsed_cmd)
+
+        def clear_from_exchange(reason):
+            truncated_cmd["exchange_projectile"] = 0
+            truncated_cmd["remote_projectile_exchange_count"] = 0
+            truncated_cmd["remote_hp_exchange_count"] = 0
+            truncated_cmd["posture"] = 0
+            truncated_cmd["activate_rune"] = 0
+            return truncated_cmd, reason
+
+        def clear_from_remote_projectile(reason):
+            truncated_cmd["remote_projectile_exchange_count"] = 0
+            truncated_cmd["remote_hp_exchange_count"] = 0
+            truncated_cmd["posture"] = 0
+            truncated_cmd["activate_rune"] = 0
+            return truncated_cmd, reason
+
+        def clear_from_remote_hp(reason):
+            truncated_cmd["remote_hp_exchange_count"] = 0
+            truncated_cmd["posture"] = 0
+            truncated_cmd["activate_rune"] = 0
+            return truncated_cmd, reason
+
+        current_exchange = self._widget.spinBox_sentry_exchange_projectile.value()
+        requested_exchange = int(parsed_cmd.get("exchange_projectile", 0))
+        if requested_exchange < current_exchange:
+            return clear_from_exchange(
+                "补血点补弹累计值回退，"
+                f"当前已成功兑换 {current_exchange}，本次请求 {requested_exchange}",
+            )
+
+        current_remote_projectile = self._widget.spinBox_sentry_remote_projectile_exchange.value()
+        requested_remote_projectile = int(parsed_cmd.get("remote_projectile_exchange_count", 0))
+        if requested_remote_projectile < current_remote_projectile:
+            return clear_from_remote_projectile(
+                "远程补弹请求次数回退，"
+                f"当前 {current_remote_projectile}，本次请求 {requested_remote_projectile}",
+            )
+        if requested_remote_projectile > current_remote_projectile + 1:
+            return clear_from_remote_projectile(
+                "远程补弹请求次数跳变，"
+                f"当前 {current_remote_projectile}，本次请求 {requested_remote_projectile}",
+            )
+
+        current_remote_hp = self._widget.spinBox_sentry_remote_hp_exchange.value()
+        requested_remote_hp = int(parsed_cmd.get("remote_hp_exchange_count", 0))
+        if requested_remote_hp < current_remote_hp:
+            return clear_from_remote_hp(
+                "远程回血请求次数回退，"
+                f"当前 {current_remote_hp}，本次请求 {requested_remote_hp}",
+            )
+        if requested_remote_hp > current_remote_hp + 1:
+            return clear_from_remote_hp(
+                "远程回血请求次数跳变，"
+                f"当前 {current_remote_hp}，本次请求 {requested_remote_hp}",
+            )
+
+        return truncated_cmd, ""
 
     def _handle_sentry_cmd(self, request, response):
         """
@@ -122,7 +273,13 @@ class MatchControlPlugin(Plugin):
                 f"activate={parsed_cmd['activate_rune']}"
             )
 
-            self.signals.update_sentry_signal.emit(parsed_cmd)
+            processed_cmd, truncate_reason = self._truncate_sentry_cmd_for_protocol(parsed_cmd)
+            if truncate_reason:
+                self._node.get_logger().warn(
+                    f"[Protocol-Truncate] {truncate_reason}；仅处理该字段前面的低位指令"
+                )
+
+            self.signals.update_sentry_signal.emit(processed_cmd)
             
             response.header.stamp = self._node.get_clock().now().to_msg()
             response.header.frame_id = "referee_mock"
@@ -170,6 +327,20 @@ class MatchControlPlugin(Plugin):
                     self._node.get_logger().warn(f">>> [UI-Fail] {message}")
                     return
 
+            remote_projectile_target = int(sentry_cmd.get("remote_projectile_exchange_count", 0))
+            if remote_projectile_target > self._widget.spinBox_sentry_remote_projectile_exchange.value():
+                self._widget.spinBox_sentry_remote_projectile_exchange.setValue(remote_projectile_target)
+                self._node.get_logger().info(
+                    f">>> [UI-Success] 远程补弹请求次数回显为 {remote_projectile_target}"
+                )
+
+            remote_hp_target = int(sentry_cmd.get("remote_hp_exchange_count", 0))
+            if remote_hp_target > self._widget.spinBox_sentry_remote_hp_exchange.value():
+                self._widget.spinBox_sentry_remote_hp_exchange.setValue(remote_hp_target)
+                self._node.get_logger().info(
+                    f">>> [UI-Success] 远程回血请求次数回显为 {remote_hp_target}"
+                )
+
             posture_val = int(sentry_cmd.get("posture", 0))
             if posture_val in (1, 2, 3):
                 now_sec = time()
@@ -179,6 +350,7 @@ class MatchControlPlugin(Plugin):
                         self._node.get_logger().warn(
                             f">>> [UI-Fail] 姿态切换冷却中，忽略 {self.received_sentry_mode} -> {posture_val}，剩余 {remaining_cooldown:.2f}s"
                         )
+                        return
                     else:
                         self.received_sentry_mode = posture_val
                         self._last_posture_change_time = now_sec
@@ -202,6 +374,8 @@ class MatchControlPlugin(Plugin):
 
     def _timer_callback(self):
         """Timer callback to publish match status periodically"""
+        self._update_auto_supply_pose_from_tf()
+
         # Get current status from widget
         status = self._widget.get_game_status()
         topic_prefix = self._widget.get_topic_prefix()
@@ -243,6 +417,16 @@ class MatchControlPlugin(Plugin):
         event_msg.event_data = int(status["event_data"]) 
         self._publisher_pool.publish(
             f"{topic_prefix}/event_data", EventData, event_msg)
+
+        # Publish RFIDStatus
+        rfid_status = status.get("rfid_status", {})
+        rfid_msg = RFIDStatus()
+        rfid_msg.header.stamp = current_time_msg
+        rfid_msg.header.frame_id = "referee_system"
+        rfid_msg.rfid_status = int(rfid_status.get("rfid_status", 0))
+        rfid_msg.rfid_status_2 = int(rfid_status.get("rfid_status_2", 0))
+        self._publisher_pool.publish(
+            f"{topic_prefix}/rfid_status", RFIDStatus, rfid_msg)
             
         # [新增] Publish RobotStatus 
         robot_status_msg = RobotStatus()
