@@ -165,6 +165,7 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("uc_supply_active", 0);
             blackboard_->set<int>("uc_outpost_active", 0);
             blackboard_->set<int>("uc_normal_posture", 3);
+            blackboard_->set<bool>("power_management_shooter_output", true);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
             blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);

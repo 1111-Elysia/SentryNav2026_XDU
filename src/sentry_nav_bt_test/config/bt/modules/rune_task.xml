@@ -17,6 +17,7 @@
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{rune_start_message}"/>
       <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
+      <PublishControllerName controller_name="FollowPath"/>
       <ReactiveSequence name="前往符点并维持移动姿态">
         <MaintainSentryPosture mode="{rune_move_posture}"/>
         <ReliableNavigateToPose
@@ -29,6 +30,7 @@
       </ReactiveSequence>
       <PrintNode message="{rune_arrived_message}"/>
       <ReactiveSequence name="打符并维持打符标志">
+        <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
         <SetBlackboardValue key="{rune_phase_key}" value="1" type="int"/>
         <EngageRune
           rune_type="{rune_type}"

@@ -9,7 +9,7 @@ namespace sentry_nav_bt_test
 namespace
 {
 
-constexpr auto kRuneActivationDelayAfterYaw = std::chrono::milliseconds(1000);
+constexpr auto kRuneActivationDelayAfterYaw = std::chrono::milliseconds(2000);
 
 struct SentryDecisionFeedback
 {
@@ -308,7 +308,7 @@ BT::NodeStatus EngageRune::onStart()
 
     RCLCPP_INFO(
         node_->get_logger(),
-        "EngageRune: 进入激活能量机关流程，等待按顺序发送 scan_mode=false -> yaw_controller=0 -> autoshoot=true -> yaw后延时1s -> 激活请求");
+        "EngageRune: 进入激活能量机关流程，等待按顺序发送 scan_mode=false -> yaw_controller=0 -> autoshoot=true -> yaw后延时2s -> 激活请求");
 
     return BT::NodeStatus::RUNNING;
 }

@@ -13,6 +13,7 @@
             avoid_repeat="{random_avoid_repeat}"
             goal="{random_goal}"
             goal_name="{random_goal_name}"/>
+          <PublishControllerName controller_name="FollowPath"/>
           <ReliableNavigateToPose
             goal="{random_goal}"
             goal_name="{random_goal_name}"

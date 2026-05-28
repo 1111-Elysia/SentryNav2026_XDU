@@ -199,4 +199,67 @@ BT::NodeStatus CheckGoalReached::tick()
   return BT::NodeStatus::FAILURE;
 }
 
+PublishControllerName::PublishControllerName(
+  const std::string &name, const BT::NodeConfig &config)
+: BT::SyncActionNode(name, config),
+  logger_(rclcpp::get_logger("PublishControllerName"))
+{
+  if (!config.blackboard || !config.blackboard->get("node", node_)) {
+    throw BT::RuntimeError("PublishControllerName: missing 'node' in blackboard");
+  }
+}
+
+BT::PortsList PublishControllerName::providedPorts()
+{
+  return {
+    BT::InputPort<std::string>("controller_name", "Nav2 controller plugin id"),
+    BT::InputPort<std::string>("topic_name", "/controller_name", "ControllerSelector topic")
+  };
+}
+
+void PublishControllerName::ensurePublisher(const std::string &topic_name)
+{
+  if (publisher_ && publisher_topic_ == topic_name) {
+    return;
+  }
+
+  publisher_ = node_->create_publisher<std_msgs::msg::String>(topic_name, 10);
+  publisher_topic_ = topic_name;
+}
+
+BT::NodeStatus PublishControllerName::tick()
+{
+  std::string controller_name;
+  if (!getInput("controller_name", controller_name) || trim(controller_name).empty()) {
+    RCLCPP_ERROR(logger_, "缺少必要参数 'controller_name'");
+    return BT::NodeStatus::FAILURE;
+  }
+  controller_name = trim(controller_name);
+
+  std::string topic_name = "/controller_name";
+  getInput("topic_name", topic_name);
+  if (trim(topic_name).empty()) {
+    topic_name = "/controller_name";
+  } else {
+    topic_name = trim(topic_name);
+  }
+
+  ensurePublisher(topic_name);
+
+  std_msgs::msg::String msg;
+  msg.data = controller_name;
+  publisher_->publish(msg);
+
+  if (config().blackboard) {
+    config().blackboard->set("last_nav_controller_name", controller_name);
+  }
+
+  RCLCPP_INFO(
+    logger_,
+    "已发布 controller_name=%s -> %s",
+    controller_name.c_str(),
+    topic_name.c_str());
+  return BT::NodeStatus::SUCCESS;
+}
+
 }  // namespace sentry_nav_bt_test

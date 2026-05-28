@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="ShooterPowerRecovery">
+    <ReactiveSequence name="发射机构断电回补">
+      <CheckCondition key_name="{shooter_output_key}" comparison="eq" threshold="0"/>
+      <PrintNode message="{recovery_start_message}" throttle_ms="2000"/>
+      <Inverter>
+        <KeepRunningUntilFailure>
+          <Sequence name="断电期间持续回补">
+            <CheckCondition key_name="{shooter_output_key}" comparison="eq" threshold="0"/>
+            <SetBlackboardValue key="{supply_active_key}" value="1" type="int"/>
+            <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+            <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
+            <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
+            <MaintainSentryPosture mode="{recovery_posture}" force="true"/>
+            <ReactiveFallback name="断电回补_RFID保持或重发补给点">
+              <Sequence name="断电回补_已在补给区">
+                <CheckCondition key_name="{supply_rfid_detected_key}" comparison="eq" threshold="1"/>
+                <PrintNode message="{recovery_wait_message}" throttle_ms="2000"/>
+                <Wait wait_duration="0.20"/>
+              </Sequence>
+              <Sequence name="断电回补_攻击姿态回补给点">
+                <PatrolGoalSelector
+                  goal_names="{supply_goal_names}"
+                  index_key="{supply_goal_index_key}"
+                  goal="{supply_goal}"
+                  goal_name="{supply_selected_goal_name}"/>
+                <PublishControllerName controller_name="FollowPath"/>
+                <ReliableNavigateToPose
+                  goal="{supply_goal}"
+                  goal_name="{supply_selected_goal_name}"
+                  reach_threshold="{supply_reach_threshold}"
+                  resend_interval="{nav_resend_interval}"
+                  response_timeout="{nav_response_timeout}"
+                  result_retry_delay="{nav_result_retry_delay}"/>
+              </Sequence>
+            </ReactiveFallback>
+          </Sequence>
+        </KeepRunningUntilFailure>
+      </Inverter>
+      <PrintNode message="{recovery_done_message}"/>
+      <SetBlackboardValue key="{supply_goal_index_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{supply_active_key}" value="0" type="int"/>
+    </ReactiveSequence>
+  </BehaviorTree>
+</root>
