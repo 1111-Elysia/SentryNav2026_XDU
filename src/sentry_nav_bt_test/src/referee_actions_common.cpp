@@ -220,17 +220,20 @@ BT::PortsList MaintainSentryPosture::providedPorts()
 {
     return {
         BT::InputPort<int>("mode", "1:Attack, 2:Defend, 3:Move"),
-        BT::InputPort<int>("cooldown_ms", 5000, "全局姿态切换冷却时间(ms)，冷却内不重复发同类请求")};
+        BT::InputPort<int>("cooldown_ms", 5000, "全局姿态切换冷却时间(ms)，冷却内不重复发同类请求"),
+        BT::InputPort<bool>("force", false, "忽略姿态切换冷却，立即发送本次姿态请求")};
 }
 
 BT::NodeStatus MaintainSentryPosture::tick()
 {
     int target_mode_int;
     int cooldown_ms;
+    bool force = false;
     if (!getInput("mode", target_mode_int)) {
         return BT::NodeStatus::FAILURE;
     }
     getInput("cooldown_ms", cooldown_ms);
+    getInput("force", force);
 
     if (config().blackboard) {
         int bb_cooldown_ms = cooldown_ms;
@@ -318,7 +321,8 @@ BT::NodeStatus MaintainSentryPosture::tick()
     const bool cooldown_active =
         last_request_time_s > 0.0 &&
         (now_s - last_request_time_s) * 1000.0 < static_cast<double>(cooldown_ms);
-    if (cooldown_active) {
+    const bool force_bypasses_cooldown = force && last_target_mode != target_mode_int;
+    if (cooldown_active && !force_bypasses_cooldown) {
         if (last_target_mode == target_mode_int) {
             updatePostureRequestStatus(
                 config().blackboard,

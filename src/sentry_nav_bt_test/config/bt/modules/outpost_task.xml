@@ -24,6 +24,7 @@
             nav_result_retry_delay="{nav_result_retry_delay}"
             _autoremap="true"/>
           <ReactiveSequence name="打前哨站并维持激活标志">
+            <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
             <SetBlackboardValue key="{outpost_active_key}" value="1" type="int"/>
             <PrintNode message="{outpost_arrived_message}" throttle_ms="10000"/>
             <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>

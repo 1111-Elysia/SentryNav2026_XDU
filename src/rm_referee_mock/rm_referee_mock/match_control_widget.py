@@ -18,8 +18,8 @@ class MatchControlWidget(QtWidgets.QWidget):
     DEFAULT_CHASSIS_POWER_LIMIT = 120
     DEFAULT_BUFFER_ENERGY_LIMIT = 60
     DEFAULT_SUPPLY_POINTS = (
-        ("supply_point"),
-        ("supply_point_2"),
+        ("supply_point", -0.87, -5.04),
+        ("supply_point_2", -1.35, -6.63),
     )
     SUPPLY_DETECT_RADIUS_M = 0.35
     SUPPLY_HEAL_HP_PER_SECOND = 100
@@ -361,8 +361,17 @@ class MatchControlWidget(QtWidgets.QWidget):
             projectile_group, projectile_layout, 6, "label_ammo_fortress", "堡垒17mm", "spinBox_ammo_fortress")
 
         self.groupBox_robot_status.setTitle("RobotStatus")
-        self.groupBox_robot_status.setGeometry(650, 20, 120, 90)
-        projectile_group.setGeometry(650, 120, 120, 210)
+        if not hasattr(self, "checkBox_shooter_output"):
+            self.checkBox_shooter_output = QtWidgets.QCheckBox(self.groupBox_robot_status)
+            self.checkBox_shooter_output.setObjectName("checkBox_shooter_output")
+        self.checkBox_shooter_output.setText("发射输出")
+        self.checkBox_shooter_output.setToolTip(
+            "发布 RobotStatus.power_management_shooter_output；取消勾选发布 0")
+        self.checkBox_shooter_output.setChecked(True)
+        self._move_widget_to_layout(self.checkBox_shooter_output, self.verticalLayout_rs)
+
+        self.groupBox_robot_status.setGeometry(650, 20, 120, 120)
+        projectile_group.setGeometry(650, 150, 120, 180)
         if hasattr(self, "groupBox_hurt"):
             self.groupBox_hurt.setGeometry(650, 340, 120, 120)
         if hasattr(self, "groupBox_service_echo"):
@@ -745,11 +754,6 @@ class MatchControlWidget(QtWidgets.QWidget):
     def get_rfid_status_value(self):
         rfid_status = 0
         rfid_status_2 = 0
-        if self.comboBox_game_stage.currentIndex() != self.MATCH_STAGE_INDEX:
-            return {
-                "rfid_status": rfid_status,
-                "rfid_status_2": rfid_status_2,
-            }
 
         if hasattr(self, "checkBox_base_buff") and self.checkBox_base_buff.isChecked():
             rfid_status |= 1 << 0
@@ -842,7 +846,7 @@ class MatchControlWidget(QtWidgets.QWidget):
                 "max_hp": self.spinBox_hp_7.maximum(),
                 "ammo": self.spinBox_ammo.value(),
                 "chassis_power_limit": self._current_chassis_power_limit(),
-                "shooter_output": not self.sentry_weak_active,
+                "shooter_output": self._current_shooter_output(),
             },
             "projectile_allowance": {
                 "projectile_allowance_17mm": self.spinBox_ammo.value(),
@@ -872,6 +876,14 @@ class MatchControlWidget(QtWidgets.QWidget):
             self.trigger_hurt = False
 
         return status
+
+    def _current_shooter_output(self):
+        manual_enabled = (
+            self.checkBox_shooter_output.isChecked()
+            if hasattr(self, "checkBox_shooter_output")
+            else True
+        )
+        return manual_enabled and not self.sentry_weak_active
 
     def get_sentry_info_status(self):
         manual_can_activate = (

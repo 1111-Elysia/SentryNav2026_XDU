@@ -6,6 +6,7 @@
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{point_start_message}"/>
       <GoalSelector goal_name="{point_goal_name}" goal="{point_goal}"/>
+      <PublishControllerName controller_name="FollowPath"/>
       <ReactiveSequence name="前往点位并维持移动姿态">
         <MaintainSentryPosture mode="{point_move_posture}"/>
         <ReliableNavigateToPose

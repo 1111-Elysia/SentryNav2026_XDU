@@ -8,6 +8,7 @@
 #include "behaviortree_cpp/condition_node.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
 
 namespace sentry_nav_bt_test
 {
@@ -43,6 +44,24 @@ private:
   bool has_goal_context_{false};
   bool last_reported_reached_{false};
   bool last_pose_invalid_reported_{false};
+};
+
+class PublishControllerName : public BT::SyncActionNode
+{
+public:
+  PublishControllerName(const std::string &name, const BT::NodeConfig &config);
+
+  static BT::PortsList providedPorts();
+
+  BT::NodeStatus tick() override;
+
+private:
+  void ensurePublisher(const std::string &topic_name);
+
+  rclcpp::Node::SharedPtr node_;
+  rclcpp::Logger logger_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+  std::string publisher_topic_;
 };
 
 }  // namespace sentry_nav_bt_test

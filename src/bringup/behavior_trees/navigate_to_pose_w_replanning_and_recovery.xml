@@ -17,10 +17,13 @@
         </RateController>
         <RecoveryNode name="FollowPath"
                       number_of_retries="10">
-          <ReactiveFallback name="FollowPathWithStuckDetection">
+          <PipelineSequence>
+            <ControllerSelector selected_controller="{selected_controller}"
+                                default_controller="FollowPath"
+                                topic_name="controller_name"/>
             <FollowPath path="{path}"
-                        controller_id="FollowPath"/>
-          </ReactiveFallback>
+                        controller_id="{selected_controller}"/>
+          </PipelineSequence>
           <ClearEntireCostmap name="ClearLocalCostmap-Context"
                               service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
@@ -58,6 +61,12 @@
     </Action>
     <Action ID="GoalUpdated"
             editable="true"/>
+    <Action ID="ControllerSelector"
+            editable="true">
+      <input_port name="default_controller"/>
+      <input_port name="topic_name"/>
+      <output_port name="selected_controller"/>
+    </Action>
     <Control ID="PipelineSequence"
              editable="true"/>
     <Decorator ID="RateController"

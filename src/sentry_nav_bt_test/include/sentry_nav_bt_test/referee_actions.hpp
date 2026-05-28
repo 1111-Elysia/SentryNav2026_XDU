@@ -202,7 +202,7 @@ namespace sentry_nav_bt_test
     };
 
     // 动作 4：打能量机关
-    // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 等待短延时 -> 发送激活请求
+    // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 等待 2s -> 发送激活请求
     // XML: <EngageRune rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
     class EngageRune : public BT::StatefulActionNode
     {

@@ -73,6 +73,26 @@
           <SubTree ID="Resurrection" _autoremap="1"/>
 
           <SubTree
+            ID="ShooterPowerRecovery"
+            shooter_output_key="power_management_shooter_output"
+            supply_goal_names="supply_point,supply_point_2"
+            supply_goal_index_key="uc_shooter_power_recovery_goal_index"
+            supply_reach_threshold="0.25"
+            supply_active_key="uc_supply_active"
+            supply_rfid_detected_key="rfid_supply_zone_detected"
+            rune_phase_key="in_rune_phase"
+            fortress_active_key="uc_fortress_hold_active"
+            outpost_active_key="uc_outpost_active"
+            recovery_posture="1"
+            recovery_start_message="[回补] 发射机构电源输出关闭，攻击姿态回补给点等待恢复"
+            recovery_wait_message="[回补] 发射机构电源输出关闭，已在补给区保持攻击姿态"
+            recovery_done_message="[回补] 发射机构电源输出恢复，继续执行全场策略"
+            nav_resend_interval="0.30"
+            nav_response_timeout="0.80"
+            nav_result_retry_delay="0.30"
+            _autoremap="1"/>
+
+          <SubTree
             ID="SupplyReturn"
             supply_goal_names="supply_point,supply_point_2"
             supply_goal_index_key="uc_supply_goal_index"
@@ -439,6 +459,7 @@
     <Action ID="MaintainSentryPosture" editable="true">
       <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
       <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
+      <input_port name="force" type="bool">忽略姿态切换冷却</input_port>
     </Action>
     <Action ID="RequestActivateRune" editable="true">
       <input_port name="posture" type="int">请求时保持的姿态</input_port>
@@ -507,6 +528,10 @@
       <input_port name="success_condition_key"/>
       <input_port name="success_condition_comparison"/>
       <input_port name="success_condition_threshold"/>
+    </Action>
+    <Action ID="PublishControllerName" editable="true">
+      <input_port name="controller_name"/>
+      <input_port name="topic_name"/>
     </Action>
     <Condition ID="CheckGoalReached" editable="true">
       <input_port name="goal"/>

@@ -15,9 +15,14 @@ from ament_index_python.packages import get_package_share_directory
 
 PACKAGE_SHARE = get_package_share_directory("rm_referee_mock")
 
-# (0, 0) at bottom-left, (29, 16) at top-right
-FIELD_WIDTH = 29.0
-FIELD_HEIGHT = 16.0
+# Navigation map coordinates used by the sentry can be slightly negative around
+# the allied supply area, so keep a bit of margin outside the nominal field.
+FIELD_MIN_X = -2.0
+FIELD_MAX_X = 8.0
+FIELD_MIN_Y = -8.0
+FIELD_MAX_Y = 7.0
+FIELD_WIDTH = FIELD_MAX_X - FIELD_MIN_X
+FIELD_HEIGHT = FIELD_MAX_Y - FIELD_MIN_Y
 
 
 class MapWidget(QWidget):
@@ -84,8 +89,8 @@ class MapWidget(QWidget):
         # Map field coordinates to map rectangle coordinates
         # x: 0 -> map_rect.left, 10 -> map_rect.right
         # y: 0 -> map_rect.bottom, 35 -> map_rect.top (flip y-axis)
-        widget_x = map_rect.left() + (field_x / FIELD_WIDTH) * map_rect.width()
-        widget_y = map_rect.bottom() - (field_y / FIELD_HEIGHT) * map_rect.height()
+        widget_x = map_rect.left() + ((field_x - FIELD_MIN_X) / FIELD_WIDTH) * map_rect.width()
+        widget_y = map_rect.bottom() - ((field_y - FIELD_MIN_Y) / FIELD_HEIGHT) * map_rect.height()
 
         return int(widget_x), int(widget_y)
 
@@ -98,14 +103,14 @@ class MapWidget(QWidget):
         widget_y = max(map_rect.top(), min(widget_y, map_rect.bottom()))
 
         # Map widget coordinates to field coordinates
-        field_x = ((widget_x - map_rect.left()) /
-                   map_rect.width()) * FIELD_WIDTH
-        field_y = ((map_rect.bottom() - widget_y) /
-                   map_rect.height()) * FIELD_HEIGHT
+        field_x = FIELD_MIN_X + ((widget_x - map_rect.left()) /
+                                 map_rect.width()) * FIELD_WIDTH
+        field_y = FIELD_MIN_Y + ((map_rect.bottom() - widget_y) /
+                                 map_rect.height()) * FIELD_HEIGHT
 
         # Clamp to field bounds
-        field_x = max(0.0, min(field_x, FIELD_WIDTH))
-        field_y = max(0.0, min(field_y, FIELD_HEIGHT))
+        field_x = max(FIELD_MIN_X, min(field_x, FIELD_MAX_X))
+        field_y = max(FIELD_MIN_Y, min(field_y, FIELD_MAX_Y))
 
         return field_x, field_y
 
@@ -320,6 +325,7 @@ class FakeLocationWidget(QWidget):
             "4 - 步兵4",
             "7 - 哨兵"
         ])
+        self.current_robot_combo.setCurrentIndex(4)
         settings_layout.addRow("当前机器人:", self.current_robot_combo)
 
         self.noise_scale_spinbox = QDoubleSpinBox()
@@ -374,7 +380,7 @@ class FakeLocationWidget(QWidget):
 
             # X coordinate spinbox
             x_spinbox = QDoubleSpinBox()
-            x_spinbox.setRange(0.0, FIELD_WIDTH)
+            x_spinbox.setRange(FIELD_MIN_X, FIELD_MAX_X)
             x_spinbox.setDecimals(2)
             x_spinbox.setSingleStep(0.1)
             x_spinbox.setValue(self.map_widget.robot_positions[robot_key]['x'])
@@ -386,7 +392,7 @@ class FakeLocationWidget(QWidget):
 
             # Y coordinate spinbox
             y_spinbox = QDoubleSpinBox()
-            y_spinbox.setRange(0.0, FIELD_HEIGHT)
+            y_spinbox.setRange(FIELD_MIN_Y, FIELD_MAX_Y)
             y_spinbox.setDecimals(2)
             y_spinbox.setSingleStep(0.1)
             y_spinbox.setValue(self.map_widget.robot_positions[robot_key]['y'])
