@@ -250,7 +250,7 @@ class GroundPosRelayNode : public rclcpp::Node {
           }
         });
 
-    RCLCPP_DEBUG(get_logger(), "Relayed 0x020B->0x0301/0x0200 (sender=%d, receiver=%d, seq=%d)",
+    RCLCPP_INFO(get_logger(), "Relayed 0x020B->0x0301/0x0200 (sender=%d, receiver=%d, seq=%d)",
                  sender_id, receiver_id, (seq_ - 1) & 0xFF);
   }
 

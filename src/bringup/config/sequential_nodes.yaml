@@ -24,6 +24,11 @@ sequential_nodes:
     cmd: ["ros2", "launch", "rm_referee", "referee_node.launch.py"]
     wait_after: 0
 
+  - label: RM-pos-relay
+    type: execute
+    cmd: ["ros2", "launch", "ground_pos_relay", "ground_pos_relay.launch.py"]
+    wait_after: 0
+
   # - label: RM-messages-pos
   #   type: execute
   #   cmd: ["ros2", "launch", "rm_referee", "referee_node_pos.launch.py"]

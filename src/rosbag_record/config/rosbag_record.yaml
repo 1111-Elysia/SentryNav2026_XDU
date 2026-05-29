@@ -2,13 +2,11 @@ rosbag_record:
   ros__parameters:
     # 需要录制的话题列表
     topics:
-      - /livox/lidar
-      - /livox/lidar/pointcloud
-      - /livox/imu
-      - /odom
+      - /rm_referee/ground_robot_position
+      - /rm_referee/sentry_info
 
     # bag 输出目录（必须为绝对路径）
-    output_dir: /tmp/rosbags
+    output_dir: /home/nuc/Desktop/SentryNav2026_XDU/src/rosbag_record/bag
     bag_prefix: sentry
 
     # 当 /rm_referee/game_status.game_progress == 3 开始录制

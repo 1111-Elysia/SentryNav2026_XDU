@@ -86,7 +86,7 @@ controller_server:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
       approach_distance: 1.5  #距目标时开始限速
-      approach_velocity: 0.5
+      approach_velocity: 0.2
       direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
       direct_approach_kp: 10.0  #直接驱动P控制增益
       time_steps: 80  #增加到80，预测时域4.8s，让MPPI能看到冲过目标的后果
@@ -179,8 +179,8 @@ controller_server:
     HanBao:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 1.5  #距目标时开始限速
-      approach_velocity: 0.5
+      approach_distance: 0.5  #距目标时开始限速
+      approach_velocity: 0.7
       direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
       direct_approach_kp: 10.0  #直接驱动P控制增益
       time_steps: 80  #增加到80，预测时域4.8s，让MPPI能看到冲过目标的后果
