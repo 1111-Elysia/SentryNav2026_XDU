@@ -14,13 +14,20 @@
             goal="{random_goal}"
             goal_name="{random_goal_name}"/>
           <PublishControllerName controller_name="FollowPath"/>
-          <ReliableNavigateToPose
-            goal="{random_goal}"
-            goal_name="{random_goal_name}"
-            reach_threshold="{random_reach_threshold}"
-            resend_interval="{nav_resend_interval}"
-            response_timeout="{nav_response_timeout}"
-            result_retry_delay="{nav_result_retry_delay}"/>
+          <ReactiveSequence name="随机巡逻_移动到点">
+            <MaintainSentryPosture mode="3"/>
+            <ReliableNavigateToPose
+              goal="{random_goal}"
+              goal_name="{random_goal_name}"
+              reach_threshold="{random_reach_threshold}"
+              resend_interval="{nav_resend_interval}"
+              response_timeout="{nav_response_timeout}"
+              result_retry_delay="{nav_result_retry_delay}"/>
+          </ReactiveSequence>
+          <ReactiveSequence name="随机巡逻_到点停留">
+            <MaintainSentryPosture mode="3"/>
+            <Wait wait_duration="{random_patrol_wait_duration}"/>
+          </ReactiveSequence>
         </Sequence>
       </ReactiveSequence>
     </KeepRunningUntilFailure>
