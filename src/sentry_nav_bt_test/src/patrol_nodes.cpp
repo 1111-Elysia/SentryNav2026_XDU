@@ -223,7 +223,8 @@ void PublishControllerName::ensurePublisher(const std::string &topic_name)
     return;
   }
 
-  publisher_ = node_->create_publisher<std_msgs::msg::String>(topic_name, 10);
+  const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  publisher_ = node_->create_publisher<std_msgs::msg::String>(topic_name, qos);
   publisher_topic_ = topic_name;
 }
 
