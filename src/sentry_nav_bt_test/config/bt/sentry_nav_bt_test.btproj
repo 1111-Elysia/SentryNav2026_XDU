@@ -12,6 +12,7 @@
     <include path="modules/supply_return.xml"/>
     <include path="train.xml"/>
     <include path="uc_main.xml"/>
+    <include path="uc_patrol.xml"/>
     <include path="train_rune.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>
