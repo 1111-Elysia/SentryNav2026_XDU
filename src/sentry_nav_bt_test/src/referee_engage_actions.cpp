@@ -10,6 +10,7 @@ namespace
 {
 
 constexpr auto kRuneActivationDelayAfterYaw = std::chrono::milliseconds(2000);
+constexpr int kRuneRequiredProjectileAllowance = 100;
 
 struct SentryDecisionFeedback
 {
@@ -414,6 +415,34 @@ BT::NodeStatus EngageRune::onRunning()
     }
 
     if (!have_can_activate || can_activate_rune != 1) {
+        return BT::NodeStatus::RUNNING;
+    }
+
+    int projectile_allowance_17mm = 0;
+    if (!getBlackboardIntLike(
+            config().blackboard,
+            "projectile_allowance_17mm",
+            projectile_allowance_17mm)) {
+        RCLCPP_WARN_THROTTLE(
+            node_->get_logger(),
+            *node_->get_clock(),
+            1000,
+            "EngageRune: 尚未获取 17mm 允许发弹量，暂不发送%s激活请求",
+            runeTypeName());
+        return BT::NodeStatus::RUNNING;
+    }
+    if (projectile_allowance_17mm < kRuneRequiredProjectileAllowance) {
+        RCLCPP_WARN(
+            node_->get_logger(),
+            "EngageRune: 当前 17mm 允许发弹量=%d，小于打符所需 %d，转入回补逻辑",
+            projectile_allowance_17mm,
+            kRuneRequiredProjectileAllowance);
+        setRuneOutcome(false, "ammo_low");
+        if (config().blackboard) {
+            config().blackboard->set("uc_supply_goal_index", 0);
+            config().blackboard->set("uc_supply_active", 1);
+        }
+        cleanupOutputs();
         return BT::NodeStatus::RUNNING;
     }
 
