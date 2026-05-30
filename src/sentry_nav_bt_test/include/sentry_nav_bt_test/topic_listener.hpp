@@ -27,6 +27,7 @@
 #include "rm_referee_msgs/msg/robot_status.hpp"
 #include "rm_referee_msgs/msg/game_robot_hp.hpp"
 #include "rm_referee_msgs/msg/projectile_allowance.hpp"
+#include "rm_referee_msgs/msg/power_heat_data.hpp"
 #include "rm_referee_msgs/msg/hurt_data.hpp"
 #include "rm_referee_msgs/msg/event_data.hpp"
 
@@ -166,6 +167,11 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("uc_outpost_active", 0);
             blackboard_->set<int>("uc_normal_posture", 3);
             blackboard_->set<bool>("power_management_shooter_output", true);
+            blackboard_->set<bool>("power_heat_data_received", false);
+            blackboard_->set<int>("shooter_17mm_barrel_heat", 0);
+            blackboard_->set<int>("shooter_17mm_barrel_heat_prev", 0);
+            blackboard_->set<int>("shooter_17mm_barrel_heat_delta", 0);
+            blackboard_->set<int>("shooter_17mm_heat_firing", 0);
             blackboard_->set<int>("center_gain_point_occupancy_status", 0);
             blackboard_->set<std::string>("ul_center_goal_name", "center_point");
             blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);
@@ -370,6 +376,59 @@ namespace sentry_nav_bt_test
                         "/rm_referee/robot_status");
                 });
 
+            // 订阅功率热量数据（0x0202），用于根据 17mm 热量趋势判断是否正在发射弹丸
+            this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::PowerHeatData>(
+                "/rm_referee/power_heat_data",
+                [this](const rm_referee_msgs::msg::PowerHeatData::SharedPtr msg, BT::Blackboard::Ptr bb)
+                {
+                    const int current_heat = static_cast<int>(msg->shooter_17mm_1_barrel_heat);
+                    const int previous_heat = has_previous_shooter_17mm_heat_
+                                                  ? previous_shooter_17mm_heat_
+                                                  : current_heat;
+                    const int heat_delta = current_heat - previous_heat;
+                    const bool heat_indicates_firing =
+                        has_previous_shooter_17mm_heat_ && current_heat > 0 && heat_delta >= 0;
+                    const rclcpp::Time now = node_->now();
+
+                    if (heat_indicates_firing) {
+                        shooter_17mm_heat_firing_latched_ = true;
+                        shooter_17mm_heat_non_firing_since_valid_ = false;
+                    } else if (shooter_17mm_heat_firing_latched_) {
+                        if (!shooter_17mm_heat_non_firing_since_valid_) {
+                            shooter_17mm_heat_non_firing_since_ = now;
+                            shooter_17mm_heat_non_firing_since_valid_ = true;
+                        }
+
+                        const double non_firing_duration =
+                            (now - shooter_17mm_heat_non_firing_since_).seconds();
+                        if (non_firing_duration >= kShooter17mmDefenseDelaySeconds) {
+                            shooter_17mm_heat_firing_latched_ = false;
+                            shooter_17mm_heat_non_firing_since_valid_ = false;
+                        }
+                    }
+
+                    const int heat_firing = shooter_17mm_heat_firing_latched_ ? 1 : 0;
+
+                    bb->set("buffer_energy", static_cast<int>(msg->buffer_energy));
+                    bb->set("shooter_17mm_barrel_heat", current_heat);
+                    bb->set("shooter_17mm_barrel_heat_prev", previous_heat);
+                    bb->set("shooter_17mm_barrel_heat_delta", heat_delta);
+                    bb->set("shooter_17mm_heat_firing", heat_firing);
+                    bb->set("shooter_42mm_barrel_heat", static_cast<int>(msg->shooter_42mm_barrel_heat));
+                    bb->set("power_heat_data_received", true);
+
+                    previous_shooter_17mm_heat_ = current_heat;
+                    has_previous_shooter_17mm_heat_ = true;
+
+                    RCLCPP_DEBUG(
+                        node_->get_logger(),
+                        "黑板更新: 17mm热量=%d, 上次=%d, 增量=%d, 正在射击=%d",
+                        current_heat,
+                        previous_heat,
+                        heat_delta,
+                        heat_firing);
+                });
+
             // 订阅弹丸允许信息  0x0208
             this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::ProjectileAllowance>(
                 "/rm_referee/projectile_allowance",
@@ -558,6 +617,13 @@ namespace sentry_nav_bt_test
         std::mutex hurt_mutex_;
 
         std::shared_ptr<CenterHoldVwController> center_hold_vw_controller_;
+        bool has_previous_shooter_17mm_heat_{false};
+        int previous_shooter_17mm_heat_{0};
+        bool shooter_17mm_heat_firing_latched_{false};
+        bool shooter_17mm_heat_non_firing_since_valid_{false};
+        rclcpp::Time shooter_17mm_heat_non_firing_since_{0, 0, RCL_ROS_TIME};
+        static constexpr double kShooter17mmDefenseDelaySeconds = 10.0;
+
         // TF
         std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
         std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

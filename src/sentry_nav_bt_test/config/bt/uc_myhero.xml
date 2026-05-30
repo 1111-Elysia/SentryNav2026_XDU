@@ -31,7 +31,7 @@
               <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
               <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
               <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
-              <CheckCondition key_name="uc_normal_posture" comparison="eq" threshold="3"/>
+              <CheckCondition key_name="uc_normal_posture" comparison="eq" threshold="2"/>
             </Sequence>
             <Sequence name="执行赛前复位">
               <PrintNode message="[UC] 比赛未开始，重置局内状态"/>
@@ -40,8 +40,8 @@
               <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
               <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
               <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
-              <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
-              <SetBlackboardValue key="uc_fortress_goal_name" value="fortress" type="string"/>
+              <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
+              <SetBlackboardValue key="uc_fortress_goal_name" value="myhero" type="string"/>
             </Sequence>
           </Fallback>
         </Sequence>
@@ -56,8 +56,8 @@
             <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
-            <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
-            <SetBlackboardValue key="uc_fortress_goal_name" value="fortress" type="string"/>
+            <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
+            <SetBlackboardValue key="uc_fortress_goal_name" value="myhero" type="string"/>
             <SetBlackboardValue key="uc_initialized" value="1" type="int"/>
           </Sequence>
         </Fallback>
@@ -118,11 +118,11 @@
               <Sequence name="普通姿态目标更新">
                 <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
                 <Fallback name="普通姿态目标选择">
-                  <Sequence name="普通受击目标进攻">
-                    <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
+                  <Sequence name="17mm热量维持_切进攻姿态">
+                    <CheckCondition key_name="shooter_17mm_heat_firing" comparison="eq" threshold="1"/>
                     <SetBlackboardValue key="uc_normal_posture" value="1" type="int"/>
                   </Sequence>
-                  <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
+                  <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
                 </Fallback>
               </Sequence>
 
@@ -236,22 +236,20 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_堡垒_Phase4">
+                <ReactiveSequence name="中期_myhero驻守_Phase4">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Phase 4 | 5:00-4:00] 不需要打符，回堡垒点位持续驻守"
-                    fortress_enemy_move_message="[Phase 4 | 5:00-4:00] 堡垒被敌方占领，转守基地前点位"
+                    ID="PointHold"
+                    point_hold_goal_name="myhero"
+                    point_hold_arrive_threshold="0.25"
+                    point_hold_exit_threshold="0.30"
+                    point_hold_move_posture="{uc_normal_posture}"
+                    point_hold_posture="{uc_normal_posture}"
+                    point_hold_wait_duration="0.5"
+                    point_hold_log_throttle_ms="10000"
+                    point_hold_message="[Phase 4 | 5:00-4:00] 不需要打符，前往 myhero 点位持续驻守"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -302,22 +300,20 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_堡垒_Phase6">
+                <ReactiveSequence name="中期_myhero驻守_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Phase 6 | 3:30-2:45] 前往堡垒点位并进入驻守"
-                    fortress_enemy_move_message="[Phase 6 | 3:30-2:45] 堡垒被敌方占领，转守基地前点位"
+                    ID="PointHold"
+                    point_hold_goal_name="myhero"
+                    point_hold_arrive_threshold="0.25"
+                    point_hold_exit_threshold="0.30"
+                    point_hold_move_posture="{uc_normal_posture}"
+                    point_hold_posture="{uc_normal_posture}"
+                    point_hold_wait_duration="0.5"
+                    point_hold_log_throttle_ms="10000"
+                    point_hold_message="[Phase 6 | 3:30-2:45] 前往 myhero 点位并进入驻守"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -368,22 +364,20 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="后期_堡垒_Phase8">
+                <ReactiveSequence name="后期_myhero驻守_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Phase 8 | 2:15-1:30] 后期回到堡垒点位持续驻守"
-                    fortress_enemy_move_message="[Phase 8 | 2:15-1:30] 堡垒被敌方占领，转守基地前点位"
+                    ID="PointHold"
+                    point_hold_goal_name="myhero"
+                    point_hold_arrive_threshold="0.25"
+                    point_hold_exit_threshold="0.30"
+                    point_hold_move_posture="{uc_normal_posture}"
+                    point_hold_posture="{uc_normal_posture}"
+                    point_hold_wait_duration="0.5"
+                    point_hold_log_throttle_ms="10000"
+                    point_hold_message="[Phase 8 | 2:15-1:30] 后期回到 myhero 点位持续驻守"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -413,21 +407,40 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="全局_堡垒驻守">
+                <Sequence name="全局_大符补打优先">
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Fallback] 不需要打符，回堡垒点位持续驻守"
-                    fortress_enemy_move_message="[Fallback] 堡垒被敌方占领，转守基地前点位"
+                    ID="RuneTask"
+                    rune_type="large"
+                    rune_goal_name="large_rune_point"
+                    rune_reach_threshold="0.10"
+                    rune_move_posture="{uc_normal_posture}"
+                    rune_posture="1"
+                    rune_timeout_ms="30000"
+                    rune_request_interval_ms="1000"
+                    rune_start_message="[Fallback] 若大符仍可进入激活窗口，优先补打大能量机关"
+                    rune_arrived_message="[Fallback] 到达大符点位，准备继续激活大能量机关"
+                    rune_done_message="[Fallback] 大能量机关补打流程结束"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
+                    nav_resend_interval="0.30"
+                    nav_response_timeout="0.80"
+                    nav_result_retry_delay="0.30"
+                    _autoremap="1"/>
+                </Sequence>
+
+                <ReactiveSequence name="全局_myhero驻守">
+                  <SubTree
+                    ID="PointHold"
+                    point_hold_goal_name="myhero"
+                    point_hold_arrive_threshold="0.25"
+                    point_hold_exit_threshold="0.30"
+                    point_hold_move_posture="{uc_normal_posture}"
+                    point_hold_posture="{uc_normal_posture}"
+                    point_hold_wait_duration="0.5"
+                    point_hold_log_throttle_ms="10000"
+                    point_hold_message="[Fallback] 不需要打符，回 myhero 点位持续驻守"
+                    rune_phase_key="in_rune_phase"
+                    fortress_active_key="uc_fortress_hold_active"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
