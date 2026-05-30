@@ -236,17 +236,22 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_随机巡逻_Phase4">
+                <ReactiveSequence name="中期_堡垒_Phase4">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                  <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
-                  <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
                   <SubTree
-                    ID="RandomWaypointNavigate"
-                    random_goal_names="point1,point2,point3"
-                    random_avoid_repeat="true"
-                    random_reach_threshold="0.25"
-                    random_patrol_wait_duration="3.0"
-                    random_wait_time_threshold="240"
+                    ID="FortressHold"
+                    fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="init"
+                    fortress_arrive_threshold="0.25"
+                    fortress_hold_exit_threshold="0.30"
+                    fortress_move_posture="3"
+                    fortress_hold_posture="3"
+                    fortress_wait_duration="0.5"
+                    fortress_move_message="[Phase 4 | 5:00-4:00] 不需要打符，回堡垒点位持续驻守"
+                    fortress_enemy_move_message="[Phase 4 | 5:00-4:00] 堡垒被敌方占领，转守基地前点位"
+                    rune_phase_key="in_rune_phase"
+                    fortress_active_key="uc_fortress_hold_active"
+                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -297,17 +302,22 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_随机巡逻_Phase6">
+                <ReactiveSequence name="中期_堡垒_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
-                  <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
-                  <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
                   <SubTree
-                    ID="RandomWaypointNavigate"
-                    random_goal_names="point1,point2,point3"
-                    random_avoid_repeat="true"
-                    random_reach_threshold="0.25"
-                    random_patrol_wait_duration="3.0"
-                    random_wait_time_threshold="165"
+                    ID="FortressHold"
+                    fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="init"
+                    fortress_arrive_threshold="0.25"
+                    fortress_hold_exit_threshold="0.30"
+                    fortress_move_posture="3"
+                    fortress_hold_posture="3"
+                    fortress_wait_duration="0.5"
+                    fortress_move_message="[Phase 6 | 3:30-2:45] 前往堡垒点位并进入驻守"
+                    fortress_enemy_move_message="[Phase 6 | 3:30-2:45] 堡垒被敌方占领，转守基地前点位"
+                    rune_phase_key="in_rune_phase"
+                    fortress_active_key="uc_fortress_hold_active"
+                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -358,17 +368,22 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="后期_随机巡逻_Phase8">
+                <ReactiveSequence name="后期_堡垒_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
-                  <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
-                  <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
                   <SubTree
-                    ID="RandomWaypointNavigate"
-                    random_goal_names="point1,point2,point3"
-                    random_avoid_repeat="true"
-                    random_reach_threshold="0.25"
-                    random_patrol_wait_duration="3.0"
-                    random_wait_time_threshold="90"
+                    ID="FortressHold"
+                    fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="init"
+                    fortress_arrive_threshold="0.25"
+                    fortress_hold_exit_threshold="0.30"
+                    fortress_move_posture="3"
+                    fortress_hold_posture="3"
+                    fortress_wait_duration="0.5"
+                    fortress_move_message="[Phase 8 | 2:15-1:30] 后期回到堡垒点位持续驻守"
+                    fortress_enemy_move_message="[Phase 8 | 2:15-1:30] 堡垒被敌方占领，转守基地前点位"
+                    rune_phase_key="in_rune_phase"
+                    fortress_active_key="uc_fortress_hold_active"
+                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -419,16 +434,21 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="全局_随机巡逻">
-                  <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
-                  <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+                <ReactiveSequence name="全局_堡垒驻守">
                   <SubTree
-                    ID="RandomWaypointNavigate"
-                    random_goal_names="point1,point2,point3"
-                    random_avoid_repeat="true"
-                    random_reach_threshold="0.25"
-                    random_patrol_wait_duration="3.0"
-                    random_wait_time_threshold="0"
+                    ID="FortressHold"
+                    fortress_goal_name="fortress"
+                    fortress_enemy_goal_name="init"
+                    fortress_arrive_threshold="0.25"
+                    fortress_hold_exit_threshold="0.30"
+                    fortress_move_posture="3"
+                    fortress_hold_posture="3"
+                    fortress_wait_duration="0.5"
+                    fortress_move_message="[Fallback] 不需要打符，回堡垒点位持续驻守"
+                    fortress_enemy_move_message="[Fallback] 堡垒被敌方占领，转守基地前点位"
+                    rune_phase_key="in_rune_phase"
+                    fortress_active_key="uc_fortress_hold_active"
+                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
