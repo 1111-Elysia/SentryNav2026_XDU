@@ -5,6 +5,7 @@
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="map_command_received" value="false" type="bool"/>
       <Parallel name="打前哨站并驻守直到阶段切换" success_count="1" failure_count="1">
         <ReactiveSequence name="驻守前哨站点并打击">
           <SubTree
@@ -27,7 +28,10 @@
             <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
             <SetBlackboardValue key="{outpost_active_key}" value="1" type="int"/>
             <PrintNode message="{outpost_arrived_message}" throttle_ms="10000"/>
-            <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+            <EngageOutpost
+              timeout_ms="{outpost_timeout_ms}"
+              map_command_received_key="map_command_received"
+              destroyed_hold_message="[前哨站] 收到 0x0303，判定对方前哨站被推掉，关闭前哨站模式并驻守到阶段切换"/>
           </ReactiveSequence>
         </ReactiveSequence>
         <KeepRunningUntilFailure>

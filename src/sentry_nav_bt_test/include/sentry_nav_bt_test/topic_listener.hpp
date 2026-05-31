@@ -30,6 +30,7 @@
 #include "rm_referee_msgs/msg/power_heat_data.hpp"
 #include "rm_referee_msgs/msg/hurt_data.hpp"
 #include "rm_referee_msgs/msg/event_data.hpp"
+#include "rm_referee_msgs/msg/map_command.hpp"
 
 #include <geometry_msgs/msg/twist.hpp>
 #include "sentry_nav_bt_test/center_hold_vw_controller.hpp"
@@ -184,6 +185,8 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("fortress_gain_point_occupancy_status", 0);
             blackboard_->set<int>("outpost_gain_point_occupancy_status", 0);
             blackboard_->set<int>("base_gain_point_occupied", 0);
+            blackboard_->set<bool>("map_command_received", false);
+            blackboard_->set<int>("enemy_outpost_destroyed_by_map_command", 0);
             blackboard_->set<bool>("sentry_info_received", false);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
@@ -292,6 +295,27 @@ namespace sentry_nav_bt_test
                         "黑板更新: '%s' 从话题 '%s'",
                         "robot_pos",
                         "/rm_referee/robot_pos");
+                });
+
+            // 订阅选手端小地图交互数据（0x0303）。收到任意一帧即认为有小地图标记。
+            this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::MapCommand>(
+                "/rm_referee/map_command",
+                [this](const rm_referee_msgs::msg::MapCommand::SharedPtr msg, BT::Blackboard::Ptr bb)
+                {
+                    const rclcpp::Time now_ros = node_->now();
+
+                    bb->set("map_command", *msg);
+                    bb->set("map_command_received", true);
+
+                    RCLCPP_INFO_ONCE(
+                        node_->get_logger(),
+                        "收到 0x0303 小地图交互包: stamp=%.3f, x=%.2f, y=%.2f, key=%u, target_robot_id=%u, cmd_source=%u",
+                        now_ros.seconds(),
+                        msg->target_position_x,
+                        msg->target_position_y,
+                        static_cast<unsigned>(msg->cmd_keyboard),
+                        static_cast<unsigned>(msg->target_robot_id),
+                        static_cast<unsigned>(msg->cmd_source));
                 });
 
             // 订阅哨兵信息（0x020D）
