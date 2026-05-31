@@ -50,6 +50,9 @@ private:
   GoalStatus evaluateGoalStatus_();
   void sendGoal_();
   void cancelGoal_(const char *reason);
+  bool tryCancelGoal_(
+    const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle,
+    const char *reason);
 
   rclcpp::Node::SharedPtr node_;
   rclcpp_action::Client<NavigateToPose>::SharedPtr client_;

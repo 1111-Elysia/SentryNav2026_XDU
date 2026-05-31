@@ -1,6 +1,7 @@
 #include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
 
 #include <cmath>
+#include <exception>
 
 #include "sentry_nav_bt_test/blackboard_utils.hpp"
 
@@ -243,7 +244,7 @@ void ReliableNavigateToPose::sendGoal_()
     {
       if (goal_id != active_goal_id_) {
         if (handle) {
-          client_->async_cancel_goal(handle);
+          tryCancelGoal_(handle, "stale_goal_response");
         }
         RCLCPP_DEBUG(
           node_->get_logger(),
@@ -255,7 +256,7 @@ void ReliableNavigateToPose::sendGoal_()
 
       if (send_id != active_send_id_) {
         if (handle) {
-          client_->async_cancel_goal(handle);
+          tryCancelGoal_(handle, "stale_send_response");
           RCLCPP_DEBUG(
             node_->get_logger(),
             "[ReliableNavigate] 取消过期已接收目标%s%s%s, send_id=%lu current=%lu",
@@ -283,7 +284,12 @@ void ReliableNavigateToPose::sendGoal_()
 
       if (cancel_requested_) {
         canceled_goal_id_ = goal_id;
-        client_->async_cancel_goal(handle);
+        if (!tryCancelGoal_(
+            handle,
+            pending_cancel_reason_.empty() ? "cancel_requested" : pending_cancel_reason_.c_str()))
+        {
+          cancel_requested_ = false;
+        }
         RCLCPP_INFO(
           node_->get_logger(),
           "[ReliableNavigate] 目标已接收但当前请求已取消%s%s%s, reason=%s",
@@ -419,6 +425,40 @@ void ReliableNavigateToPose::sendGoal_()
     goal_id);
 }
 
+bool ReliableNavigateToPose::tryCancelGoal_(
+  const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle,
+  const char *reason)
+{
+  if (!client_ || !handle) {
+    return false;
+  }
+
+  try {
+    client_->async_cancel_goal(handle);
+    return true;
+  } catch (const rclcpp_action::exceptions::UnknownGoalHandleError &ex) {
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "[ReliableNavigate] 取消目标时 goal handle 已失效%s%s%s, reason=%s, detail=%s",
+      goal_name_.empty() ? "" : "[",
+      goal_name_.empty() ? "" : goal_name_.c_str(),
+      goal_name_.empty() ? "" : "]",
+      reason ? reason : "",
+      ex.what());
+  } catch (const std::exception &ex) {
+    RCLCPP_ERROR(
+      node_->get_logger(),
+      "[ReliableNavigate] 取消目标失败%s%s%s, reason=%s, detail=%s",
+      goal_name_.empty() ? "" : "[",
+      goal_name_.empty() ? "" : goal_name_.c_str(),
+      goal_name_.empty() ? "" : "]",
+      reason ? reason : "",
+      ex.what());
+  }
+
+  return false;
+}
+
 void ReliableNavigateToPose::cancelGoal_(const char *reason)
 {
   canceled_goal_id_ = active_goal_id_;
@@ -426,7 +466,9 @@ void ReliableNavigateToPose::cancelGoal_(const char *reason)
   pending_cancel_reason_ = reason ? reason : "";
 
   if (client_ && goal_handle_) {
-    client_->async_cancel_goal(goal_handle_);
+    if (!tryCancelGoal_(goal_handle_, reason)) {
+      cancel_requested_ = false;
+    }
     RCLCPP_WARN(
       node_->get_logger(),
       "[ReliableNavigate] 取消当前目标%s%s%s, reason=%s",
