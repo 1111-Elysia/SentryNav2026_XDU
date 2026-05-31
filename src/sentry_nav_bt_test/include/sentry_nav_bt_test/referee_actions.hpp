@@ -278,16 +278,21 @@ namespace sentry_nav_bt_test
         // 确保打前哨站所需输出已经按顺序打开；已打开的输出不会重复发布。
         bool ensureEngageOutputs();
         void cleanupOutputs();
+        bool hasMapCommandReceived() const;
         void setOutpostOutcome(bool success, const std::string &result) const;
 
         rclcpp::Node::SharedPtr node_;
         std::shared_ptr<ControlTopicPublishers> control_publishers_;
 
         int timeout_ms_{45000};
+        std::string map_command_received_key_{"map_command_received"};
+        std::string destroyed_hold_message_{
+            "EngageOutpost: 收到 0x0303，关闭前哨站模式并驻守到时间窗结束"};
         std::chrono::steady_clock::time_point start_time_{};
         bool scan_mode_disabled_{false};
         bool yaw_controller_triggered_{false};
         bool outpost_mode_enabled_{false};
+        bool enemy_outpost_destroyed_{false};
     };
 
 } // namespace sentry_nav_bt_test
