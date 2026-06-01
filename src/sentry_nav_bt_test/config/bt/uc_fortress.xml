@@ -130,8 +130,11 @@
                 <Sequence name="前期_小符_Phase1">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="390"/>
                   <SubTree
-                    ID="RuneTask"
+                    ID="RuneTaskViaPoint"
                     rune_type="small"
+                    rune_via_goal_name="myhero"
+                    rune_via_reach_threshold="0.25"
+                    rune_via_start_message="[Phase 1 | 7:00-6:30] 先经由 myhero 减速点，再前往小符点位"
                     rune_goal_name="small_rune_point"
                     rune_reach_threshold="0.10"
                     rune_move_posture="{uc_normal_posture}"

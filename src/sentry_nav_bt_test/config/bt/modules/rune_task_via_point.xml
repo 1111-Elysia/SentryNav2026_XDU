@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="RuneTaskViaPoint">
+    <Sequence name="经由减速点的能量机关任务">
+      <Fallback name="符任务允许">
+        <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+        <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
+        <Sequence>
+          <Fallback name="能量机关未激活">
+            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
+          </Fallback>
+          <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+        </Sequence>
+      </Fallback>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
+      <PrintNode message="{rune_via_start_message}"/>
+      <GoalSelector goal_name="{rune_via_goal_name}" goal="{rune_via_goal}"/>
+      <PublishControllerName controller_name="FollowPath"/>
+      <ReactiveSequence name="前往减速点并维持对应姿态">
+        <MaintainSentryPosture mode="{rune_move_posture}"/>
+        <ReliableNavigateToPose
+          goal="{rune_via_goal}"
+          goal_name="{rune_via_goal_name}"
+          reach_threshold="{rune_via_reach_threshold}"
+          resend_interval="{nav_resend_interval}"
+          response_timeout="{nav_response_timeout}"
+          result_retry_delay="{nav_result_retry_delay}"/>
+      </ReactiveSequence>
+      <PrintNode message="{rune_start_message}"/>
+      <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
+      <PublishControllerName controller_name="FollowPath"/>
+      <ReactiveSequence name="前往符点并维持对应姿态">
+        <MaintainSentryPosture mode="{rune_move_posture}"/>
+        <ReliableNavigateToPose
+          goal="{rune_goal}"
+          goal_name="{rune_goal_name}"
+          reach_threshold="{rune_reach_threshold}"
+          resend_interval="{nav_resend_interval}"
+          response_timeout="{nav_response_timeout}"
+          result_retry_delay="{nav_result_retry_delay}"/>
+      </ReactiveSequence>
+      <PrintNode message="{rune_arrived_message}"/>
+      <ReactiveSequence name="打符并维持打符标志">
+        <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
+        <SetBlackboardValue key="{rune_phase_key}" value="1" type="int"/>
+        <EngageRune
+          rune_type="{rune_type}"
+          posture="{rune_posture}"
+          timeout_ms="{rune_timeout_ms}"
+          request_interval_ms="{rune_request_interval_ms}"/>
+      </ReactiveSequence>
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <PrintNode message="{rune_done_message}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>
