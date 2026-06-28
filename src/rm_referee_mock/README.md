@@ -1,6 +1,6 @@
 # rm_referee_mock
 
-这是 `rm_referee_ros2` 所属的一个子模块，提供了一些用于测试的 Mock 组件，用来模拟裁判系统的数据发送行为，方便在没有真实裁判系统或者不便搭建环境的情况下进行开发和测试。当前文档以《RoboMaster 2026 机甲大师高校系列赛通信协议 V1.3.1（20260519）》为准。
+这是 `rm_referee_ros2` 所属的一个子模块，提供了一些用于测试的 Mock 组件，用来模拟裁判系统的数据发送行为，方便在没有真实裁判系统或者不便搭建环境的情况下进行开发和测试。当前文档以《RoboMaster 2026 机甲大师高校系列赛通信协议 V2.0.0（20260626）》为准。
 
 目前为止所有的 Mock 组件均以 rqt 插件的形式实现，编译并 source 工作空间后，在 rqt 中启动对应的插件即可使用。
 
@@ -27,14 +27,11 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 - 影响：`sentry_nav_bt_test` 默认只订阅 `/rm_referee/robot_pos`，所以 TF 以外的裁判系统位置链路不会自动接上
 - 解决方案：联调 UC 树时把 `FakeLocation` 的话题前缀手动改成 `/rm_referee`
 
-### 2. `MatchControl` 的姿态冷却默认是 5 秒，不适合直接压测 UC 树
+### 2. `MatchControl` 按规则执行 5 秒姿态冷却
 
-- 现状：mock 在处理 `/rm_referee/tx` 的姿态切换时，默认加了 `5.0 s` 冷却
-- 影响：`uc.xml` 里很多 `SetSentryPosture` 节点超时只有 `300 ms`，mock 会把本来正常的姿态切换请求表现成“超时失败”
-- 解决方案：
-  - 用 mock 联调 UC 时，不要直接拿“姿态切换失败”判断策略错了
-  - 先单独验证 `/rm_referee/tx -> /rm_referee/sentry_info.current_posture` 闭环延迟
-  - 如果后面要做严格联调，建议让 mock 冷却时间和 BT 超时参数对齐
+- mock 接收并解析请求后，`Tx.response.ok` 表示链路处理成功；冷却中或强化额度耗尽时，姿态字段会在语义层被拒绝。
+- 是否切换成功应以随后发布的 `/rm_referee/sentry_info` 为准。
+- UI 的“强制设置”仅用于构造测试场景，可以绕过冷却，但不会补充已经耗尽的强化额度。
 
 ### 3. `/rm_referee/tx` 的 `response.ok` 只是链路层成功，不是语义层成功
 
@@ -85,7 +82,7 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 手动控制比赛数据发布。当前可以控制发布的数据包括：
 
 - `0x0001` `rm_referee_msgs/GameStatus`：比赛状态
-- `0x0003` `rm_referee_msgs/GameRobotHP`：己方机器人血量
+- `0x0003` `rm_referee_msgs/GameRobotHP`：己方机器人、双方建筑血量和伤害差
 - `0x0101` `rm_referee_msgs/EventData`：场地事件数据
 - `0x0201` `rm_referee_msgs/RobotStatus`：本机器人状态
 - `0x0202` `rm_referee_msgs/PowerHeatData`：缓冲能量和射击热量
@@ -93,6 +90,14 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 - `0x0208` `rm_referee_msgs/ProjectileAllowance`：允许发弹量和剩余金币
 - `0x0209` `rm_referee_msgs/RFIDStatus`：RFID 模块状态
 - `0x020D` `rm_referee_msgs/SentryInfo`：哨兵兑换、复活、姿态与能量机关激活状态
+
+姿态规则模拟：
+
+- 支持普通进攻/防御/移动和强化进攻/防御/移动共六种请求。
+- 三种普通姿态各有独立的 180 秒弱化前累计时间；三种强化姿态各有独立的 15 秒累计时间。
+- 强化姿态期间会同时消耗对应普通姿态时间，强化额度归零后自动回到对应普通姿态。
+- UI 可直接编辑六个时间窗，并提供“强化进攻剩余 2s”“耗尽当前强化”等快速场景。
+- “敌方前哨站归零”“模拟射击：热量 +10”和“连续受击 3 次”用于测试行为树结束条件、热量姿态选择和受击保持逻辑。
 
 可以接收并回显的发送数据：
 
@@ -124,6 +129,6 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 需要注意两点：
 
 - `/rm_referee/tx` 的返回值更偏向“请求被 mock 正常解析”，不是最终状态确认
-- 当前 mock 内置了姿态切换冷却，更适合做协议联调，不适合直接当作“实车姿态执行器”的等价替身
+- 当前 mock 按规则内置姿态切换冷却和强化累计计时，更适合做裁判系统协议与策略联调，不等价于实车执行器响应时间
 
 如果有需要，可以继续扩展更多比赛状态的控制项。

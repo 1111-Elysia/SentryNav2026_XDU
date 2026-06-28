@@ -13,6 +13,16 @@
           <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
         </Sequence>
       </Fallback>
+      <Fallback name="打符前弹量足够或触发回补">
+        <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="100"/>
+        <ForceFailure>
+          <Sequence name="打符前弹量不足_先回补">
+            <SetBlackboardValue key="uc_supply_goal_index" value="0" type="int"/>
+            <SetBlackboardValue key="uc_supply_active" value="1" type="int"/>
+            <PrintNode message="[打符] 17mm允许发弹量不足100，先回补" throttle_ms="2000"/>
+          </Sequence>
+        </ForceFailure>
+      </Fallback>
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{rune_start_message}"/>

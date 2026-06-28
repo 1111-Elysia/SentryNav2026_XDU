@@ -219,7 +219,7 @@ MaintainSentryPosture::MaintainSentryPosture(const std::string &name, const BT::
 BT::PortsList MaintainSentryPosture::providedPorts()
 {
     return {
-        BT::InputPort<int>("mode", "1:Attack, 2:Defend, 3:Move"),
+        BT::InputPort<int>("mode", "1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove"),
         BT::InputPort<int>("cooldown_ms", 5000, "全局姿态切换冷却时间(ms)，冷却内不重复发同类请求"),
         BT::InputPort<bool>("force", false, "忽略姿态切换冷却，立即发送本次姿态请求")};
 }
@@ -236,6 +236,30 @@ BT::NodeStatus MaintainSentryPosture::tick()
     getInput("force", force);
 
     if (config().blackboard) {
+        if (target_mode_int >= 4 && target_mode_int <= 6) {
+            bool sentry_info_received = false;
+            const char *remaining_keys[] = {
+                "enhanced_attack_posture_remaining_s",
+                "enhanced_defense_posture_remaining_s",
+                "enhanced_move_posture_remaining_s"};
+            int remaining_s = -1;
+            const char *remaining_key = remaining_keys[target_mode_int - 4];
+            if (config().blackboard->get("sentry_info_received", sentry_info_received) &&
+                sentry_info_received &&
+                getBlackboardIntLike(config().blackboard, remaining_key, remaining_s) &&
+                remaining_s <= 0) {
+                const int requested_mode = target_mode_int;
+                target_mode_int -= 3;
+                RCLCPP_INFO_THROTTLE(
+                    node_->get_logger(),
+                    *node_->get_clock(),
+                    5000,
+                    "MaintainSentryPosture: 强化姿态 %d 已耗尽，自动维持对应普通姿态 %d",
+                    requested_mode,
+                    target_mode_int);
+            }
+        }
+
         int bb_cooldown_ms = cooldown_ms;
         if (getBlackboardIntLike(config().blackboard, kPostureSwitchCooldownKey, bb_cooldown_ms)) {
             cooldown_ms = bb_cooldown_ms;
@@ -265,8 +289,10 @@ BT::NodeStatus MaintainSentryPosture::tick()
     }
 
     int current_real_posture = -1;
-    if (getBlackboardIntLike(config().blackboard, "current_posture", current_real_posture) &&
-        current_real_posture == target_mode_int) {
+    if (!getBlackboardIntLike(config().blackboard, "current_effective_posture", current_real_posture)) {
+        getBlackboardIntLike(config().blackboard, "current_posture", current_real_posture);
+    }
+    if (current_real_posture == target_mode_int) {
         if (last_confirmed_mode_ != target_mode_int) {
             RCLCPP_INFO(
                 node_->get_logger(),
@@ -303,7 +329,7 @@ BT::NodeStatus MaintainSentryPosture::tick()
     }
 
     if (last_pending &&
-        current_real_posture >= 1 && current_real_posture <= 3 &&
+        current_real_posture >= 1 && current_real_posture <= 6 &&
         current_real_posture == last_target_mode) {
         updatePostureRequestStatus(
             config().blackboard,
@@ -380,6 +406,75 @@ BT::NodeStatus MaintainSentryPosture::tick()
             1000,
             "MaintainSentryPosture 发送姿态 %d 失败，将在后续 tick 中继续重试",
             target_mode_int);
+    }
+
+    return BT::NodeStatus::SUCCESS;
+}
+
+ResolveSentryPosture::ResolveSentryPosture(
+    const std::string &name,
+    const BT::NodeConfig &config)
+    : BT::SyncActionNode(name, config)
+{
+}
+
+BT::PortsList ResolveSentryPosture::providedPorts()
+{
+    return {
+        BT::InputPort<int>("requested_mode", "请求姿态，1-3 为普通姿态，4-6 为强化姿态"),
+        BT::OutputPort<int>("resolved_mode", "强化窗口耗尽后回退得到的实际目标姿态")};
+}
+
+BT::NodeStatus ResolveSentryPosture::tick()
+{
+    int requested_mode = 0;
+    if (!getInput("requested_mode", requested_mode) ||
+        requested_mode < 1 || requested_mode > 6) {
+        RCLCPP_ERROR(
+            rclcpp::get_logger("ResolveSentryPosture"),
+            "请求姿态必须在 1-6 范围内，当前值: %d",
+            requested_mode);
+        return BT::NodeStatus::FAILURE;
+    }
+
+    int resolved_mode = requested_mode;
+    if (requested_mode >= 4 && config().blackboard) {
+        bool sentry_info_received = false;
+        const char *remaining_key = nullptr;
+        switch (requested_mode) {
+            case 4:
+                remaining_key = "enhanced_attack_posture_remaining_s";
+                break;
+            case 5:
+                remaining_key = "enhanced_defense_posture_remaining_s";
+                break;
+            case 6:
+                remaining_key = "enhanced_move_posture_remaining_s";
+                break;
+            default:
+                break;
+        }
+
+        int remaining_s = -1;
+        if (config().blackboard->get("sentry_info_received", sentry_info_received) &&
+            sentry_info_received && remaining_key &&
+            getBlackboardIntLike(config().blackboard, remaining_key, remaining_s) &&
+            remaining_s <= 0) {
+            resolved_mode = requested_mode - 3;
+        }
+    }
+
+    setOutput("resolved_mode", resolved_mode);
+    if (requested_mode != last_requested_mode_ || resolved_mode != last_resolved_mode_) {
+        if (resolved_mode != requested_mode) {
+            RCLCPP_INFO(
+                rclcpp::get_logger("ResolveSentryPosture"),
+                "强化姿态 %d 的累计时长已耗尽，目标回退为普通姿态 %d",
+                requested_mode,
+                resolved_mode);
+        }
+        last_requested_mode_ = requested_mode;
+        last_resolved_mode_ = resolved_mode;
     }
 
     return BT::NodeStatus::SUCCESS;

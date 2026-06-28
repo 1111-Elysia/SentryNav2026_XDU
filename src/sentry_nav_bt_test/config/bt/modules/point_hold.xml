@@ -8,7 +8,10 @@
       <Fallback name="点位驻守维持">
         <ReactiveSequence name="已在驻守半径内">
           <CheckGoalReached goal="{point_hold_goal}" threshold="{point_hold_exit_threshold}"/>
-          <MaintainSentryPosture mode="{point_hold_posture}"/>
+          <ResolveSentryPosture
+            requested_mode="{point_hold_posture}"
+            resolved_mode="{point_hold_effective_posture}"/>
+          <MaintainSentryPosture mode="{point_hold_effective_posture}"/>
           <Wait wait_duration="{point_hold_wait_duration}"/>
         </ReactiveSequence>
         <Sequence name="回驻守点位">

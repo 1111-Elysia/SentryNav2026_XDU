@@ -157,12 +157,12 @@
 
   <TreeNodesModel>
     <Action ID="SetSentryPosture" editable="true">
-      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove</input_port>
       <input_port name="timeout_ms" type="int">姿态切换等待超时</input_port>
       <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
     </Action>
     <Action ID="MaintainSentryPosture" editable="true">
-      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove</input_port>
       <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
       <input_port name="force" type="bool">忽略姿态切换冷却</input_port>
     </Action>
@@ -184,8 +184,6 @@
     </Action>
     <Action ID="EngageOutpost" editable="true">
       <input_port name="timeout_ms"/>
-      <input_port name="map_command_received_key"/>
-      <input_port name="destroyed_hold_message"/>
     </Action>
     <Condition ID="CheckCondition" editable="true">
       <input_port name="key_name"/>

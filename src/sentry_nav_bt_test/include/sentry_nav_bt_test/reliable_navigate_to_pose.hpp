@@ -63,6 +63,7 @@ private:
   double resend_interval_{0.50};
   double response_timeout_{1.00};
   double result_retry_delay_{0.50};
+  int log_throttle_ms_{0};
   std::string success_condition_key_;
   std::string success_condition_comparison_{"eq"};
   double success_condition_threshold_{1.0};

@@ -130,11 +130,14 @@ namespace rm_protocol {
     const uint16_t ID_RED_SENTRY = 7;
     const uint16_t ID_BLUE_SENTRY = 107;
 
-    // value 的 bit21-22 表示哨兵姿态
+    // value 的 bit21-23 表示哨兵姿态，4/5/6 为强化姿态。
     enum class SentryPosture : uint32_t {
         ATTACK = 1,
         DEFEND = 2,
-        MOVE = 3
+        MOVE = 3,
+        ENHANCED_ATTACK = 4,
+        ENHANCED_DEFEND = 5,
+        ENHANCED_MOVE = 6
     };
 
     // 0x0120 value 的 bit0，表示发送给裁判系统的“确认免费复活”指令位
@@ -157,14 +160,14 @@ public:
         uint8_t remote_hp_exchange_count = 0) {
         uint32_t decision_val = 0;
 
-        // 决策位：复活 bit0-1，补血点补弹 bit2-12，远程补给 bit13-20，姿态 bit21-22，激活能量机关 bit23
+        // 决策位：复活 bit0-1，补血点补弹 bit2-12，远程补给 bit13-20，姿态 bit21-23，激活能量机关 bit24
         decision_val |= (static_cast<uint32_t>(exchange_projectile) & 0x7FFu) << 2;
         decision_val |= (static_cast<uint32_t>(remote_projectile_exchange_count) & 0x0Fu) << 13;
         decision_val |= (static_cast<uint32_t>(remote_hp_exchange_count) & 0x0Fu) << 17;
-        decision_val |= (static_cast<uint32_t>(posture) & 0x3) << 21;
+        decision_val |= (static_cast<uint32_t>(posture) & 0x7u) << 21;
 
         if (activate_energy) {
-            decision_val |= (1 << 23);
+            decision_val |= (1u << 24);
         }
 
         if (confirm_resurrection) {

@@ -213,7 +213,8 @@ BT::PortsList PublishControllerName::providedPorts()
 {
   return {
     BT::InputPort<std::string>("controller_name", "Nav2 controller plugin id"),
-    BT::InputPort<std::string>("topic_name", "/controller_name", "ControllerSelector topic")
+    BT::InputPort<std::string>("topic_name", "/controller_name", "ControllerSelector topic"),
+    BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流")
   };
 }
 
@@ -255,8 +256,12 @@ BT::NodeStatus PublishControllerName::tick()
     config().blackboard->set("last_nav_controller_name", controller_name);
   }
 
-  RCLCPP_INFO(
+  int log_throttle_ms = 0;
+  getInput("log_throttle_ms", log_throttle_ms);
+  RCLCPP_INFO_THROTTLE(
     logger_,
+    *node_->get_clock(),
+    log_throttle_ms,
     "已发布 controller_name=%s -> %s",
     controller_name.c_str(),
     topic_name.c_str());

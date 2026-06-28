@@ -90,7 +90,7 @@ BT::PortsList EngageRune::providedPorts()
         BT::InputPort<std::string>("rune_type", "small", "small 或 large"),
         BT::InputPort<int>("posture", 0, "打符时保持的姿态 (0 表示自动读取当前姿态)"),
         BT::InputPort<int>("timeout_ms", 45000, "整段打符流程的超时时间"),
-        BT::InputPort<int>("request_interval_ms", 1000, "重复发送 0x0120 bit23 的最小间隔")};
+        BT::InputPort<int>("request_interval_ms", 1000, "重复发送 0x0120 bit24 的最小间隔")};
 }
 
 bool EngageRune::initUtils()
@@ -479,7 +479,7 @@ BT::NodeStatus EngageRune::onRunning()
     if (send_packet(packet)) {
         RCLCPP_INFO(
             node_->get_logger(),
-            "EngageRune: 已按顺序最后发送 0x0120 bit23，请求%s进入正在激活状态",
+            "EngageRune: 已按顺序最后发送 0x0120 bit24，请求%s进入正在激活状态",
             runeTypeName());
     }
 
@@ -499,21 +499,78 @@ EngageOutpost::EngageOutpost(const std::string &name, const BT::NodeConfig &conf
         throw std::runtime_error("Missing 'node' in blackboard");
     }
 
+    client_ = node_->create_client<rm_referee_msgs::srv::Tx>("/rm_referee/tx");
     control_publishers_ = std::make_shared<ControlTopicPublishers>(node_);
+}
+
+bool EngageOutpost::initUtils()
+{
+    if (utils_) {
+        return true;
+    }
+
+    uint8_t robot_id = 0;
+    if (config().blackboard->get("robot_id", robot_id) && robot_id != 0) {
+        utils_ = std::make_shared<SentryRefereeUtils>(robot_id);
+        return true;
+    }
+    return false;
+}
+
+bool EngageOutpost::send_packet(
+    const std::vector<uint8_t> &data,
+    std::chrono::milliseconds response_timeout)
+{
+    if (!client_->service_is_ready()) {
+        if (config().blackboard) {
+            config().blackboard->set("last_referee_tx_ok", false);
+        }
+        RCLCPP_WARN_THROTTLE(
+            node_->get_logger(),
+            *node_->get_clock(),
+            1000,
+            "Tx.srv 未就绪，无法发送前哨站强化姿态请求");
+        return false;
+    }
+
+    auto request = std::make_shared<rm_referee_msgs::srv::Tx::Request>();
+    request->header.stamp = node_->now();
+    request->data = data;
+
+    auto future = client_->async_send_request(request);
+    const auto future_status =
+        rclcpp::spin_until_future_complete(node_, future, response_timeout);
+
+    bool ok = false;
+    if (future_status != rclcpp::FutureReturnCode::SUCCESS) {
+        RCLCPP_WARN(
+            node_->get_logger(),
+            "Tx.srv 调用超时或被中断，data_size=%zu",
+            data.size());
+    } else {
+        try {
+            auto response = future.get();
+            ok = response && response->ok;
+        } catch (const std::exception &e) {
+            RCLCPP_WARN(node_->get_logger(), "Tx.srv 调用异常: %s", e.what());
+        }
+    }
+
+    if (config().blackboard) {
+        config().blackboard->set("last_referee_tx_ok", ok);
+    }
+
+    if (!ok) {
+        RCLCPP_WARN(node_->get_logger(), "Tx.srv 返回失败，data_size=%zu", data.size());
+    }
+
+    return ok;
 }
 
 BT::PortsList EngageOutpost::providedPorts()
 {
     return {
-        BT::InputPort<int>("timeout_ms", 45000, "整段打前哨站流程的超时时间"),
-        BT::InputPort<std::string>(
-            "map_command_received_key",
-            "map_command_received",
-            "0x0303 小地图交互收包标志黑板键"),
-        BT::InputPort<std::string>(
-            "destroyed_hold_message",
-            "EngageOutpost: 收到 0x0303，关闭前哨站模式并驻守到时间窗结束",
-            "收到 0x0303 后的日志")};
+        BT::InputPort<int>("timeout_ms", 45000, "整段打前哨站流程的超时时间")};
 }
 
 bool EngageOutpost::publishScanMode(bool enabled)
@@ -531,8 +588,67 @@ bool EngageOutpost::publishOutpostMode(bool enabled)
     return control_publishers_ && control_publishers_->publishOutpostMode(enabled);
 }
 
+bool EngageOutpost::requestOutpostAttackPosture()
+{
+    if (outpost_attack_posture_requested_) {
+        return true;
+    }
+
+    if (!initUtils()) {
+        RCLCPP_WARN_THROTTLE(
+            node_->get_logger(),
+            *node_->get_clock(),
+            1000,
+            "EngageOutpost: robot_id 尚未就绪，暂不能请求强化进攻姿态");
+        return false;
+    }
+
+    bool sentry_info_received = false;
+    int enhanced_remaining_s = -1;
+    const bool enhanced_attack_available =
+        !config().blackboard ||
+        !config().blackboard->get("sentry_info_received", sentry_info_received) ||
+        !sentry_info_received ||
+        !getBlackboardIntLike(
+            config().blackboard,
+            "enhanced_attack_posture_remaining_s",
+            enhanced_remaining_s) ||
+        enhanced_remaining_s > 0;
+    const auto target_posture = enhanced_attack_available
+        ? rm_protocol::SentryPosture::ENHANCED_ATTACK
+        : rm_protocol::SentryPosture::ATTACK;
+
+    const auto feedback = getSentryDecisionFeedback(config().blackboard);
+    auto packet = utils_->buildSentryCmdPacket(
+        target_posture,
+        false,
+        false,
+        false,
+        feedback.exchanged_ammo,
+        feedback.remote_projectile_exchange_count,
+        feedback.remote_hp_exchange_count);
+
+    if (!send_packet(packet)) {
+        return false;
+    }
+
+    outpost_attack_posture_requested_ = true;
+    if (enhanced_attack_available) {
+        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: 已请求强化进攻姿态");
+    } else {
+        RCLCPP_INFO(
+            node_->get_logger(),
+            "EngageOutpost: 强化进攻姿态累计时长已耗尽，改为请求普通进攻姿态");
+    }
+    return true;
+}
+
 bool EngageOutpost::ensureEngageOutputs()
 {
+    if (!requestOutpostAttackPosture()) {
+        return false;
+    }
+
     if (!scan_mode_disabled_) {
         if (!publishScanMode(false)) {
             return false;
@@ -560,6 +676,15 @@ bool EngageOutpost::ensureEngageOutputs()
     return true;
 }
 
+bool EngageOutpost::isEnemyOutpostDestroyed() const
+{
+    int enemy_outpost_hp = 0;
+    if (!getBlackboardIntLike(config().blackboard, "enemy_outpost_hp", enemy_outpost_hp)) {
+        return false;
+    }
+    return enemy_outpost_hp <= 0;
+}
+
 void EngageOutpost::cleanupOutputs()
 {
     if (outpost_mode_enabled_) {
@@ -575,16 +700,6 @@ void EngageOutpost::cleanupOutputs()
     yaw_controller_triggered_ = false;
 }
 
-bool EngageOutpost::hasMapCommandReceived() const
-{
-    int map_command_received = 0;
-    if (!getBlackboardIntLike(config().blackboard, map_command_received_key_, map_command_received)) {
-        return false;
-    }
-
-    return map_command_received != 0;
-}
-
 void EngageOutpost::setOutpostOutcome(bool success, const std::string &result) const
 {
     if (!config().blackboard) {
@@ -598,42 +713,30 @@ void EngageOutpost::setOutpostOutcome(bool success, const std::string &result) c
 BT::NodeStatus EngageOutpost::onStart()
 {
     getInput("timeout_ms", timeout_ms_);
-    getInput("map_command_received_key", map_command_received_key_);
-    getInput("destroyed_hold_message", destroyed_hold_message_);
     if (timeout_ms_ < 1) {
         timeout_ms_ = 1;
-    }
-    if (map_command_received_key_.empty()) {
-        map_command_received_key_ = "map_command_received";
     }
 
     start_time_ = std::chrono::steady_clock::now();
     scan_mode_disabled_ = false;
     yaw_controller_triggered_ = false;
     outpost_mode_enabled_ = false;
-    enemy_outpost_destroyed_ = false;
+    outpost_attack_posture_requested_ = false;
     setOutpostOutcome(false, "running");
-    if (config().blackboard) {
-        config().blackboard->set("enemy_outpost_destroyed_by_map_command", 0);
-    }
 
     RCLCPP_INFO(
         node_->get_logger(),
         "EngageOutpost: 进入打前哨站流程，等待按顺序发送 scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true");
 
-    if (hasMapCommandReceived()) {
-        enemy_outpost_destroyed_ = true;
-        setOutpostOutcome(true, "enemy_outpost_destroyed");
-        if (config().blackboard) {
-            config().blackboard->set("enemy_outpost_destroyed_by_map_command", 1);
-        }
-        RCLCPP_INFO(node_->get_logger(), "%s", destroyed_hold_message_.c_str());
-        return BT::NodeStatus::RUNNING;
+    if (isEnemyOutpostDestroyed()) {
+        setOutpostOutcome(true, "enemy_outpost_destroyed_by_hp");
+        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: enemy_outpost_hp<=0，对方前哨站已被击毁");
+        return BT::NodeStatus::SUCCESS;
     }
 
     if (!ensureEngageOutputs()) {
         cleanupOutputs();
-        return BT::NodeStatus::FAILURE;
+        return BT::NodeStatus::RUNNING;
     }
 
     return BT::NodeStatus::RUNNING;
@@ -647,19 +750,11 @@ BT::NodeStatus EngageOutpost::onRunning()
     const auto elapsed_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(now_tp - start_time_).count();
 
-    if (!enemy_outpost_destroyed_ && hasMapCommandReceived()) {
-        enemy_outpost_destroyed_ = true;
-        setOutpostOutcome(true, "enemy_outpost_destroyed");
-        if (config().blackboard) {
-            config().blackboard->set("enemy_outpost_destroyed_by_map_command", 1);
-        }
+    if (isEnemyOutpostDestroyed()) {
+        setOutpostOutcome(true, "enemy_outpost_destroyed_by_hp");
         cleanupOutputs();
-        RCLCPP_INFO(node_->get_logger(), "%s", destroyed_hold_message_.c_str());
-        return BT::NodeStatus::RUNNING;
-    }
-
-    if (enemy_outpost_destroyed_) {
-        return BT::NodeStatus::RUNNING;
+        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: enemy_outpost_hp<=0，对方前哨站已被击毁");
+        return BT::NodeStatus::SUCCESS;
     }
 
     if (elapsed_ms > timeout_ms_) {
@@ -671,7 +766,7 @@ BT::NodeStatus EngageOutpost::onRunning()
 
     if (!ensureEngageOutputs()) {
         cleanupOutputs();
-        return BT::NodeStatus::FAILURE;
+        return BT::NodeStatus::RUNNING;
     }
 
     return BT::NodeStatus::RUNNING;
@@ -679,11 +774,7 @@ BT::NodeStatus EngageOutpost::onRunning()
 
 void EngageOutpost::onHalted()
 {
-    if (enemy_outpost_destroyed_) {
-        setOutpostOutcome(true, "enemy_outpost_destroyed_hold_finished");
-    } else {
-        setOutpostOutcome(false, "halted");
-    }
+    setOutpostOutcome(false, "halted");
     cleanupOutputs();
 }
 

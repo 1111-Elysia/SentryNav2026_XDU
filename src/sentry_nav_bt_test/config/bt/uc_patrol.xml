@@ -24,25 +24,28 @@
       <KeepRunningUntilFailure>
         <Sequence name="开始比赛检测">
           <CheckCondition key_name="game_progress" comparison="lte" threshold="3"/>
-          <Fallback name="赛前状态复位">
-            <Sequence name="赛前状态已复位">
-              <CheckCondition key_name="uc_initialized" comparison="eq" threshold="0"/>
-              <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
-              <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
-              <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
-              <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
-              <CheckCondition key_name="uc_normal_posture" comparison="eq" threshold="3"/>
-            </Sequence>
-            <Sequence name="执行赛前复位">
-              <PrintNode message="[UC] 比赛未开始，重置局内状态"/>
+          <Fallback name="标记局内状态待初始化">
+            <CheckCondition key_name="uc_initialized" comparison="eq" threshold="0"/>
+            <Sequence name="清除局内初始化标记">
+              <PrintNode message="[UC] 比赛未开始，标记局内状态待初始化"/>
               <SetBlackboardValue key="uc_initialized" value="0" type="int"/>
-              <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
-              <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
-              <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
-              <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
-              <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
-              <SetBlackboardValue key="uc_fortress_goal_name" value="fortress" type="string"/>
             </Sequence>
+          </Fallback>
+          <Fallback name="赛前准备阶段">
+            <SubTree
+              ID="PrestartInitReturn"
+              game_progress_key="game_progress"
+              prepare_progress="1"
+              init_goal_name="init"
+              prestart_message="[UC] 准备时间，持续发送 init(0,0) 导航目标"
+              log_throttle_ms="2000"
+              controller_name="FollowPath"
+              reach_threshold="0.10"
+              nav_resend_interval="0.30"
+              nav_response_timeout="0.80"
+              nav_result_retry_delay="0.30"
+              _autoremap="1"/>
+            <CheckCondition key_name="game_progress" comparison="lte" threshold="3"/>
           </Fallback>
         </Sequence>
       </KeepRunningUntilFailure>
@@ -63,7 +66,7 @@
         </Fallback>
       </ForceFailure>
 
-      <Sequence name="主循环_Root">
+      <ReactiveSequence name="主循环_Root">
         <Sequence name="前置检查">
           <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
           <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
@@ -450,20 +453,24 @@
             </Parallel>
           </Sequence>
         </ReactiveFallback>
-      </Sequence>
+      </ReactiveSequence>
     </Fallback>
   </BehaviorTree>
 
   <TreeNodesModel>
     <Action ID="SetSentryPosture" editable="true">
-      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove</input_port>
       <input_port name="timeout_ms" type="int">姿态切换等待超时</input_port>
       <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
     </Action>
     <Action ID="MaintainSentryPosture" editable="true">
-      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move</input_port>
+      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove</input_port>
       <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
       <input_port name="force" type="bool">忽略姿态切换冷却</input_port>
+    </Action>
+    <Action ID="ResolveSentryPosture" editable="true">
+      <input_port name="requested_mode" type="int">请求姿态</input_port>
+      <output_port name="resolved_mode" type="int">强化窗口耗尽后的实际目标姿态</output_port>
     </Action>
     <Action ID="RequestActivateRune" editable="true">
       <input_port name="posture" type="int">请求时保持的姿态</input_port>
@@ -492,8 +499,6 @@
     </Action>
     <Action ID="EngageOutpost" editable="true">
       <input_port name="timeout_ms"/>
-      <input_port name="map_command_received_key"/>
-      <input_port name="destroyed_hold_message"/>
     </Action>
     <Condition ID="CheckCondition" editable="true">
       <input_port name="key_name"/>

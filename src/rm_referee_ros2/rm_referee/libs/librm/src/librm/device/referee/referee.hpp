@@ -33,6 +33,7 @@
 #include "protocol_new_v110.hpp"
 #include "protocol_new_v120.hpp"
 #include "protocol_new_v130.hpp"
+#include "protocol_new_v200.hpp"
 // implement and add more revisions here
 
 #include <cstring>

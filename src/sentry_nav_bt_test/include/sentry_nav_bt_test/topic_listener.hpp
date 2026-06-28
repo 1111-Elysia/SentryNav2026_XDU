@@ -186,7 +186,6 @@ namespace sentry_nav_bt_test
             blackboard_->set<int>("outpost_gain_point_occupancy_status", 0);
             blackboard_->set<int>("base_gain_point_occupied", 0);
             blackboard_->set<bool>("map_command_received", false);
-            blackboard_->set<int>("enemy_outpost_destroyed_by_map_command", 0);
             blackboard_->set<bool>("sentry_info_received", false);
             blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
             blackboard_->set<bool>("waypoint_now_valid", false);
@@ -231,9 +230,12 @@ namespace sentry_nav_bt_test
                     bb->set("ally_2_robot_hp", msg->ally_2_robot_hp);
                     bb->set("ally_3_robot_hp", msg->ally_3_robot_hp);
                     bb->set("ally_4_robot_hp", msg->ally_4_robot_hp);
+                    bb->set("damage_difference", msg->damage_difference);
                     bb->set("ally_7_robot_hp", msg->ally_7_robot_hp);
                     bb->set("ally_outpost_hp", msg->ally_outpost_hp); // 前哨站
                     bb->set("ally_base_hp", msg->ally_base_hp);       // 基地
+                    bb->set("enemy_outpost_hp", msg->enemy_outpost_hp);
+                    bb->set("enemy_base_hp", msg->enemy_base_hp);
                     RCLCPP_DEBUG(
                         node_->get_logger(),
                         "黑板更新: '%s' 从话题 '%s'",
@@ -343,6 +345,20 @@ namespace sentry_nav_bt_test
                     uint8_t current_posture = (raw_info_2 >> 12) & 0x03;
                     // Bit 14: 己方能量机关是否能够进入正在激活状态 (1=可激活)  需要先确认这个位是 1，才能发指令去激活
                     bool can_activate_rune = (raw_info_2 >> 14) & 0x01;
+                    // Bit 15: 当前姿态是否为强化姿态。
+                    bool current_posture_enhanced = (raw_info_2 >> 15) & 0x01;
+                    int current_effective_posture = static_cast<int>(current_posture);
+                    if (current_posture_enhanced && current_posture >= 1 && current_posture <= 3) {
+                        current_effective_posture += 3;
+                    }
+
+                    uint64_t raw_info_3 = msg->sentry_info_3;
+                    uint8_t attack_posture_remaining_s = raw_info_3 & 0xFF;
+                    uint8_t defense_posture_remaining_s = (raw_info_3 >> 8) & 0xFF;
+                    uint8_t move_posture_remaining_s = (raw_info_3 >> 16) & 0xFF;
+                    uint8_t enhanced_attack_posture_remaining_s = (raw_info_3 >> 32) & 0xFF;
+                    uint8_t enhanced_defense_posture_remaining_s = (raw_info_3 >> 40) & 0xFF;
+                    uint8_t enhanced_move_posture_remaining_s = (raw_info_3 >> 48) & 0xFF;
 
                     // 写入黑板
                     bb->set("exchanged_ammo", exchanged_ammo);
@@ -353,12 +369,32 @@ namespace sentry_nav_bt_test
                     bb->set("buy_resurrection_cost", buy_resurrection_cost);
 
                     bb->set("current_posture", static_cast<int>(current_posture));
+                    bb->set("current_posture_enhanced", current_posture_enhanced);
+                    bb->set("current_effective_posture", current_effective_posture);
                     bb->set("can_activate_rune", can_activate_rune);
+                    bb->set("sentry_info_3", raw_info_3);
+                    bb->set("attack_posture_remaining_s", static_cast<int>(attack_posture_remaining_s));
+                    bb->set("defense_posture_remaining_s", static_cast<int>(defense_posture_remaining_s));
+                    bb->set("move_posture_remaining_s", static_cast<int>(move_posture_remaining_s));
+                    bb->set(
+                        "enhanced_attack_posture_remaining_s",
+                        static_cast<int>(enhanced_attack_posture_remaining_s));
+                    bb->set(
+                        "enhanced_defense_posture_remaining_s",
+                        static_cast<int>(enhanced_defense_posture_remaining_s));
+                    bb->set(
+                        "enhanced_move_posture_remaining_s",
+                        static_cast<int>(enhanced_move_posture_remaining_s));
                     bb->set("sentry_info_received", true);
 
                     RCLCPP_DEBUG(node_->get_logger(),
-                                 "哨兵信息: 姿态=%d, 可激活符=%d, 复活金币=%d",
-                                 current_posture, can_activate_rune, buy_resurrection_cost);
+                                 "哨兵信息: 姿态=%d, 强化=%d, 有效姿态=%d, 可激活符=%d, 强化进攻剩余=%d, 复活金币=%d",
+                                 current_posture,
+                                 current_posture_enhanced,
+                                 current_effective_posture,
+                                 can_activate_rune,
+                                 enhanced_attack_posture_remaining_s,
+                                 buy_resurrection_cost);
                 });
 
             // 订阅游戏状态
@@ -390,6 +426,7 @@ namespace sentry_nav_bt_test
                     bb->set("shooter_barrel_cooling_value", msg->shooter_barrel_cooling_value);
                     bb->set("shooter_barrel_heat_limit", msg->shooter_barrel_heat_limit);
                     bb->set("chassis_power_limit", msg->chassis_power_limit);
+                    bb->set("bullet_speed_limit", msg->bullet_speed_limit);
                     bb->set("power_management_gimbal_output", msg->power_management_gimbal_output);
                     bb->set("power_management_chassis_output", msg->power_management_chassis_output);
                     bb->set("power_management_shooter_output", msg->power_management_shooter_output);

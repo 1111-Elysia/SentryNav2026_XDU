@@ -24,4 +24,12 @@ install(PROGRAMS
 )
 
 ament_python_install_package(${PROJECT_NAME}) # Install Python module
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_sentry_posture test/test_sentry_posture.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+  )
+endif()
+
 ament_package()

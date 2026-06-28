@@ -279,10 +279,12 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       game_robot_hp_msg_.ally_2_robot_hp = referee_data.game_robot_HP.ally_2_robot_HP;
       game_robot_hp_msg_.ally_3_robot_hp = referee_data.game_robot_HP.ally_3_robot_HP;
       game_robot_hp_msg_.ally_4_robot_hp = referee_data.game_robot_HP.ally_4_robot_HP;
-      game_robot_hp_msg_.reserved = referee_data.game_robot_HP.reserved;
+      game_robot_hp_msg_.damage_difference = referee_data.game_robot_HP.damage_difference;
       game_robot_hp_msg_.ally_7_robot_hp = referee_data.game_robot_HP.ally_7_robot_HP;
       game_robot_hp_msg_.ally_outpost_hp = referee_data.game_robot_HP.ally_outpost_HP;
       game_robot_hp_msg_.ally_base_hp = referee_data.game_robot_HP.ally_base_HP;
+      game_robot_hp_msg_.enemy_outpost_hp = referee_data.game_robot_HP.enemy_outpost_HP;
+      game_robot_hp_msg_.enemy_base_hp = referee_data.game_robot_HP.enemy_base_HP;
       game_robot_hp_pub_->publish(game_robot_hp_msg_);
       break;
     }
@@ -316,6 +318,7 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       robot_status_msg_.shooter_barrel_cooling_value = referee_data.robot_status.shooter_barrel_cooling_value;
       robot_status_msg_.shooter_barrel_heat_limit = referee_data.robot_status.shooter_barrel_heat_limit;
       robot_status_msg_.chassis_power_limit = referee_data.robot_status.chassis_power_limit;
+      robot_status_msg_.bullet_speed_limit = referee_data.robot_status.bullet_speed_limit;
       robot_status_msg_.power_management_gimbal_output = referee_data.robot_status.power_management_gimbal_output;
       robot_status_msg_.power_management_chassis_output = referee_data.robot_status.power_management_chassis_output;
       robot_status_msg_.power_management_shooter_output = referee_data.robot_status.power_management_shooter_output;
@@ -419,6 +422,7 @@ void RefereeNode::PublishMsg(uint16_t cmd_id, const rm::device::RefereeProtocol<
       sentry_info_msg_.header.stamp = get_clock()->now();
       sentry_info_msg_.sentry_info = referee_data.sentry_info.sentry_info;
       sentry_info_msg_.sentry_info_2 = referee_data.sentry_info.sentry_info_2;
+      sentry_info_msg_.sentry_info_3 = referee_data.sentry_info.sentry_info_3;
       sentry_info_pub_->publish(sentry_info_msg_);
       break;
     }

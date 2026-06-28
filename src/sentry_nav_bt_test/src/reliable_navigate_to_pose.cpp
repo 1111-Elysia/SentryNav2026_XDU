@@ -30,6 +30,7 @@ BT::PortsList ReliableNavigateToPose::providedPorts()
     BT::InputPort<double>("resend_interval", 0.50, "重发最小间隔"),
     BT::InputPort<double>("response_timeout", 1.00, "等待 Nav2 接收超时"),
     BT::InputPort<double>("result_retry_delay", 0.50, "结果失败后的重试延迟"),
+    BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流"),
     BT::InputPort<std::string>("success_condition_key", "", "判定导航成功时需要满足的黑板键"),
     BT::InputPort<std::string>("success_condition_comparison", "eq", "成功条件比较符"),
     BT::InputPort<double>("success_condition_threshold", 1.0, "成功条件阈值")
@@ -104,14 +105,17 @@ BT::NodeStatus ReliableNavigateToPose::onStart()
   getInput("resend_interval", resend_interval_);
   getInput("response_timeout", response_timeout_);
   getInput("result_retry_delay", result_retry_delay_);
+  getInput("log_throttle_ms", log_throttle_ms_);
   getInput("success_condition_key", success_condition_key_);
   getInput("success_condition_comparison", success_condition_comparison_);
   getInput("success_condition_threshold", success_condition_threshold_);
 
   resetRuntimeState_();
 
-  RCLCPP_INFO(
+  RCLCPP_INFO_THROTTLE(
     node_->get_logger(),
+    *node_->get_clock(),
+    log_throttle_ms_,
     "[ReliableNavigate] 开始导航%s%s%s -> (%.2f, %.2f), threshold=%.2f",
     goal_name_.empty() ? "" : "[",
     goal_name_.empty() ? "" : goal_name_.c_str(),
@@ -120,7 +124,9 @@ BT::NodeStatus ReliableNavigateToPose::onStart()
     current_goal_.pose.position.y,
     reach_threshold_);
   if (!goal_name_.empty()) {
-    RCLCPP_INFO(node_->get_logger(), "[ReliableNavigate] 目标名称: %s", goal_name_.c_str());
+    RCLCPP_INFO_THROTTLE(
+      node_->get_logger(), *node_->get_clock(), log_throttle_ms_,
+      "[ReliableNavigate] 目标名称: %s", goal_name_.c_str());
   }
 
   return BT::NodeStatus::RUNNING;
@@ -200,8 +206,10 @@ ReliableNavigateToPose::GoalStatus ReliableNavigateToPose::evaluateGoalStatus_()
       return GoalStatus::REACHED_GUARD_UNSATISFIED;
     }
 
-    RCLCPP_INFO(
+    RCLCPP_INFO_THROTTLE(
       node_->get_logger(),
+      *node_->get_clock(),
+      log_throttle_ms_,
       "[ReliableNavigate] 到达目标%s%s%s, 距离 %.3f m <= %.3f m",
       goal_name_.empty() ? "" : "[",
       goal_name_.empty() ? "" : goal_name_.c_str(),
@@ -302,8 +310,10 @@ void ReliableNavigateToPose::sendGoal_()
 
       goal_handle_ = handle;
       state_ = InternalState::ACCEPTED;
-      RCLCPP_INFO(
+      RCLCPP_INFO_THROTTLE(
         node_->get_logger(),
+        *node_->get_clock(),
+        log_throttle_ms_,
         "[ReliableNavigate] Nav2 已接收目标%s%s%s, send_attempt=%d",
         goal_name_.empty() ? "" : "[",
         goal_name_.empty() ? "" : goal_name_.c_str(),
@@ -339,8 +349,10 @@ void ReliableNavigateToPose::sendGoal_()
         case rclcpp_action::ResultCode::SUCCEEDED:
           result_success_ = true;
           result_ready_ = true;
-          RCLCPP_INFO(
+          RCLCPP_INFO_THROTTLE(
             node_->get_logger(),
+            *node_->get_clock(),
+            log_throttle_ms_,
             "[ReliableNavigate] Nav2 返回成功%s%s%s",
             goal_name_.empty() ? "" : "[",
             goal_name_.empty() ? "" : goal_name_.c_str(),
@@ -413,8 +425,10 @@ void ReliableNavigateToPose::sendGoal_()
   state_ = InternalState::SENDING;
   last_send_time_ = now;
 
-  RCLCPP_INFO(
+  RCLCPP_INFO_THROTTLE(
     node_->get_logger(),
+    *node_->get_clock(),
+    log_throttle_ms_,
     "[ReliableNavigate] 发送目标%s%s%s -> (%.2f, %.2f), attempt=%d, goal_id=%lu",
     goal_name_.empty() ? "" : "[",
     goal_name_.empty() ? "" : goal_name_.c_str(),

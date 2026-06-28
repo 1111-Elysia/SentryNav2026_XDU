@@ -41,6 +41,7 @@ except ImportError:
 
 from rm_referee_mock.match_control_widget import MatchControlWidget
 from rm_referee_mock.publisher_pool import PublisherPool
+from rm_referee_mock.sentry_posture import decode_sentry_command
 
 
 # [新增] 创建一个用于跨线程通信的桥接类
@@ -73,9 +74,6 @@ class MatchControlPlugin(Plugin):
         self.signals.update_sentry_signal.connect(self._ui_update_callback)
 
         # === Service Server 初始化 ===
-        self.received_sentry_mode = 0
-        self._posture_cooldown_sec = 5.0
-        self._last_posture_change_time = 0.0
         if Tx:
             self._srv = self._node.create_service(
                 Tx, 
@@ -251,16 +249,7 @@ class MatchControlPlugin(Plugin):
                 return response
 
             sentry_cmd = int.from_bytes(bytes(raw_data[13:17]), byteorder="little", signed=False)
-            parsed_cmd = {
-                "confirm_free_revive": sentry_cmd & 0x01,
-                "confirm_buy_revive": (sentry_cmd >> 1) & 0x01,
-                "exchange_projectile": (sentry_cmd >> 2) & 0x07FF,
-                "remote_projectile_exchange_count": (sentry_cmd >> 13) & 0x0F,
-                "remote_hp_exchange_count": (sentry_cmd >> 17) & 0x0F,
-                "posture": (sentry_cmd >> 21) & 0x03,
-                "activate_rune": (sentry_cmd >> 23) & 0x01,
-                "raw": sentry_cmd,
-            }
+            parsed_cmd = decode_sentry_command(sentry_cmd)
 
             self._node.get_logger().info(
                 "[Service-Parse] 解析成功 -> "
@@ -342,24 +331,14 @@ class MatchControlPlugin(Plugin):
                 )
 
             posture_val = int(sentry_cmd.get("posture", 0))
-            if posture_val in (1, 2, 3):
-                now_sec = time()
-                if posture_val != self.received_sentry_mode:
-                    remaining_cooldown = self._posture_cooldown_sec - (now_sec - self._last_posture_change_time)
-                    if self.received_sentry_mode in (1, 2, 3) and remaining_cooldown > 0.0:
-                        self._node.get_logger().warn(
-                            f">>> [UI-Fail] 姿态切换冷却中，忽略 {self.received_sentry_mode} -> {posture_val}，剩余 {remaining_cooldown:.2f}s"
-                        )
-                        return
-                    else:
-                        self.received_sentry_mode = posture_val
-                        self._last_posture_change_time = now_sec
-                        self._widget.update_sentry_echo(posture_val)
-                        self._node.get_logger().info(
-                            f">>> [UI-Success] 姿态切换成功: {posture_val}，进入 {self._posture_cooldown_sec:.1f}s 冷却"
-                        )
+            if posture_val in (1, 2, 3, 4, 5, 6):
+                accepted, message = self._widget.request_sentry_posture(posture_val)
+                if accepted:
+                    self._node.get_logger().info(f">>> [UI-Success] 姿态请求: {message}")
                 else:
-                    self._widget.update_sentry_echo(posture_val)
+                    # Tx.response.ok 只表示链路成功；语义拒绝通过不改变 0x020D 回显体现。
+                    self._node.get_logger().warn(f">>> [UI-Semantic-Reject] {message}")
+                    return
 
             if sentry_cmd["activate_rune"] == 1:
                 self._node.get_logger().info("[UI-Logic] 收到激活请求，调用 Widget 逻辑...")
@@ -402,10 +381,12 @@ class MatchControlPlugin(Plugin):
         robot_hp_msg.ally_2_robot_hp = int(status["robot_hp"]["engineer"])
         robot_hp_msg.ally_3_robot_hp = int(status["robot_hp"]["infantry_3"])
         robot_hp_msg.ally_4_robot_hp = int(status["robot_hp"]["infantry_4"])
-        robot_hp_msg.reserved = 0
+        robot_hp_msg.damage_difference = int(status["robot_hp"]["damage_difference"])
         robot_hp_msg.ally_7_robot_hp = int(status["robot_hp"]["sentry"])
-        robot_hp_msg.ally_outpost_hp = int(status["robot_hp"]["outpost"])
-        robot_hp_msg.ally_base_hp = int(status["robot_hp"]["base"])
+        robot_hp_msg.ally_outpost_hp = int(status["robot_hp"]["ally_outpost"])
+        robot_hp_msg.ally_base_hp = int(status["robot_hp"]["ally_base"])
+        robot_hp_msg.enemy_outpost_hp = int(status["robot_hp"]["enemy_outpost"])
+        robot_hp_msg.enemy_base_hp = int(status["robot_hp"]["enemy_base"])
 
         self._publisher_pool.publish(
             f"{topic_prefix}/game_robot_hp", GameRobotHP, robot_hp_msg)
@@ -493,7 +474,8 @@ class MatchControlPlugin(Plugin):
         sentry_info_msg.header.frame_id = "referee_system"
 
         sentry_status = status.get("sentry_info", {})
-        posture_bits = self.received_sentry_mode & 0x03
+        posture_bits = int(sentry_status.get("base_posture", 3)) & 0x03
+        posture_enhanced = int(bool(sentry_status.get("enhanced", False)))
         can_activate = int(sentry_status.get("can_activate", False))
 
         packed_info = 0
@@ -509,9 +491,11 @@ class MatchControlPlugin(Plugin):
         packed_info_2 |= (int(sentry_status.get("team_projectile_exchange_remaining", 0)) & 0x07FF) << 1
         packed_info_2 |= (posture_bits & 0x03) << 12
         packed_info_2 |= (can_activate & 0x01) << 14
+        packed_info_2 |= (posture_enhanced & 0x01) << 15
 
         sentry_info_msg.sentry_info = packed_info
         sentry_info_msg.sentry_info_2 = packed_info_2
+        sentry_info_msg.sentry_info_3 = int(sentry_status.get("sentry_info_3", 0))
         
         self._publisher_pool.publish(
             f"{topic_prefix}/sentry_info", SentryInfo, sentry_info_msg)

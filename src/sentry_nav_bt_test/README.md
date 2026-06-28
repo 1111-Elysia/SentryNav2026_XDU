@@ -398,6 +398,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `PrintBlackboardValue` | Action | 打印某个黑板键值 |
 | `RandomSelector` | Action | 从路径点列表里随机选点 |
 | `MaintainSentryPosture` | Action | 通过裁判系统维持哨兵姿态，优先读当前姿态并结合全局冷却去重 |
+| `ResolveSentryPosture` | Action | 强化姿态累计时长耗尽后，将目标回退到对应普通姿态 |
 | `ConfirmResurrection` | Action | 连发确认复活指令 |
 | `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
 | `EngageOutpost` | Stateful Action | 管理 scan mode、yaw、outpost mode 和 `/vw` 的前哨站进攻流程 |

@@ -76,8 +76,8 @@ class RefereeNode : public rclcpp::Node {
   std::unique_ptr<referee_node::ByteStreamRecorder> vt_recorder_;
   /** </Raw Data Recording> **/
   /** <Decoders> **/
-  rm::device::Referee<rm::device::RefereeRevision::kNewV130> normal_referee_;
-  rm::device::Referee<rm::device::RefereeRevision::kNewV130> vt_referee_;
+  rm::device::Referee<rm::device::RefereeRevision::kNewV200> normal_referee_;
+  rm::device::Referee<rm::device::RefereeRevision::kNewV200> vt_referee_;
   /** </Decoders> **/
 
  private:

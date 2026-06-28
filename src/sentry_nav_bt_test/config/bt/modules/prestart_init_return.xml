@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="PrestartInitReturn">
+    <Sequence name="准备时间回初始点">
+      <CheckCondition key_name="{game_progress_key}" comparison="eq" threshold="{prepare_progress}"/>
+      <PrintNode message="{prestart_message}" throttle_ms="{log_throttle_ms}"/>
+      <GoalSelector goal_name="{init_goal_name}" goal="{prestart_init_goal}"/>
+      <PublishControllerName
+        controller_name="{controller_name}"
+        log_throttle_ms="{log_throttle_ms}"/>
+      <ReliableNavigateToPose
+        goal="{prestart_init_goal}"
+        goal_name="{init_goal_name}"
+        reach_threshold="{reach_threshold}"
+        resend_interval="{nav_resend_interval}"
+        response_timeout="{nav_response_timeout}"
+        result_retry_delay="{nav_result_retry_delay}"
+        log_throttle_ms="{log_throttle_ms}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

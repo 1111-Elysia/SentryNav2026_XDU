@@ -7,6 +7,7 @@ from os import path
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtCore import QTimer
 from rm_referee_mock.widget_confirmed_line_edit import ConfirmedLineEdit
+from rm_referee_mock.sentry_posture import POSTURE_NAMES, SentryPostureState
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -50,6 +51,12 @@ class MatchControlWidget(QtWidgets.QWidget):
         self.stage_countdown_remaining = 0
         self.countdown_timer = QTimer(self)
         self.countdown_timer.timeout.connect(self.update_time)
+        self.hurt_burst_timer = QTimer(self)
+        self.hurt_burst_timer.setInterval(500)
+        self.hurt_burst_timer.timeout.connect(self._emit_hurt_burst)
+        self.hurt_burst_remaining = 0
+        self.sentry_posture = SentryPostureState(cooldown_seconds=5.0)
+        self._suppress_posture_ui_change = False
 
         self.current_hurt_armor_id = 0
         self.trigger_hurt = False
@@ -81,8 +88,8 @@ class MatchControlWidget(QtWidgets.QWidget):
 
     def init_ui(self):
         """初始化 UI 控件的默认值和选项"""
-        self.resize(1020, 620)
-        self.setMinimumSize(1020, 620)
+        self.resize(1310, 720)
+        self.setMinimumSize(1310, 720)
 
         # 设置比赛类型选项 (索引0不使用，从1开始)
         self.comboBox_game_type.addItems([
@@ -179,6 +186,7 @@ class MatchControlWidget(QtWidgets.QWidget):
             self.spinBox_robot_id = QtWidgets.QSpinBox()
         self._setup_projectile_allowance_inputs()
         self._setup_sentry_info_inputs()
+        self._setup_v2_game_hp_inputs()
 
         if hasattr(self, "checkBox"):
             self.checkBox.setChecked(False)
@@ -437,6 +445,210 @@ class MatchControlWidget(QtWidgets.QWidget):
         self._update_sentry_auto_activate_label()
         self._update_rune_window_label()
 
+        self.groupBox_posture = QtWidgets.QGroupBox(self)
+        self.groupBox_posture.setObjectName("groupBox_posture")
+        self.groupBox_posture.setTitle("V2.0.0 哨兵姿态")
+        self.groupBox_posture.setGeometry(1020, 20, 280, 465)
+        posture_layout = QtWidgets.QFormLayout(self.groupBox_posture)
+
+        self.comboBox_sentry_posture = QtWidgets.QComboBox(self.groupBox_posture)
+        for mode in range(1, 7):
+            self.comboBox_sentry_posture.addItem(f"[{mode}] {POSTURE_NAMES[mode]}", mode)
+        self.pushButton_force_posture = QtWidgets.QPushButton("强制设置", self.groupBox_posture)
+        posture_select_layout = QtWidgets.QHBoxLayout()
+        posture_select_layout.addWidget(self.comboBox_sentry_posture)
+        posture_select_layout.addWidget(self.pushButton_force_posture)
+        posture_layout.addRow("当前姿态", posture_select_layout)
+
+        self.posture_normal_spinboxes = {}
+        self.posture_enhanced_spinboxes = {}
+        labels = {1: "进攻", 2: "防御", 3: "移动"}
+        for base in (1, 2, 3):
+            spinbox = self._create_posture_time_spinbox(180, 180)
+            self.posture_normal_spinboxes[base] = spinbox
+            posture_layout.addRow(f"普通{labels[base]}剩余", spinbox)
+            spinbox.valueChanged.connect(
+                lambda value, posture=base: self._on_posture_time_changed(
+                    "normal", posture, value))
+
+        for base in (1, 2, 3):
+            spinbox = self._create_posture_time_spinbox(15, 15)
+            self.posture_enhanced_spinboxes[base] = spinbox
+            posture_layout.addRow(f"强化{labels[base]}剩余", spinbox)
+            spinbox.valueChanged.connect(
+                lambda value, posture=base: self._on_posture_time_changed(
+                    "enhanced", posture, value))
+
+        self.label_posture_cooldown = QtWidgets.QLabel(self.groupBox_posture)
+        self.label_posture_result = QtWidgets.QLabel(self.groupBox_posture)
+        self.label_posture_result.setWordWrap(True)
+        posture_layout.addRow("切换冷却", self.label_posture_cooldown)
+        posture_layout.addRow("最近结果", self.label_posture_result)
+
+        self.pushButton_reset_posture = QtWidgets.QPushButton("重置 180/15", self.groupBox_posture)
+        self.pushButton_expire_posture = QtWidgets.QPushButton("耗尽当前强化", self.groupBox_posture)
+        posture_button_layout = QtWidgets.QHBoxLayout()
+        posture_button_layout.addWidget(self.pushButton_reset_posture)
+        posture_button_layout.addWidget(self.pushButton_expire_posture)
+        posture_layout.addRow(posture_button_layout)
+
+        self.pushButton_enhanced_attack_2s = QtWidgets.QPushButton(
+            "场景：强化进攻剩余 2s", self.groupBox_posture)
+        posture_layout.addRow(self.pushButton_enhanced_attack_2s)
+
+        self.pushButton_force_posture.clicked.connect(self._on_force_posture_clicked)
+        self.pushButton_reset_posture.clicked.connect(self._on_reset_posture_clicked)
+        self.pushButton_expire_posture.clicked.connect(self._on_expire_posture_clicked)
+        self.pushButton_enhanced_attack_2s.clicked.connect(
+            self._on_enhanced_attack_2s_clicked)
+        self._sync_posture_ui()
+
+    def _setup_v2_game_hp_inputs(self):
+        self.groupBox_v2_game_hp = QtWidgets.QGroupBox(self)
+        self.groupBox_v2_game_hp.setObjectName("groupBox_v2_game_hp")
+        self.groupBox_v2_game_hp.setTitle("V2.0.0 对局血量")
+        self.groupBox_v2_game_hp.setGeometry(780, 360, 230, 345)
+        layout = QtWidgets.QFormLayout(self.groupBox_v2_game_hp)
+
+        self.spinBox_damage_difference = QtWidgets.QSpinBox(self.groupBox_v2_game_hp)
+        self.spinBox_damage_difference.setRange(-32768, 32767)
+        self.spinBox_enemy_outpost_hp = QtWidgets.QSpinBox(self.groupBox_v2_game_hp)
+        self.spinBox_enemy_outpost_hp.setRange(0, 5000)
+        self.spinBox_enemy_outpost_hp.setValue(1500)
+        self.spinBox_enemy_base_hp = QtWidgets.QSpinBox(self.groupBox_v2_game_hp)
+        self.spinBox_enemy_base_hp.setRange(0, 10000)
+        self.spinBox_enemy_base_hp.setValue(5000)
+        layout.addRow("伤害差", self.spinBox_damage_difference)
+        layout.addRow("敌方前哨站", self.spinBox_enemy_outpost_hp)
+        layout.addRow("敌方基地", self.spinBox_enemy_base_hp)
+
+        self.spinBox_test_shooter_heat = QtWidgets.QSpinBox(self.groupBox_v2_game_hp)
+        self.spinBox_test_shooter_heat.setRange(0, 1000)
+        self.spinBox_test_shooter_heat.valueChanged.connect(
+            lambda value: setattr(self, "shooter_17mm_heat", int(value)))
+        layout.addRow("17mm 热量", self.spinBox_test_shooter_heat)
+
+        self.pushButton_destroy_enemy_outpost = QtWidgets.QPushButton(
+            "敌方前哨站归零", self.groupBox_v2_game_hp)
+        self.pushButton_reset_enemy_hp = QtWidgets.QPushButton(
+            "重置敌方建筑", self.groupBox_v2_game_hp)
+        layout.addRow(self.pushButton_destroy_enemy_outpost)
+        layout.addRow(self.pushButton_reset_enemy_hp)
+        self.pushButton_heat_shot = QtWidgets.QPushButton("模拟射击：热量 +10", self.groupBox_v2_game_hp)
+        self.pushButton_hurt_burst = QtWidgets.QPushButton("连续受击 3 次", self.groupBox_v2_game_hp)
+        layout.addRow(self.pushButton_heat_shot)
+        layout.addRow(self.pushButton_hurt_burst)
+        self.pushButton_destroy_enemy_outpost.clicked.connect(
+            lambda: self.spinBox_enemy_outpost_hp.setValue(0))
+        self.pushButton_reset_enemy_hp.clicked.connect(self._reset_enemy_hp)
+        self.pushButton_heat_shot.clicked.connect(self._simulate_heat_shot)
+        self.pushButton_hurt_burst.clicked.connect(self._start_hurt_burst)
+
+    def _create_posture_time_spinbox(self, maximum, value):
+        spinbox = QtWidgets.QSpinBox(self.groupBox_posture)
+        spinbox.setRange(0, maximum)
+        spinbox.setSuffix(" s")
+        spinbox.setValue(value)
+        return spinbox
+
+    def _on_posture_time_changed(self, timer_type, base, value):
+        if self._suppress_posture_ui_change:
+            return
+        if timer_type == "normal":
+            self.sentry_posture.set_normal_remaining(base, value)
+        else:
+            self.sentry_posture.set_enhanced_remaining(base, value)
+            if (
+                value == 0
+                and self.sentry_posture.current_mode == base + 3
+            ):
+                self.sentry_posture.expire_current_enhanced()
+        self._sync_posture_ui()
+
+    def _sync_posture_ui(self):
+        if not hasattr(self, "comboBox_sentry_posture"):
+            return
+        self._suppress_posture_ui_change = True
+        try:
+            self.comboBox_sentry_posture.setCurrentIndex(
+                max(0, self.sentry_posture.current_mode - 1))
+            for base, spinbox in self.posture_normal_spinboxes.items():
+                spinbox.setValue(self.sentry_posture.normal_remaining[base])
+            for base, spinbox in self.posture_enhanced_spinboxes.items():
+                spinbox.setValue(self.sentry_posture.enhanced_remaining[base])
+        finally:
+            self._suppress_posture_ui_change = False
+
+        remaining = self.sentry_posture.cooldown_remaining()
+        self.label_posture_cooldown.setText(
+            f"{remaining:.1f}s" if remaining > 0.0 else "就绪")
+        self.label_posture_result.setText(self.sentry_posture.last_result)
+        self.label_sentry_mode.setText(
+            f"姿态: {POSTURE_NAMES[self.sentry_posture.current_mode]}")
+
+    def _on_force_posture_clicked(self):
+        mode = int(self.comboBox_sentry_posture.currentData())
+        accepted, message = self.sentry_posture.force_mode(mode)
+        print(f"[Posture-Debug] {'成功' if accepted else '拒绝'}: {message}")
+        self._sync_posture_ui()
+
+    def _on_reset_posture_clicked(self):
+        self.sentry_posture.reset()
+        print("[Posture-Debug] 已重置姿态和六个剩余时间")
+        self._sync_posture_ui()
+
+    def _on_expire_posture_clicked(self):
+        changed = self.sentry_posture.expire_current_enhanced()
+        print(f"[Posture-Debug] {self.sentry_posture.last_result}")
+        if changed:
+            self.update_sentry_echo(self.sentry_posture.current_mode)
+        self._sync_posture_ui()
+
+    def _on_enhanced_attack_2s_clicked(self):
+        self.sentry_posture.set_enhanced_remaining(1, 2)
+        self.sentry_posture.force_mode(4)
+        print("[Posture-Debug] 场景已设置：强化进攻剩余 2s")
+        self._sync_posture_ui()
+
+    def _reset_enemy_hp(self):
+        self.spinBox_enemy_outpost_hp.setValue(1500)
+        self.spinBox_enemy_base_hp.setValue(5000)
+
+    def _simulate_heat_shot(self):
+        self.spinBox_test_shooter_heat.setValue(
+            min(self.spinBox_test_shooter_heat.maximum(), self.shooter_17mm_heat + 10))
+
+    def _start_hurt_burst(self):
+        self.hurt_burst_remaining = 3
+        self._emit_hurt_burst()
+        self.hurt_burst_timer.start()
+
+    def _emit_hurt_burst(self):
+        if self.hurt_burst_remaining <= 0:
+            self.hurt_burst_timer.stop()
+            return
+        self.current_hurt_armor_id = self.spinBox_hurt_armor_id.value()
+        self.trigger_hurt = True
+        self.hurt_burst_remaining -= 1
+
+    def request_sentry_posture(self, mode):
+        accepted, message = self.sentry_posture.request_mode(mode)
+        if accepted:
+            self.update_sentry_echo(self.sentry_posture.current_mode)
+        self._sync_posture_ui()
+        return accepted, message
+
+    def _tick_sentry_posture(self):
+        active = (
+            self.comboBox_game_stage.currentIndex() == self.MATCH_STAGE_INDEX
+            and self.spinBox_hp_7.value() > 0
+        )
+        fallback = self.sentry_posture.tick(active=active)
+        if fallback:
+            print(f"[Posture-Timeout] {self.sentry_posture.last_result}")
+            self.update_sentry_echo(self.sentry_posture.current_mode)
+        self._sync_posture_ui()
+
     def _get_rune_combo(self, rune_name):
         return self.comboBox_small_rune if rune_name == "small" else self.comboBox_big_rune
 
@@ -519,11 +731,16 @@ class MatchControlWidget(QtWidgets.QWidget):
         self.rune_window_timers = {"small": 0, "big": 0}
         self.supply_projectile_claimed = 0
         self.gold_income_claimed = set()
+        self.sentry_posture.reset()
+        if hasattr(self, "spinBox_damage_difference"):
+            self.spinBox_damage_difference.setValue(0)
+            self._reset_enemy_hp()
         self._reset_resurrection_state(clear_buy_count=True)
         if hasattr(self, "checkBox_can_activate_rune"):
             self.checkBox_can_activate_rune.setChecked(False)
         self._update_sentry_auto_activate_label()
         self._update_rune_window_label()
+        self._sync_posture_ui()
 
     def _refresh_sentry_activate_flag(self):
         current_small_status = self.comboBox_small_rune.currentIndex()
@@ -654,6 +871,7 @@ class MatchControlWidget(QtWidgets.QWidget):
             return
 
         self._tick_rune_windows()
+        self._tick_sentry_posture()
         self._tick_resurrection()
         self._tick_match_countdown()
 
@@ -836,8 +1054,11 @@ class MatchControlWidget(QtWidgets.QWidget):
                 "infantry_3": self.spinBox_hp_3.value(),
                 "infantry_4": self.spinBox_hp_4.value(),
                 "sentry": self.spinBox_hp_7.value(),
-                "outpost": self.spinBox_hp_outpost.value(),
-                "base": self.spinBox_hp_base.value(),
+                "ally_outpost": self.spinBox_hp_outpost.value(),
+                "ally_base": self.spinBox_hp_base.value(),
+                "damage_difference": self.spinBox_damage_difference.value(),
+                "enemy_outpost": self.spinBox_enemy_outpost_hp.value(),
+                "enemy_base": self.spinBox_enemy_base_hp.value(),
             },
             # 详细机器人状态
             "robot_status": {
@@ -901,14 +1122,23 @@ class MatchControlWidget(QtWidgets.QWidget):
             "is_disengaged": self.checkBox_sentry_is_disengaged.isChecked(),
             "team_projectile_exchange_remaining": self.spinBox_sentry_team_projectile_exchange.value(),
             "can_activate": self.sentry_can_activate_flag or manual_can_activate,
+            "current_mode": self.sentry_posture.current_mode,
+            "base_posture": (
+                self.sentry_posture.current_mode - 3
+                if self.sentry_posture.current_mode >= 4
+                else self.sentry_posture.current_mode
+            ),
+            "enhanced": self.sentry_posture.current_mode >= 4,
+            "posture_remaining": dict(self.sentry_posture.normal_remaining),
+            "enhanced_posture_remaining": dict(self.sentry_posture.enhanced_remaining),
+            "sentry_info_3": self.sentry_posture.pack_sentry_info_3(),
         }
 
     def update_sentry_echo(self, mode):
         """更新 UI 显示收到的指令"""
         if hasattr(self, 'label_sentry_mode'):
             # 简单映射模式名
-            names = {0: "无效", 1: "进攻", 2: "防御", 3: "移动"}
-            txt = names.get(mode, str(mode))
+            txt = POSTURE_NAMES.get(mode, str(mode))
             self.label_sentry_mode.setText(f"姿态: {txt}")
             # 可以变个色提示更新
             self.label_sentry_mode.setStyleSheet("color: red; font-weight: bold;")
@@ -926,6 +1156,8 @@ class MatchControlWidget(QtWidgets.QWidget):
         self.shooter_17mm_heat = 0
         self.shooter_42mm_heat = 0
         self.buffer_energy = self.DEFAULT_BUFFER_ENERGY_LIMIT
+        if hasattr(self, "spinBox_test_shooter_heat"):
+            self.spinBox_test_shooter_heat.setValue(0)
 
     def _reset_resurrection_state(self, clear_buy_count=False):
         self.resurrection_active = False
