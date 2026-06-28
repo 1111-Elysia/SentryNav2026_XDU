@@ -1,0 +1,7 @@
+<class_libraries>
+  <library path="libelastic_planner">
+    <class type="elastic_planner::ElasticPlanner" base_class_type="nav2_core::GlobalPlanner">
+      <description>Elastic-Tracker 2D: MINCO trajectory optimization planner for dynamic target tracking</description>
+    </class>
+  </library>
+</class_libraries>

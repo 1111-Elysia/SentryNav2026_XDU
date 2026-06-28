@@ -8,9 +8,17 @@
         <RateController hz="3.0">
           <RecoveryNode name="ComputePathToPose"
                         number_of_retries="1">
-            <ComputePathToPose goal="{goal}"
-                               path="{path}"
-                               planner_id="GridBased"/>
+            <PipelineSequence>
+              <PlannerSelector selected_planner="{selected_planner}"
+                               default_planner="GridBased"
+                               topic_name="planner_name"/>
+              <GoalUpdater input_goal="{goal}"
+                           output_goal="{updated_goal}">
+                <ComputePathToPose goal="{updated_goal}"
+                                   path="{path}"
+                                   planner_id="{selected_planner}"/>
+              </GoalUpdater>
+            </PipelineSequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context"
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
@@ -67,6 +75,17 @@
       <input_port name="topic_name"/>
       <output_port name="selected_controller"/>
     </Action>
+    <Action ID="PlannerSelector"
+            editable="true">
+      <input_port name="default_planner"/>
+      <input_port name="topic_name"/>
+      <output_port name="selected_planner"/>
+    </Action>
+    <Decorator ID="GoalUpdater"
+               editable="true">
+      <input_port name="input_goal"/>
+      <output_port name="output_goal"/>
+    </Decorator>
     <Control ID="PipelineSequence"
              editable="true"/>
     <Decorator ID="RateController"
