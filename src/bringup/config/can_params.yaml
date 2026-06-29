@@ -1,4 +1,4 @@
-can_comm_node:
+can_send:
   ros__parameters:
     # CAN 设备端口
     port: "can0"
@@ -6,9 +6,8 @@ can_comm_node:
     # 发送频率 (Hz)
     send_frequency: 500
 
-    # CAN ID
-    id_xyz: 0x180   # vx, vy, vw, vyaw
-    id_scan: 0x190  # scan mode + armor presence + auto shoot
+    # CAN ID（单帧发送，所有数据合并到一帧）
+    id_scan: 0x190
 
     # topics
     cmd_vel_topic: "/cmd_vel"
@@ -18,6 +17,7 @@ can_comm_node:
     outpost_mode_type_topic: "/outpost_mode_type"
     all_detect_topic: "/detector/armor_presence"
     game_status_topic: "/rm_referee/game_status"
+    target_yaw_topic: "/target_yaw"
 
     # 超时门控 (s)
     cmd_vel_timeout_s: 0.1
@@ -25,7 +25,7 @@ can_comm_node:
 
 hurt_spin_vw_node:
   ros__parameters:
-    # 输出给 can_comm_node 的 vw 话题
+    # 输出给 can_send 的 vw 话题
     vw_out_topic: "/vw"
 
     # 裁判系统受击信息
@@ -41,36 +41,35 @@ hurt_spin_vw_node:
     # 定时发布频率 (Hz)
     publish_rate_hz: 50.0
 
-vxvy_to_vw_node:
+can_receive:
   ros__parameters:
-    cmd_vel_topic: "/cmd_vel_good"
-    # 若启用该节点，通常用于替代 hurt_spin_vw_node 输出到同一通道
-    vw_topic: "/vw"
+    port: "can0"
+    can_id: 0x180
+    yaw_topic: "/target/yaw"
+    pitch_topic: "/target/pitch"
+    distance_topic: "/target/distance"
+    publish_rate_hz: 50.0
+
+target_frame:
+  ros__parameters:
+    publish_rate_hz: 50.0
+    map_frame: "map"
+    base_frame: "base_link"
+    target_frame: "target_frame"
+    target_pose_topic: "/detected_target_pose"
 
 vyaw_tf_yaw_controller:
   ros__parameters:
-    cmd_vel_topic: "/cmd_vel"
+    target_yaw_topic: "/target_yaw"
     map_frame: "map"
     base_frame: "base_link"
-
-    # 方向相关参数使用角度制
-    yaw_tolerance_deg: 3.0
 
     # Pose of NLJG in map frame
     NLJG_pose_x: 10.44
     NLJG_pose_y: 0.0
-    NLJG_pose_yaw_deg: 0.0
 
     # Pose of outpost in map frame
     outpost_pose_x: 13.48
     outpost_pose_y: 3.92
-    outpost_pose_yaw_deg: 0.0
 
-    # 旋转速度约束（绝对值）
-    min_abs_vyaw: 0.25
-    max_abs_vyaw: 0.5
-
-    # 简单比例控制增益（基于弧度误差）
-    k_p: 1.2
-
-    control_frequency: 30.0
+    publish_rate_hz: 30.0

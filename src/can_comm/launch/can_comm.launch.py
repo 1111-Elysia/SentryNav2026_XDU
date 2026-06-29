@@ -19,17 +19,24 @@ def generate_launch_description():
         Node(
             package='can_comm',
             executable='can_comm_node',
-            name='can_comm_node',
+            name='can_send',
             output='screen',
             parameters=[config_file],
         ),
-        # Node(
-        #     package='can_comm',
-        #     executable='vxvy_to_vw_node',
-        #     name='vxvy_to_vw_node',
-        #     output='screen',
-        #     parameters=[config_file],
-        # ),
+        Node(
+            package='can_comm',
+            executable='can_receive_node',
+            name='can_receive',
+            output='screen',
+            parameters=[config_file],
+        ),
+        Node(
+            package='can_comm',
+            executable='target_frame_node',
+            name='target_frame',
+            output='screen',
+            parameters=[config_file],
+        ),
         Node(
             package='can_comm',
             executable='vyaw_tf_yaw_controller_node',

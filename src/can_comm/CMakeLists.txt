@@ -13,9 +13,10 @@ find_package(sentry_msgs REQUIRED)
 find_package(rm_referee_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 add_executable(can_comm_node
-  src/can_comm.cpp
+  src/can_send.cpp
 )
 
 add_executable(hurt_spin_vw_node
@@ -26,8 +27,12 @@ add_executable(vyaw_tf_yaw_controller_node
   src/vyaw_tf_yaw_controller_node.cpp
 )
 
-add_executable(vxvy_to_vw_node
-  src/vxvy_to_vw_node.cpp
+add_executable(can_receive_node
+  src/can_receive.cpp
+)
+
+add_executable(target_frame_node
+  src/target_frame_node.cpp
 )
 
 target_include_directories(can_comm_node PRIVATE
@@ -59,10 +64,18 @@ ament_target_dependencies(vyaw_tf_yaw_controller_node
   tf2_ros
 )
 
-ament_target_dependencies(vxvy_to_vw_node
+ament_target_dependencies(can_receive_node
   rclcpp
+  std_msgs
+)
+
+ament_target_dependencies(target_frame_node
+  rclcpp
+  std_msgs
   geometry_msgs
-  sentry_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
 )
 
 add_subdirectory(librm)
@@ -80,7 +93,11 @@ install(TARGETS vyaw_tf_yaw_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(TARGETS vxvy_to_vw_node
+install(TARGETS can_receive_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS target_frame_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

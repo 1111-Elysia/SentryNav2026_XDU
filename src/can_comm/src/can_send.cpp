@@ -4,6 +4,7 @@
 #include <sentry_msgs/msg/armor_presence.hpp>
 #include <sentry_msgs/msg/scan_mode.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float32.hpp>
 #include "rm_referee_msgs/msg/game_status.hpp"
 #include <rclcpp/qos.hpp>
 
@@ -23,13 +24,12 @@ class CanCommNode : public rclcpp::Node
 {
 public:
     CanCommNode()
-    : Node("can_comm_node")
+    : Node("can_send")
     {
         // 参数声明
         this->declare_parameter<std::string>("port", "can2");
         this->declare_parameter<int>("send_frequency", 500);
-        // 发送用的两个 ID 参数
-        this->declare_parameter<int>("id_xyz", 0x180);
+        // 发送用的 CAN ID 参数（单帧发送）
         this->declare_parameter<int>("id_scan", 0x190);
         this->declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel");
         this->declare_parameter<std::string>("vw_topic", "/vw");
@@ -38,15 +38,15 @@ public:
         this->declare_parameter<std::string>("outpost_mode_type_topic", "/outpost_mode_type");
         this->declare_parameter<std::string>("all_detect_topic", "/detector/armor_presence");
         this->declare_parameter<std::string>("game_status_topic", "/rm_referee/game_status");
+        this->declare_parameter<std::string>("target_yaw_topic", "/target_yaw");
         this->declare_parameter<double>("cmd_vel_timeout_s", 0.1);
+        // target_yaw 无超时：电控靠值不再更新来判定停止
         this->declare_parameter<double>("vw_timeout_s", 0.1);
 
         // 读取参数
         std::string port      = this->get_parameter("port").as_string();
         int send_freq  = this->get_parameter("send_frequency").as_int();
-        int id_xyz_int = this->get_parameter("id_xyz").as_int();
         int id_scan_int = this->get_parameter("id_scan").as_int();
-        id_xyz_  = static_cast<uint32_t>(id_xyz_int);
         id_scan_ = static_cast<uint32_t>(id_scan_int);
 
         std::string cmd_vel_topic       = this->get_parameter("cmd_vel_topic").as_string();
@@ -56,6 +56,7 @@ public:
         std::string outpost_mode_type_topic = this->get_parameter("outpost_mode_type_topic").as_string();
         std::string all_detect_topic    = this->get_parameter("all_detect_topic").as_string();
         std::string game_status_topic   = this->get_parameter("game_status_topic").as_string();
+        std::string target_yaw_topic   = this->get_parameter("target_yaw_topic").as_string();
         cmd_vel_timeout_s_ = this->get_parameter("cmd_vel_timeout_s").as_double();
         vw_timeout_s_ = this->get_parameter("vw_timeout_s").as_double();
 
@@ -121,7 +122,14 @@ public:
                 armor_behind_ = m->behind;
                 armor_right_  = m->right;
             });
-    
+
+        target_yaw_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+            target_yaw_topic, 10,
+            [this](const std_msgs::msg::Float32::SharedPtr m) {
+                std::lock_guard<std::mutex> lk(mutex_);
+                target_yaw_ = m->data;
+            });
+
         // 定时发送 CAN 帧
         if (send_freq <= 0) send_freq = 1;
         int period_ms = 1000 / send_freq;
@@ -138,13 +146,12 @@ public:
     ~CanCommNode() override = default;
 
 private:
-    // 新增：cmd_vel 回调，更新 vx_ / vy_ / vyaw_
+    // cmd_vel 回调，仅更新 vx_ / vy_
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         vx_   = static_cast<float>(msg->linear.x);
         vy_   = static_cast<float>(msg->linear.y);
-        vyaw_ = static_cast<float>(msg->angular.z);
         cmd_vel_received_once_ = true;
         last_cmd_vel_msg_time_ = this->now();
     }
@@ -163,7 +170,7 @@ private:
     {
         if (!can_) return;
 
-        float vx, vy, vyaw, vw;
+        float vx, vy, target_yaw, vw;
         bool scan;
         bool NLJG_mode;
         bool outpost_mode;
@@ -172,12 +179,12 @@ private:
         uint8_t right = 0;
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            vx    = vx_;
-            vy    = vy_;
-            vyaw  = vyaw_;
-            vw    = vw_;
-            scan  = scan_mod_type_;
-            NLJG_mode = NLJG_mode_;
+            vx         = vx_;
+            vy         = vy_;
+            target_yaw = target_yaw_;
+            vw         = vw_;
+            scan       = scan_mod_type_;
+            NLJG_mode  = NLJG_mode_;
             outpost_mode = outpost_mode_;
             left   = armor_left_;
             behind = armor_behind_;
@@ -190,7 +197,6 @@ private:
             if (!cmd_vel_fresh) {
                 vx = 0.0f;
                 vy = 0.0f;
-                vyaw = 0.0f;
             }
 
             const bool vw_fresh =
@@ -199,17 +205,6 @@ private:
             if (!vw_fresh) {
                 vw = 0.0f;
             }
-
-            // 运动和装甲检测位门控直接依据 game_status 话题内容
-            // if (game_progress_ != 4) {
-            //     vx = 0.0f;
-            //     vy = 0.0f;
-            //     vyaw = 0.0f;
-            //     vw = 0.0f;
-            //     left = 0;
-            //     behind = 0;
-            //     right = 0;
-            // }
         }
 
         // 限幅 lambda
@@ -217,34 +212,39 @@ private:
             return std::max(std::min(v, max_v), min_v);
         };
 
-        // 限幅 [-32.767, 32.767] 并乘 1000 转 int16
-        int16_t vx_q   = static_cast<int16_t>(clamp(vx,   -32.767f, 32.767f) * 1000.0f);
-        int16_t vy_q   = static_cast<int16_t>(clamp(vy,   -32.767f, 32.767f) * 1000.0f);
-        int16_t vyaw_q = static_cast<int16_t>(clamp(vyaw,-32.767f, 32.767f) * 1000.0f);
-        int16_t vw_q   = static_cast<int16_t>(clamp(vw,   -32.767f, 32.767f) * 1000.0f);
+        // vx/vy/vw: 归一化到 [-1, 1] 再乘 127 → int8_t
+        int8_t vx_q = static_cast<int8_t>(clamp(vx, -1.0f, 1.0f) * 127.0f);
+        int8_t vy_q = static_cast<int8_t>(clamp(vy, -1.0f, 1.0f) * 127.0f);
+        int8_t vw_q = static_cast<int8_t>(clamp(vw, -1.0f, 1.0f) * 127.0f);
 
-        uint8_t data_xyz[8];
-        data_xyz[0] = (vx_q >> 8) & 0xFF;
-        data_xyz[1] = vx_q & 0xFF;
+        // target_yaw: 限幅 [-180, 180] 再乘 100 → int16_t, big-endian
+        int16_t target_yaw_q = static_cast<int16_t>(clamp(target_yaw, -180.0f, 180.0f) * 100.0f);
 
-        data_xyz[2] = (vy_q >> 8) & 0xFF;
-        data_xyz[3] = vy_q & 0xFF;
+        // 单帧 6 字节，ID 0x190
+        uint8_t data[6] = {0};
 
-        data_xyz[4] = (vw_q >> 8) & 0xFF;
-        data_xyz[5] = vw_q & 0xFF;
+        // byte [0]: vx (int8_t)
+        data[0] = static_cast<uint8_t>(vx_q);
 
-        data_xyz[6] = (vyaw_q >> 8) & 0xFF;
-        data_xyz[7] = vyaw_q & 0xFF;
+        // byte [1]: vy (int8_t)
+        data[1] = static_cast<uint8_t>(vy_q);
 
-        can_->Write(id_xyz_, data_xyz, sizeof(data_xyz));
+        // byte [2-3]: target_yaw (int16_t, big-endian, ×100, 范围[-180,180])
+        data[2] = (target_yaw_q >> 8) & 0xFF;
+        data[3] = target_yaw_q & 0xFF;
 
-        // 发送 scan mode + ArmorPresence + auto shoot 
-        uint8_t data_mode[8] = {0};
-        data_mode[0] = scan ? 1 : 0;
-        data_mode[1] = left | (behind << 1) | (right << 2);
-        data_mode[2] = NLJG_mode ? 1 : 0;   //0为打装甲板，1为打符
-        data_mode[3] = outpost_mode ? 1 : 0; // 预留给前哨站
-        can_->Write(id_scan_, data_mode, sizeof(data_mode));
+        // byte [4]: 低4位 = left|behind|right, 高4位 = scan_mode|NLJG_mode|outpost_mode
+        data[4] = (left ? 1 : 0)
+                | ((behind ? 1 : 0) << 1)
+                | ((right ? 1 : 0) << 2)
+                | ((scan ? 1 : 0) << 4)
+                | ((NLJG_mode ? 1 : 0) << 5)
+                | ((outpost_mode ? 1 : 0) << 6);
+
+        // byte [5]: vw (int8_t)
+        data[5] = static_cast<uint8_t>(vw_q);
+
+        can_->Write(id_scan_, data, sizeof(data));
 
         // 频率日志
         send_count_++;
@@ -253,8 +253,8 @@ private:
         if (dt >= 1.0) {
             double freq = send_count_ / dt;
             RCLCPP_INFO(this->get_logger(),
-                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f vyaw=%.3f vw=%.3f scan=%u NLJG_mode=%u outpost_mode=%u left=%u behind=%u right=%u",
-                        freq, vx, vy, vyaw, vw,
+                        "CAN发送频率: %.1f Hz | vx=%.3f vy=%.3f target_yaw=%.3f vw=%.3f scan=%u NLJG_mode=%u outpost_mode=%u left=%u behind=%u right=%u",
+                        freq, vx, vy, target_yaw, vw,
                         static_cast<unsigned>(scan),
                         static_cast<unsigned>(NLJG_mode),
                         static_cast<unsigned>(outpost_mode),
@@ -276,11 +276,11 @@ private:
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr             outpost_mode_sub_;
     rclcpp::Subscription<rm_referee_msgs::msg::GameStatus>::SharedPtr game_status_sub_;
     rclcpp::Subscription<sentry_msgs::msg::ArmorPresence>::SharedPtr armor_presence_sub_;
-    // 受击旋转逻辑已迁移至 hurt_spin_vw_node；此处不再订阅 hurt_data
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr            target_yaw_sub_;
     rclcpp::TimerBase::SharedPtr                                     timer_;
 
     std::mutex mutex_;
-    float vx_ = 0.0f, vy_ = 0.0f, vyaw_ = 0.0f;
+    float vx_ = 0.0f, vy_ = 0.0f, target_yaw_ = 0.0f;
     float vw_ = 0.0f;
     bool vw_received_once_ = false;
     uint8_t game_progress_ = 0;
@@ -296,7 +296,6 @@ private:
     double cmd_vel_timeout_s_ = 0.5;
     double vw_timeout_s_ = 0.5;
 
-    uint32_t id_xyz_  = 0x180;
     uint32_t id_scan_ = 0x190;
 
     size_t send_count_ = 0;
