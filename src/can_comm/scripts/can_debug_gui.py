@@ -23,6 +23,7 @@ class CanDebugGui(Node):
         self.outpost_pub = self.create_publisher(Bool, "/outpost_mode_type", 10)
         self.armor_pub = self.create_publisher(ArmorPresence, "/detector/armor_presence", 10)
         self.yaw_ctrl_pub = self.create_publisher(Int32, "/yaw_controller", 10)
+        self.target_yaw_override_pub = self.create_publisher(Float32, "/target_yaw", 10)
 
         self.tx_target_yaw = 0.0
         self.create_subscription(Float32, "/target_yaw", self._on_yaw_tx, 10)
@@ -87,11 +88,11 @@ class CanDebugGui(Node):
 def build_gui(node: CanDebugGui):
     root = tk.Tk()
     root.title("CAN Debug — can_send / can_receive")
-    root.geometry("720x510")
+    root.geometry("720x540")
     root.resizable(False, False)
 
     ctrl = ttk.LabelFrame(root, text="发送控制", padding=10)
-    ctrl.place(x=10, y=10, width=340, height=490)
+    ctrl.place(x=10, y=10, width=340, height=520)
 
     # ── 滑条 ──
     def _make_slider_cb(attr, disp):
@@ -102,17 +103,33 @@ def build_gui(node: CanDebugGui):
                 setattr(node, attr, v)
         return cb
 
-    for row, (label, attr) in enumerate([
-        ("vx", "tx_vx"), ("vy", "tx_vy"), ("vw", "tx_vw"),
+    for row, (label, attr, rng) in enumerate([
+        ("vx", "tx_vx", 100), ("vy", "tx_vy", 100), ("vw", "tx_vw", 100),
     ]):
         ttk.Label(ctrl, text=label).grid(row=row, column=0, sticky="e", padx=(0, 5))
         disp = tk.StringVar(value="0.00")
-        ttk.Label(ctrl, textvariable=disp, width=6).grid(row=row, column=1)
-        s = ttk.Scale(ctrl, from_=-100, to=100, command=_make_slider_cb(attr, disp))
+        ttk.Label(ctrl, textvariable=disp, width=7).grid(row=row, column=1)
+        s = ttk.Scale(ctrl, from_=-rng, to=rng, command=_make_slider_cb(attr, disp))
         s.set(0)
         s.grid(row=row, column=2, padx=5)
 
-    ttk.Separator(ctrl, orient="horizontal").grid(row=3, columnspan=3, sticky="ew", pady=10)
+    # target_yaw 滑条: 范围 [-180, 180]，直接发布到 /target_yaw
+    ty_row = 3
+    ttk.Separator(ctrl, orient="horizontal").grid(row=ty_row, columnspan=3, sticky="ew", pady=10)
+    ttk.Label(ctrl, text="target_yaw").grid(row=ty_row + 1, column=0, sticky="e", padx=(0, 5))
+    ty_disp = tk.StringVar(value="0.0")
+    ttk.Label(ctrl, textvariable=ty_disp, width=7).grid(row=ty_row + 1, column=1)
+
+    def _on_target_yaw_slider(val_str):
+        v = float(val_str) / 10.0      # Scale int → deg, 精度 0.1°
+        ty_disp.set(f"{v:.1f}")
+        node.target_yaw_override_pub.publish(Float32(data=v))
+
+    ty_s = ttk.Scale(ctrl, from_=-1800, to=1800, command=_on_target_yaw_slider)
+    ty_s.set(0)
+    ty_s.grid(row=ty_row + 1, column=2, padx=5)
+
+    ttk.Separator(ctrl, orient="horizontal").grid(row=ty_row + 2, columnspan=3, sticky="ew", pady=10)
 
     # ── 勾选框 ──
     def _set_toggle(attr):
@@ -127,7 +144,7 @@ def build_gui(node: CanDebugGui):
         ("scan_mode", "tx_scan"),
         ("NLJG_mode (打符)", "tx_nljg"),
         ("outpost_mode", "tx_outpost"),
-    ], start=4):
+    ], start=6):
         var = tk.BooleanVar()
         setattr(node, f"{attr}_var", var)
         var.trace_add("write", lambda *a, a2=attr: setattr(
@@ -136,13 +153,13 @@ def build_gui(node: CanDebugGui):
             row=row, column=0, columnspan=3, sticky="w", padx=50)
         toggles.append((attr, var))
 
-    ttk.Separator(ctrl, orient="horizontal").grid(row=7, columnspan=3, sticky="ew", pady=10)
+    ttk.Separator(ctrl, orient="horizontal").grid(row=9, columnspan=3, sticky="ew", pady=10)
 
     for row, (label, attr) in enumerate([
         ("armor_left", "tx_left"),
         ("armor_behind", "tx_behind"),
         ("armor_right", "tx_right"),
-    ], start=8):
+    ], start=10):
         var = tk.BooleanVar()
         setattr(node, f"{attr}_var", var)
         var.trace_add("write", lambda *a, a2=attr: setattr(
@@ -151,7 +168,7 @@ def build_gui(node: CanDebugGui):
             row=row, column=0, columnspan=3, sticky="w", padx=50)
 
     # ── yaw controller 触发按钮 ──
-    btn_row = 11
+    btn_row = 13
     ttk.Separator(ctrl, orient="horizontal").grid(
         row=btn_row, columnspan=3, sticky="ew", pady=10)
     ttk.Label(ctrl, text="yaw_controller:").grid(
@@ -165,7 +182,7 @@ def build_gui(node: CanDebugGui):
 
     # ── 右侧: 显示 ──
     disp = ttk.LabelFrame(root, text="实时数据", padding=10)
-    disp.place(x=360, y=10, width=350, height=490)
+    disp.place(x=360, y=10, width=350, height=520)
 
     ttk.Label(disp, text="── 发送到 CAN ──", font=("", 10, "bold")).grid(
         row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
