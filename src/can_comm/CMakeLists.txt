@@ -105,4 +105,9 @@ install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS scripts/can_debug_gui.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME can_debug_gui
+)
+
 ament_package()
