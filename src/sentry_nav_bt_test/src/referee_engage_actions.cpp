@@ -174,12 +174,12 @@ bool EngageRune::triggerYawController()
 
 bool EngageRune::ensureEngageOutputs()
 {
-    if (!scan_mode_disabled_) {
-        if (!publishScanMode(false)) {
+    if (!scan_mode_yaw_control_enabled_) {
+        if (!publishScanMode(true)) {
             return false;
         }
-        scan_mode_disabled_ = true;
-        RCLCPP_INFO(node_->get_logger(), "EngageRune: 已按顺序向 scan mode 发送 false");
+        scan_mode_yaw_control_enabled_ = true;
+        RCLCPP_INFO(node_->get_logger(), "EngageRune: 已向 scan mode 发送 1，切换为定向 yaw 控制");
     }
 
     if (!yaw_controller_triggered_) {
@@ -213,9 +213,9 @@ void EngageRune::cleanupOutputs()
         auto_shoot_enabled_ = false;
     }
 
-    if (scan_mode_disabled_) {
-        publishScanMode(true);
-        scan_mode_disabled_ = false;
+    if (scan_mode_yaw_control_enabled_) {
+        publishScanMode(false);
+        scan_mode_yaw_control_enabled_ = false;
     }
 
     yaw_controller_triggered_ = false;
@@ -299,7 +299,7 @@ BT::NodeStatus EngageRune::onStart()
     yaw_controller_trigger_time_ = std::chrono::steady_clock::time_point{};
     active_rune_status_key_.clear();
     saw_activating_state_ = false;
-    scan_mode_disabled_ = false;
+    scan_mode_yaw_control_enabled_ = false;
     yaw_controller_triggered_ = false;
     auto_shoot_enabled_ = false;
     setRuneOutcome(false, "running");
@@ -309,7 +309,7 @@ BT::NodeStatus EngageRune::onStart()
 
     RCLCPP_INFO(
         node_->get_logger(),
-        "EngageRune: 进入激活能量机关流程，等待按顺序发送 scan_mode=false -> yaw_controller=0 -> autoshoot=true -> yaw后延时2s -> 激活请求");
+        "EngageRune: 进入激活能量机关流程，等待按顺序发送 scan_mode=true -> yaw_controller=0 -> autoshoot=true -> yaw后延时2s -> 激活请求");
 
     return BT::NodeStatus::RUNNING;
 }
@@ -649,12 +649,12 @@ bool EngageOutpost::ensureEngageOutputs()
         return false;
     }
 
-    if (!scan_mode_disabled_) {
-        if (!publishScanMode(false)) {
+    if (!scan_mode_yaw_control_enabled_) {
+        if (!publishScanMode(true)) {
             return false;
         }
-        scan_mode_disabled_ = true;
-        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: 已按顺序向 scan mode 发送 false");
+        scan_mode_yaw_control_enabled_ = true;
+        RCLCPP_INFO(node_->get_logger(), "EngageOutpost: 已向 scan mode 发送 1，切换为定向 yaw 控制");
     }
 
     if (!yaw_controller_triggered_) {
@@ -692,9 +692,9 @@ void EngageOutpost::cleanupOutputs()
         outpost_mode_enabled_ = false;
     }
 
-    if (scan_mode_disabled_) {
-        publishScanMode(true);
-        scan_mode_disabled_ = false;
+    if (scan_mode_yaw_control_enabled_) {
+        publishScanMode(false);
+        scan_mode_yaw_control_enabled_ = false;
     }
 
     yaw_controller_triggered_ = false;
@@ -718,7 +718,7 @@ BT::NodeStatus EngageOutpost::onStart()
     }
 
     start_time_ = std::chrono::steady_clock::now();
-    scan_mode_disabled_ = false;
+    scan_mode_yaw_control_enabled_ = false;
     yaw_controller_triggered_ = false;
     outpost_mode_enabled_ = false;
     outpost_attack_posture_requested_ = false;
@@ -726,7 +726,7 @@ BT::NodeStatus EngageOutpost::onStart()
 
     RCLCPP_INFO(
         node_->get_logger(),
-        "EngageOutpost: 进入打前哨站流程，等待按顺序发送 scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true");
+        "EngageOutpost: 进入打前哨站流程，等待按顺序发送 scan_mode=true -> yaw_controller=1 -> outpost_mode_type=true");
 
     if (isEnemyOutpostDestroyed()) {
         setOutpostOutcome(true, "enemy_outpost_destroyed_by_hp");

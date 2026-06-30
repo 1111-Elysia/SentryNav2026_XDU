@@ -218,7 +218,7 @@ namespace sentry_nav_bt_test
     };
 
     // 动作 4：打能量机关
-    // 顺序：scan_mode=false -> yaw_controller=0 -> autoshoot=true -> 等待 2s -> 发送激活请求
+    // 顺序：scan_mode=true -> yaw_controller=0 -> autoshoot=true -> 等待 2s -> 发送激活请求
     // XML: <EngageRune rune_type="small" posture="1" timeout_ms="30000" request_interval_ms="1000"/>
     class EngageRune : public BT::StatefulActionNode
     {
@@ -266,7 +266,7 @@ namespace sentry_nav_bt_test
         std::chrono::steady_clock::time_point start_time_{};
         std::chrono::steady_clock::time_point last_request_time_{};
         std::chrono::steady_clock::time_point yaw_controller_trigger_time_{};
-        bool scan_mode_disabled_{false};
+        bool scan_mode_yaw_control_enabled_{false};
         bool yaw_controller_triggered_{false};
         bool auto_shoot_enabled_{false};
         bool saw_activating_state_{false};
@@ -274,7 +274,7 @@ namespace sentry_nav_bt_test
     };
 
     // 动作 5：打前哨站
-    // 顺序：scan_mode=false -> yaw_controller=1 -> outpost_mode_type=true
+    // 顺序：scan_mode=true -> yaw_controller=1 -> outpost_mode_type=true
     // XML: <EngageOutpost timeout_ms="70000"/>
     class EngageOutpost : public BT::StatefulActionNode
     {
@@ -309,7 +309,7 @@ namespace sentry_nav_bt_test
 
         int timeout_ms_{45000};
         std::chrono::steady_clock::time_point start_time_{};
-        bool scan_mode_disabled_{false};
+        bool scan_mode_yaw_control_enabled_{false};
         bool yaw_controller_triggered_{false};
         bool outpost_mode_enabled_{false};
         bool outpost_attack_posture_requested_{false};
