@@ -24,6 +24,9 @@ class CanDebugGui(Node):
         self.armor_pub = self.create_publisher(ArmorPresence, "/detector/armor_presence", 10)
         self.yaw_ctrl_pub = self.create_publisher(Int32, "/yaw_controller", 10)
 
+        self.tx_target_yaw = 0.0
+        self.create_subscription(Float32, "/target_yaw", self._on_yaw_tx, 10)
+
         self.rx_yaw = 0.0
         self.rx_pitch = 0.0
         self.rx_dist = 0.0
@@ -45,6 +48,10 @@ class CanDebugGui(Node):
         self.tx_right = False
 
         self.pub_timer = self.create_timer(0.05, self._pub_tick)
+
+    def _on_yaw_tx(self, m):
+        with self.tx_lock:
+            self.tx_target_yaw = m.data
 
     def _on(self, attr):
         def cb(m):
@@ -80,11 +87,11 @@ class CanDebugGui(Node):
 def build_gui(node: CanDebugGui):
     root = tk.Tk()
     root.title("CAN Debug — can_send / can_receive")
-    root.geometry("720x480")
+    root.geometry("720x510")
     root.resizable(False, False)
 
     ctrl = ttk.LabelFrame(root, text="发送控制", padding=10)
-    ctrl.place(x=10, y=10, width=340, height=460)
+    ctrl.place(x=10, y=10, width=340, height=490)
 
     # ── 滑条 ──
     def _make_slider_cb(attr, disp):
@@ -158,7 +165,7 @@ def build_gui(node: CanDebugGui):
 
     # ── 右侧: 显示 ──
     disp = ttk.LabelFrame(root, text="实时数据", padding=10)
-    disp.place(x=360, y=10, width=350, height=460)
+    disp.place(x=360, y=10, width=350, height=490)
 
     ttk.Label(disp, text="── 发送到 CAN ──", font=("", 10, "bold")).grid(
         row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
@@ -166,6 +173,7 @@ def build_gui(node: CanDebugGui):
     tx_labels = {}
     tx_items = [
         ("tx_vx", "vx"), ("tx_vy", "vy"), ("tx_vw", "vw"),
+        ("tx_target_yaw", "target_yaw"),
         ("tx_scan", "scan_mode"), ("tx_nljg", "NLJG"), ("tx_outpost", "outpost"),
         ("tx_left", "armor_left"), ("tx_behind", "armor_behind"), ("tx_right", "armor_right"),
     ]
