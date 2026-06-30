@@ -87,9 +87,10 @@ def build_gui(node: CanDebugGui):
     ctrl.place(x=10, y=10, width=340, height=460)
 
     # ── 滑条 ──
-    def _set_slider_tx(attr):
+    def _make_slider_cb(attr, disp):
         def cb(val_str):
             v = float(val_str) / 100.0
+            disp.set(f"{v:.2f}")
             with node.tx_lock:
                 setattr(node, attr, v)
         return cb
@@ -100,14 +101,7 @@ def build_gui(node: CanDebugGui):
         ttk.Label(ctrl, text=label).grid(row=row, column=0, sticky="e", padx=(0, 5))
         disp = tk.StringVar(value="0.00")
         ttk.Label(ctrl, textvariable=disp, width=6).grid(row=row, column=1)
-        s = ttk.Scale(ctrl, from_=-100, to=100, command=_set_slider_tx(attr))
-        # 同步显示文本
-        s._disp = disp
-        s._attr = attr
-        def _sync(val_str, scale=s):
-            v = float(val_str) / 100.0
-            scale._disp.set(f"{v:.2f}")
-        s.configure(command=_sync)
+        s = ttk.Scale(ctrl, from_=-100, to=100, command=_make_slider_cb(attr, disp))
         s.set(0)
         s.grid(row=row, column=2, padx=5)
 
