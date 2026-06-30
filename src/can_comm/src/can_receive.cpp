@@ -95,6 +95,9 @@ public:
             std::chrono::duration_cast<std::chrono::nanoseconds>(period),
             std::bind(&CanReceiveNode::onTimer, this));
 
+        // 初始化 last_log_ 时间为当前时刻，确保时钟类型一致
+        last_log_ = this->now();
+
         RCLCPP_INFO(this->get_logger(), "CAN 接收节点初始化完成 | port=%s can_id=0x%X", port.c_str(), can_id);
     }
 
