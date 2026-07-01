@@ -66,6 +66,17 @@
         </Fallback>
       </ForceFailure>
 
+      <ForceFailure>
+        <SubTree
+          ID="UnderAttackVw"
+          high_hp_threshold="250"
+          high_hp_vw="1.0"
+          low_hp_threshold="150"
+          low_hp_vw="0.3"
+          republish_interval_ms="50"
+          _autoremap="1"/>
+      </ForceFailure>
+
       <ReactiveSequence name="主循环_Root">
         <Sequence name="前置检查">
           <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
@@ -559,9 +570,6 @@
     </Action>
     <Action ID="Wait" editable="true">
       <input_port name="wait_duration"/>
-    </Action>
-    <Action ID="AutoAimAndFire" editable="true">
-      <input_port name="target_type"/>
     </Action>
     <Decorator ID="RetryUntilSuccessful">
       <input_port name="num_attempts"/>

@@ -41,6 +41,11 @@ class RefereeNode : public rclcpp::Node {
                                                                 .automatically_declare_parameters_from_overrides(true));
   ~RefereeNode() override;
 
+ protected:
+  RefereeNode(const std::string& node_name, const rclcpp::NodeOptions& options, bool start_serial_io);
+  void FeedNormalData(const std::string& data);
+  void FeedVtData(const std::string& data);
+
  private:
   void SpawnPublishers();
   void GetParameters();

@@ -18,9 +18,6 @@
     <include path="train_rune.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>
-        <Action ID="AutoAimAndFire" editable="true">
-            <input_port name="target_type"/>
-        </Action>
         <Condition ID="CheckCondition" editable="true">
             <input_port name="key_name"/>
             <input_port name="comparison"/>

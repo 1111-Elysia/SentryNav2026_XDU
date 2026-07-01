@@ -43,8 +43,12 @@ add_library(sentry_nav_bt_test_nodes SHARED
   src/goal_selector_node.cpp
   src/patrol_nodes.cpp
   src/reliable_navigate_to_pose.cpp
+  src/publish_vw_action.cpp
   src/referee_actions_common.cpp
   src/referee_engage_actions.cpp
+  src/referee/control_topic_publishers.cpp
+  src/blackboard/defaults.cpp
+  src/navigation/waypoint_loader.cpp
 )
 
 # 库的依赖
@@ -74,7 +78,6 @@ target_compile_definitions(sentry_nav_bt_test_nodes PRIVATE BT_PLUGIN_EXPORT)
 # ============================================
 add_executable(navigate_bt_node 
   src/sentry_nav_bt_test.cpp 
-  src/chase_target_action.cpp
 )
 
 # 链接刚才创建的库

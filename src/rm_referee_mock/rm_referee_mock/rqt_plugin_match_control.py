@@ -41,7 +41,11 @@ except ImportError:
 
 from rm_referee_mock.match_control_widget import MatchControlWidget
 from rm_referee_mock.publisher_pool import PublisherPool
-from rm_referee_mock.sentry_posture import decode_sentry_command
+from rm_referee_mock.protocol import (
+    decode_sentry_command,
+    pack_sentry_info,
+    truncate_sentry_command,
+)
 
 
 # [新增] 创建一个用于跨线程通信的桥接类
@@ -159,64 +163,14 @@ class MatchControlPlugin(Plugin):
         self._widget.update_auto_supply_pose(translation.x, translation.y, "tf")
 
     def _truncate_sentry_cmd_for_protocol(self, parsed_cmd):
-        truncated_cmd = dict(parsed_cmd)
-
-        def clear_from_exchange(reason):
-            truncated_cmd["exchange_projectile"] = 0
-            truncated_cmd["remote_projectile_exchange_count"] = 0
-            truncated_cmd["remote_hp_exchange_count"] = 0
-            truncated_cmd["posture"] = 0
-            truncated_cmd["activate_rune"] = 0
-            return truncated_cmd, reason
-
-        def clear_from_remote_projectile(reason):
-            truncated_cmd["remote_projectile_exchange_count"] = 0
-            truncated_cmd["remote_hp_exchange_count"] = 0
-            truncated_cmd["posture"] = 0
-            truncated_cmd["activate_rune"] = 0
-            return truncated_cmd, reason
-
-        def clear_from_remote_hp(reason):
-            truncated_cmd["remote_hp_exchange_count"] = 0
-            truncated_cmd["posture"] = 0
-            truncated_cmd["activate_rune"] = 0
-            return truncated_cmd, reason
-
-        current_exchange = self._widget.spinBox_sentry_exchange_projectile.value()
-        requested_exchange = int(parsed_cmd.get("exchange_projectile", 0))
-        if requested_exchange < current_exchange:
-            return clear_from_exchange(
-                "补血点补弹累计值回退，"
-                f"当前已成功兑换 {current_exchange}，本次请求 {requested_exchange}",
-            )
-
-        current_remote_projectile = self._widget.spinBox_sentry_remote_projectile_exchange.value()
-        requested_remote_projectile = int(parsed_cmd.get("remote_projectile_exchange_count", 0))
-        if requested_remote_projectile < current_remote_projectile:
-            return clear_from_remote_projectile(
-                "远程补弹请求次数回退，"
-                f"当前 {current_remote_projectile}，本次请求 {requested_remote_projectile}",
-            )
-        if requested_remote_projectile > current_remote_projectile + 1:
-            return clear_from_remote_projectile(
-                "远程补弹请求次数跳变，"
-                f"当前 {current_remote_projectile}，本次请求 {requested_remote_projectile}",
-            )
-
-        current_remote_hp = self._widget.spinBox_sentry_remote_hp_exchange.value()
-        requested_remote_hp = int(parsed_cmd.get("remote_hp_exchange_count", 0))
-        if requested_remote_hp < current_remote_hp:
-            return clear_from_remote_hp(
-                "远程回血请求次数回退，"
-                f"当前 {current_remote_hp}，本次请求 {requested_remote_hp}",
-            )
-        if requested_remote_hp > current_remote_hp + 1:
-            return clear_from_remote_hp(
-                "远程回血请求次数跳变，"
-                f"当前 {current_remote_hp}，本次请求 {requested_remote_hp}",
-            )
-
-        return truncated_cmd, ""
+        current = {
+            "exchange_projectile": self._widget.spinBox_sentry_exchange_projectile.value(),
+            "remote_projectile_exchange_count":
+                self._widget.spinBox_sentry_remote_projectile_exchange.value(),
+            "remote_hp_exchange_count":
+                self._widget.spinBox_sentry_remote_hp_exchange.value(),
+        }
+        return truncate_sentry_command(parsed_cmd, current)
 
     def _handle_sentry_cmd(self, request, response):
         """
@@ -474,28 +428,10 @@ class MatchControlPlugin(Plugin):
         sentry_info_msg.header.frame_id = "referee_system"
 
         sentry_status = status.get("sentry_info", {})
-        posture_bits = int(sentry_status.get("base_posture", 3)) & 0x03
-        posture_enhanced = int(bool(sentry_status.get("enhanced", False)))
-        can_activate = int(sentry_status.get("can_activate", False))
-
-        packed_info = 0
-        packed_info |= int(sentry_status.get("exchange_projectile", 0)) & 0x07FF
-        packed_info |= (int(sentry_status.get("remote_projectile_exchange_count", 0)) & 0x0F) << 11
-        packed_info |= (int(sentry_status.get("remote_hp_exchange_count", 0)) & 0x0F) << 15
-        packed_info |= (int(bool(sentry_status.get("can_free_revive", False))) & 0x01) << 19
-        packed_info |= (int(bool(sentry_status.get("can_buy_revive", False))) & 0x01) << 20
-        packed_info |= (int(sentry_status.get("buy_revive_cost", 0)) & 0x03FF) << 21
-
-        packed_info_2 = 0
-        packed_info_2 |= int(bool(sentry_status.get("is_disengaged", False))) & 0x01
-        packed_info_2 |= (int(sentry_status.get("team_projectile_exchange_remaining", 0)) & 0x07FF) << 1
-        packed_info_2 |= (posture_bits & 0x03) << 12
-        packed_info_2 |= (can_activate & 0x01) << 14
-        packed_info_2 |= (posture_enhanced & 0x01) << 15
-
+        packed_info, packed_info_2, packed_info_3 = pack_sentry_info(sentry_status)
         sentry_info_msg.sentry_info = packed_info
         sentry_info_msg.sentry_info_2 = packed_info_2
-        sentry_info_msg.sentry_info_3 = int(sentry_status.get("sentry_info_3", 0))
+        sentry_info_msg.sentry_info_3 = packed_info_3
         
         self._publisher_pool.publish(
             f"{topic_prefix}/sentry_info", SentryInfo, sentry_info_msg)

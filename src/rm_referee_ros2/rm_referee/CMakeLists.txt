@@ -29,6 +29,18 @@ rclcpp_components_register_node(referee_node_component
   EXECUTABLE referee_node
 )
 
+# 创建裁判系统原始数据回放组件库
+ament_auto_add_library(referee_replay_node_component SHARED src/referee_replay_node.cc)
+target_link_libraries(referee_replay_node_component referee_node_component ${PROJECT_NAME}_third_party)
+target_include_directories(referee_replay_node_component PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+rclcpp_components_register_node(referee_replay_node_component
+  PLUGIN "RefereeReplayNode"
+  EXECUTABLE referee_replay_node
+)
+
 # 创建 tf_publisher 组件库
 ament_auto_add_library(tf_publisher_component SHARED src/tf_publisher.cc)
 target_include_directories(tf_publisher_component PUBLIC
@@ -41,7 +53,7 @@ rclcpp_components_register_node(tf_publisher_component
 )
 
 # 安装库和可执行文件
-install(TARGETS referee_node_component tf_publisher_component
+install(TARGETS referee_node_component referee_replay_node_component tf_publisher_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

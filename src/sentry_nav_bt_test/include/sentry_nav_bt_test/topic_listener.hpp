@@ -10,8 +10,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "behaviortree_cpp/blackboard.h"
 
-#include <fstream>
-#include <nlohmann/json.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <tf2_ros/transform_listener.h>
@@ -34,6 +32,9 @@
 
 #include <geometry_msgs/msg/twist.hpp>
 #include "sentry_nav_bt_test/center_hold_vw_controller.hpp"
+#include "sentry_nav_bt_test/blackboard/defaults.hpp"
+#include "sentry_nav_bt_test/blackboard_utils.hpp"
+#include "sentry_nav_bt_test/navigation/waypoint_loader.hpp"
 
 namespace sentry_nav_bt_test
 {
@@ -140,67 +141,7 @@ namespace sentry_nav_bt_test
         // 订阅裁判系统话题
         void bb_manager_init()
         {
-            // 设置必要的黑板参数
-            blackboard_->set<std::chrono::milliseconds>("bt_loop_duration", std::chrono::milliseconds(10));
-            blackboard_->set<std::chrono::milliseconds>("wait_for_service_timeout", std::chrono::milliseconds(1000));
-            blackboard_->set<std::chrono::milliseconds>("server_timeout", std::chrono::milliseconds(1000));
-            blackboard_->set<bool>("initial_pose_received", false);
-
-            // 显式记录是否已经收到过裁判系统状态，避免用 game_progress 的默认值误判已连接
-            blackboard_->set<bool>("game_status_received", false);
-            blackboard_->set<int>("game_status_connected_logged", 0);
-
-            // 初始化 UL/UC 状态，避免赛前条件检查因缺键刷 warning
-            blackboard_->set<bool>("last_referee_tx_ok", false);
-            blackboard_->set<int>("last_posture_request_target", -1);
-            blackboard_->set<bool>("last_posture_request_sent", false);
-            blackboard_->set<bool>("last_posture_request_tx_ok", false);
-            blackboard_->set<bool>("last_posture_request_confirmed", false);
-            blackboard_->set<bool>("last_posture_request_pending", false);
-            blackboard_->set<std::string>("last_posture_request_result", "idle");
-            blackboard_->set<double>("last_posture_request_time_s", -1.0);
-            blackboard_->set<int>("posture_switch_cooldown_ms", 5000);
-            blackboard_->set<int>("ul_initialized", 0);
-            blackboard_->set<int>("uc_initialized", 0);
-            blackboard_->set<int>("ul_retreat_active", 0);
-            blackboard_->set<int>("ul_center_ready", 0);
-            blackboard_->set<int>("uc_supply_active", 0);
-            blackboard_->set<int>("uc_outpost_active", 0);
-            blackboard_->set<int>("uc_normal_posture", 3);
-            blackboard_->set<bool>("power_management_shooter_output", true);
-            blackboard_->set<bool>("power_heat_data_received", false);
-            blackboard_->set<int>("shooter_17mm_barrel_heat", 0);
-            blackboard_->set<int>("shooter_17mm_barrel_heat_prev", 0);
-            blackboard_->set<int>("shooter_17mm_barrel_heat_delta", 0);
-            blackboard_->set<int>("shooter_17mm_heat_firing", 0);
-            blackboard_->set<int>("center_gain_point_occupancy_status", 0);
-            blackboard_->set<std::string>("ul_center_goal_name", "center_point");
-            blackboard_->set<double>("ul_center_arrive_distance_threshold", 0.10);
-            blackboard_->set<double>("ul_center_hold_distance_threshold", 0.50);
-            blackboard_->set<double>("ul_center_hold_exit_distance_threshold", 0.55);
-            blackboard_->set<int>("uc_fortress_hold_active", 0);
-            blackboard_->set<std::string>("uc_fortress_goal_name", "fortress");
-            blackboard_->set<double>("uc_fortress_hold_distance_threshold", 0.25);
-            blackboard_->set<double>("uc_fortress_hold_exit_distance_threshold", 0.30);
-            blackboard_->set<int>("fortress_gain_point_occupancy_status", 0);
-            blackboard_->set<int>("outpost_gain_point_occupancy_status", 0);
-            blackboard_->set<int>("base_gain_point_occupied", 0);
-            blackboard_->set<bool>("map_command_received", false);
-            blackboard_->set<bool>("sentry_info_received", false);
-            blackboard_->set<double>("ul_pose_stale_timeout_s", 0.50);
-            blackboard_->set<bool>("waypoint_now_valid", false);
-            blackboard_->set<uint32_t>("rfid_status", 0U);
-            blackboard_->set<uint8_t>("rfid_status_2", 0U);
-            blackboard_->set<int>("rfid_ally_fortress_detected", 0);
-            blackboard_->set<int>("rfid_supply_zone_bit19_detected", 0);
-            blackboard_->set<int>("rfid_supply_zone_bit20_detected", 0);
-            blackboard_->set<int>("rfid_supply_zone_detected", 0);
-
-            // 初始化 hurt_armor_id 为 -1
-            blackboard_->set<int>("hurt_armor_id", -1);
-            blackboard_->set<int>("hurt_armor", 0);
-            blackboard_->set<int>("is_under_attack", 0);
-            blackboard_->set<int>("in_rune_phase", 0);
+            blackboard::initializeDefaults(blackboard_);
 
             // 初始化定时器
             hurt_reset_timer_ = node_->create_wall_timer(
@@ -407,6 +348,11 @@ namespace sentry_nav_bt_test
                     bb->set("stage_remain_time", msg->stage_remain_time);
                     bb->set("sync_timestamp", msg->sync_timestamp);
                     bb->set("game_status_received", true);
+                    if (msg->game_progress < 4U) {
+                        bb->set("is_under_attack", 0);
+                        bb->set("hurt_armor_id", -1);
+                        bb->set("hurt_armor", 0);
+                    }
                     RCLCPP_DEBUG(
                         node_->get_logger(),
                         "黑板更新: '%s' 从话题 '%s'",
@@ -547,6 +493,24 @@ namespace sentry_nav_bt_test
                 {
                     std::lock_guard<std::mutex> lock(hurt_mutex_);
 
+                    double game_progress = 0.0;
+                    if (!blackboard_utils::getValue(bb, "game_progress", game_progress, "BlackboardManager") ||
+                        game_progress < 4.0) {
+                        bb->set("is_under_attack", 0);
+                        bb->set("hurt_armor_id", -1);
+                        bb->set("hurt_armor", 0);
+                        return;
+                    }
+
+                    double current_hp = 0.0;
+                    if (blackboard_utils::getValue(bb, "current_hp", current_hp, "BlackboardManager") &&
+                        current_hp <= 0.0) {
+                        bb->set("is_under_attack", 0);
+                        bb->set("hurt_armor_id", -1);
+                        bb->set("hurt_armor", 0);
+                        return;
+                    }
+
                     uint8_t id = msg->armor_id;              
                     uint8_t type = msg->hp_deduction_reason; // 0=弹丸
                     // 1. 如果装甲板ID大于5，忽略 (无效数据)
@@ -583,89 +547,7 @@ namespace sentry_nav_bt_test
 
         void load_waypoints(const std::string &json_file_path)
         {
-            try
-            {
-                this->load_waypoints_from_json(json_file_path, blackboard_, node_);
-            }
-            catch (const std::exception &e)
-            {
-                RCLCPP_ERROR(node_->get_logger(), "加载目标点文件时出错: %s", e.what());
-            }
-        }
-
-        // 从JSON文件加载路径点信息
-        void load_waypoints_from_json(const std::string &json_file_path, BT::Blackboard::Ptr blackboard,
-                                      std::shared_ptr<rclcpp::Node> node)
-        {
-            try
-            {
-                // 打开并读取JSON文件
-                std::ifstream file(json_file_path);
-                if (!file.is_open())
-                {
-                    RCLCPP_ERROR(node->get_logger(), "无法打开目标点文件: %s", json_file_path.c_str());
-                    return;
-                }
-
-                // 解析JSON
-                nlohmann::json waypoints_json;
-                file >> waypoints_json;
-
-                // 检查文件格式
-                if (!waypoints_json.is_object() || !waypoints_json.contains("waypoints"))
-                {
-                    RCLCPP_ERROR(node->get_logger(), "JSON文件格式错误，应包含'waypoints'数组");
-                    return;
-                }
-
-                // 获取并解析waypoints数组
-                auto &waypoints_array = waypoints_json["waypoints"];
-                if (!waypoints_array.is_array())
-                {
-                    RCLCPP_ERROR(node->get_logger(), "'waypoints'不是数组");
-                    return;
-                }
-
-                int loaded_count = 0;
-
-                for (const auto &wp : waypoints_array)
-                {
-                    if (!wp.is_object() || !wp.contains("name") || !wp.contains("x") || !wp.contains("y") || !wp.contains("yaw"))
-                    {
-                        RCLCPP_WARN(node->get_logger(), "跳过格式不正确的目标点");
-                        continue;
-                    }
-
-                    // 创建PoseStamped消息
-                    geometry_msgs::msg::PoseStamped pose;
-                    pose.header.frame_id = "map";
-                    pose.header.stamp = node->now();
-
-                    // 设置位置
-                    pose.pose.position.x = wp["x"];
-                    pose.pose.position.y = wp["y"];
-                    pose.pose.position.z = 0.0;
-
-                    // 从偏航角计算四元数
-                    double yaw = wp["yaw"];
-                    tf2::Quaternion q;
-                    q.setRPY(0, 0, yaw);
-                    pose.pose.orientation.x = q.x();
-                    pose.pose.orientation.y = q.y();
-                    pose.pose.orientation.z = q.z();
-                    pose.pose.orientation.w = q.w();
-
-                    const std::string name = wp["name"];
-                    blackboard->set("waypoint_" + name, pose);
-                    loaded_count++;
-                }
-
-                RCLCPP_INFO(node->get_logger(), "成功加载 %d 个目标点", loaded_count);
-            }
-            catch (const std::exception &e)
-            {
-                RCLCPP_ERROR(node->get_logger(), "加载目标点文件时出错: %s", e.what());
-            }
+            navigation::loadWaypoints(json_file_path, blackboard_, node_);
         }
 
     private:

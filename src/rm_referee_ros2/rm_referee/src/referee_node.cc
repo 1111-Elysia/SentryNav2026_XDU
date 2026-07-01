@@ -2,13 +2,22 @@
 #include "referee_node/referee_node.hpp"
 #include "referee_node/log_utils.hpp"
 
-RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("referee_node", options) {
+RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : RefereeNode("referee_node", options, true) {}
+
+RefereeNode::RefereeNode(const std::string &node_name, const rclcpp::NodeOptions &options, bool start_serial_io)
+    : rclcpp::Node(node_name, options) {
   SpawnPublishers();
-  GetParameters();
+  if (start_serial_io) {
+    GetParameters();
+  }
 
   // 为两个 Referee 对象注册回调函数
   normal_referee_.AttachCallback([this](uint16_t cmd_id, uint8_t seq) { PublishMsg(cmd_id, normal_referee_.data()); });
   vt_referee_.AttachCallback([this](uint16_t cmd_id, uint8_t seq) { PublishMsg(cmd_id, vt_referee_.data()); });
+
+  if (!start_serial_io) {
+    return;
+  }
 
   // 初始化串口、启动线程
   if (param_enable_normal_) {
@@ -38,14 +47,7 @@ RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("ref
         if (normal_recorder_) {
           normal_recorder_->Write(data);
         }
-        for (auto byte : data) {
-          normal_referee_ << byte;
-        }
-        if (normal_referee_.loss_rate() > 10.f) {
-          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                               text::Yellow("High loss rate on normal link! %.2f%%").c_str(),
-                               normal_referee_.loss_rate());
-        }
+        FeedNormalData(data);
       }
     });
   } else {
@@ -83,14 +85,7 @@ RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("ref
         if (vt_recorder_) {
           vt_recorder_->Write(data);
         }
-        for (auto byte : data) {
-          vt_referee_ << byte;
-        }
-        if (vt_referee_.loss_rate() > 10.f) {
-          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                               text::Yellow("High loss rate on VT link! %.2f%%").c_str(),  //
-                               vt_referee_.loss_rate());
-        }
+        FeedVtData(data);
       }
     });
   } else {
@@ -115,6 +110,26 @@ RefereeNode::RefereeNode(const rclcpp::NodeOptions &options) : rclcpp::Node("ref
           response->header.stamp = get_clock()->now();
         });
     RCLCPP_INFO(get_logger(), "Referee service is now at /rm_referee/tx");
+  }
+}
+
+void RefereeNode::FeedNormalData(const std::string &data) {
+  for (auto byte : data) {
+    normal_referee_ << byte;
+  }
+  if (normal_referee_.loss_rate() > 10.f) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         text::Yellow("High loss rate on normal link! %.2f%%").c_str(), normal_referee_.loss_rate());
+  }
+}
+
+void RefereeNode::FeedVtData(const std::string &data) {
+  for (auto byte : data) {
+    vt_referee_ << byte;
+  }
+  if (vt_referee_.loss_rate() > 10.f) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         text::Yellow("High loss rate on VT link! %.2f%%").c_str(), vt_referee_.loss_rate());
   }
 }
 

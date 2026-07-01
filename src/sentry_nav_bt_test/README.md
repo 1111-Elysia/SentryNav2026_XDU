@@ -2,7 +2,8 @@
 
 `sentry_nav_bt_test` 是一个基于 `BehaviorTree.CPP + Nav2 + ROS 2` 的哨兵导航包。它把裁判系统状态、TF 位姿、路径点配置和自定义行为树节点组织到同一个执行入口里，用来驱动哨兵在比赛中的导航与局内决策。
 
-当前默认启动入口为 `launch/sentry_nav_bt_test.launch.py`，默认加载的行为树为 `config/uc_test.xml`。
+当前默认启动入口为 `launch/sentry_nav_bt_test.launch.py`，默认加载的行为树为
+`config/bt/uc_myhero.xml`。
 
 ## 功能概览
 
@@ -10,7 +11,7 @@
 - 监听 `/rm_referee/*` 相关话题，并将比赛状态、血量、受击信息、中心增益点占领状态等写入黑板
 - 从单一 `config/waypoints.json` 加载路径点，不再按机器人 ID 区分红蓝方点位
 - 从路径点配置中提取初始位姿并发布到 `/initialpose`
-- 提供一组自定义行为树节点，用于目标点选择、可靠导航、巡逻、追击、自定义条件判断和裁判系统指令发送
+- 提供一组自定义行为树节点，用于目标点选择、可靠导航、巡逻、自定义条件判断和裁判系统指令发送
 - 默认 `uc.xml` 实现了高校赛对抗主流程，包括赛前等待、开赛初始化、复活、回补、小符/大符激活、前哨站点位、防御姿态切换和堡垒驻守
 - `ul.xml` 仍然保留了赛前等待、比赛开始初始化、低血量回补、中心点/备用点切换与驻守逻辑
 
@@ -19,15 +20,14 @@
 ```text
 src/sentry_nav_bt_test
 ├── config
-│   ├── ul.xml
-│   ├── chase_bt.xml
-│   ├── uc.xml
-│   ├── ul_3.21.xml
+│   ├── bt/                 # 主树和可复用子树
 │   └── waypoints.json
 ├── include/sentry_nav_bt_test
+│   ├── blackboard/         # 黑板默认值等基础设施
+│   ├── navigation/         # 路径点与导航适配
+│   ├── referee/            # 裁判/底盘控制适配
 │   ├── topic_listener.hpp
 │   ├── reliable_navigate_to_pose.hpp
-│   ├── chase_target_action.hpp
 │   ├── patrol_nodes.hpp
 │   └── ...
 ├── launch
@@ -35,7 +35,6 @@ src/sentry_nav_bt_test
 └── src
     ├── sentry_nav_bt_test.cpp
     ├── reliable_navigate_to_pose.cpp
-    ├── chase_target_action.cpp
     ├── patrol_nodes.cpp
     └── ...
 ```
@@ -79,18 +78,9 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py
 
 默认行为：
 
-- 加载 `config/uc_test.xml`
+- 加载 `config/bt/uc_myhero.xml`
 - 路径点文件使用 `config/waypoints.json`
 - 节点参数中固定设置了 `use_sim_time=False`
-
-### 2. 切换到追击行为树
-
-```bash
-ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
-  bt_xml_filename:=$(ros2 pkg prefix sentry_nav_bt_test)/share/sentry_nav_bt_test/config/chase_bt.xml
-```
-
-`chase_bt.xml` 会启用 `ChaseTarget` 节点，默认订阅 `/autoaim/target_bl`，并持续向 `navigate_to_pose` 发送站位追击目标。当前版本在接近目标后会进入 `HOLD` 保持态，不会直接触发真实开火。
 
 ## 启动参数
 
@@ -98,7 +88,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 
 - `bt_xml_filename`
   - 行为树 XML 完整路径
-  - 默认值：安装目录下的 `config/uc_test.xml`
+  - 默认值：安装目录下的 `config/bt/uc_myhero.xml`
 - `waypoints_file`
   - 路径点 JSON
   - 默认值：安装目录下的 `config/waypoints.json`
@@ -235,29 +225,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `last_posture_request_result`
 
 
-### 追击树 `chase_bt.xml`
-
-追击树当前主要使用一个 `ChaseTarget` 节点，默认参数如下：
-
-- 自瞄输入话题：`/autoaim/target_bl`
-- 自瞄输入消息：`geometry_msgs/msg/Point`
-- 导航 action：`navigate_to_pose`
-- 世界坐标系：`map`
-- 车体坐标系：`base_link`
-
-当前实现的行为是：
-
-- 把 `base_link` 下的自瞄点转换成带 `standoff` 的站位导航目标
-- 当目标距离小于等于 `stop_dist` 时进入 `HOLD`
-- 当目标重新离开到 `start_dist` 之外时恢复追击，避免在阈值附近来回抖动
-- 当目标丢失超时、TF 变换不可用或 Nav2 连续异常时，节点会返回失败，由外层行为树切换策略
-
-当前限制：
-
-- 追击输入接口还是临时约定，尚未和自瞄侧固化正式消息定义
-- `AutoAimAndFire` 仍然是 mock 节点，没有接入真实火控链路
-- 追击树目前还是独立 demo，没有并入 `ul.xml` 的比赛主流程
-
 ## 路径点配置格式
 
 路径点从 JSON 文件加载，格式如下：
@@ -310,8 +277,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - `/rm_referee/projectile_allowance`
 - `/rm_referee/hurt_data`
 - `/rm_referee/robot_pos`
-- `/autoaim/target_bl`
-  - 仅追击树使用
 
 ### 主要输出
 
@@ -390,7 +355,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `PatrolGoalSelector` | Action | 依次选择巡逻点 |
 | `ReliableNavigateToPose` | Stateful Action | 带重发、到点判定和重试逻辑的导航节点 |
 | `CheckGoalReached` | Condition | 基于 `waypoint_now` 判断是否到点 |
-| `ChaseTarget` | Stateful Action | 把自瞄点转成站位导航目标并持续追击 |
 | `CheckCondition` | Condition | 黑板值与阈值比较 |
 | `CompareValues` | Condition | 两个黑板值之间比较 |
 | `SetBlackboardValue` | Action | 往黑板写入常量 |
@@ -402,7 +366,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 | `ConfirmResurrection` | Action | 连发确认复活指令 |
 | `EngageRune` | Stateful Action | 管理 scan mode、yaw、激活请求和 autoshoot 的整段打符流程 |
 | `EngageOutpost` | Stateful Action | 管理 scan mode、yaw、outpost mode 和 `/vw` 的前哨站进攻流程 |
-| `AutoAimAndFire` | Action | 当前为 mock 节点，仅打印日志 |
 
 此外也注册了本包内置的兼容节点：
 
@@ -428,7 +391,7 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 把高频使用的黑板 key、默认参数和阵营 ID 常量集中管理，减少字符串散落和 magic number
 - 抽取 `PrintNode` / `PrintBlackboardValue` 共用的日志落盘逻辑，避免重复维护
 - 将 `ul.xml` 继续拆成更清晰的子树或可复用片段，降低主树复杂度
-- 给路径点加载、`GoalSelector`、`ReliableNavigateToPose`、`ChaseTargetAction` 增加最小测试
+- 给路径点加载、`GoalSelector`、`ReliableNavigateToPose` 增加最小测试
 - 清理遗留硬编码逻辑，例如 `RandomSelector` 仍使用示例目标点，未接入实际配置
 - 统一依赖与包元数据，补全 `package.xml` 里的 license，并明确哪些依赖是主流程必需、哪些仅旧协议桥接需要
 - 减少大头文件中的实现代码，尽量把可以下沉到 `.cpp` 的逻辑移出头文件，优化增量编译体验
@@ -441,16 +404,6 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py \
 - 继续收敛 `ReliableNavigateToPose` 的重发、超时、取消、结果处理语义，保证与外层行为树的状态切换一致
 - 梳理“机器人 ID 获取失败时强制回退红方”这类临时策略，改成明确可配置的启动策略
 - 为日志、回放、bag 分析整理固定流程，减少现场靠肉眼翻终端排查的问题
-
-### 追击链路
-
-- 与自瞄侧统一正式通信接口，至少明确目标点坐标系、时间戳、目标有效位、目标 ID、置信度等字段
-- 为追击链路增加一层适配节点，避免 BT 直接依赖自瞄原始话题格式
-- 把 `AutoAimAndFire` 从 mock 改成真实接口，明确“追到位后由谁负责瞄准/开火”
-- 将 `chase_bt.xml` 中验证过的追击能力按触发条件接入 `ul.xml`，而不是长期作为独立 demo
-- 明确比赛中的追击触发和退出条件，例如血量阈值、区域限制、目标稳定时间和 Nav2 连续异常次数
-- 为 `ChaseTargetAction` 增加最小测试，覆盖 `HOLD/恢复追击/目标丢失/Nav2 aborted` 等关键状态切换
-- 补充 rosbag 或日志回放调参流程，便于离线调整 `stop_dist`、`start_dist`、`lost_timeout`、`update_thresh`
 
 ## 当前默认行为的几个实现细节
 

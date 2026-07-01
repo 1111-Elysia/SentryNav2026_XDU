@@ -4,6 +4,8 @@
 
 from time import monotonic
 
+from rm_referee_mock.protocol import decode_sentry_command
+
 
 POSTURE_NAMES = {
     0: "无效",
@@ -23,21 +25,6 @@ def base_posture(mode):
 
 def is_enhanced_posture(mode):
     return int(mode) in (4, 5, 6)
-
-
-def decode_sentry_command(value):
-    """Decode the V2.0.0 0x0120 sentry command payload."""
-    value = int(value) & 0xFFFFFFFF
-    return {
-        "confirm_free_revive": value & 0x01,
-        "confirm_buy_revive": (value >> 1) & 0x01,
-        "exchange_projectile": (value >> 2) & 0x07FF,
-        "remote_projectile_exchange_count": (value >> 13) & 0x0F,
-        "remote_hp_exchange_count": (value >> 17) & 0x0F,
-        "posture": (value >> 21) & 0x07,
-        "activate_rune": (value >> 24) & 0x01,
-        "raw": value,
-    }
 
 
 class SentryPostureState:
@@ -161,4 +148,3 @@ class SentryPostureState:
         value |= (self.enhanced_remaining[2] & 0xFF) << 40
         value |= (self.enhanced_remaining[3] & 0xFF) << 48
         return value
-

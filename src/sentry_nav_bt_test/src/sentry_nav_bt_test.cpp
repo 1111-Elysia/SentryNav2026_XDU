@@ -30,10 +30,9 @@
 #include "sentry_nav_bt_test/print_node.hpp"
 #include "sentry_nav_bt_test/set_blackboard.hpp"
 #include "sentry_nav_bt_test/referee_actions.hpp"
-#include "sentry_nav_bt_test/auto_aim_and_fire_action.hpp"
-#include "sentry_nav_bt_test/chase_target_action.hpp"
 #include "sentry_nav_bt_test/patrol_nodes.hpp"
 #include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
+#include "sentry_nav_bt_test/publish_vw_action.hpp"
 
 namespace
 {
@@ -321,8 +320,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     factory.registerNodeType<sentry_nav_bt_test::BuySentryProjectile>("BuySentryProjectile");
     factory.registerNodeType<sentry_nav_bt_test::EngageRune>("EngageRune");
     factory.registerNodeType<sentry_nav_bt_test::EngageOutpost>("EngageOutpost");
-    // 注册自瞄节点
-    factory.registerNodeType<sentry_nav_bt_test::AutoAimAndFire>("AutoAimAndFire");
+    factory.registerNodeType<sentry_nav_bt_test::PublishVw>("PublishVw");
     factory.registerBuilder<sentry_nav_bt_test::PrintBlackboardValue>("PrintBlackboardValue", print_blackboard_builder);
     // 条件检查
     factory.registerNodeType<sentry_nav_bt_test::CheckCondition>("CheckCondition");
@@ -340,12 +338,6 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     factory.registerNodeType<sentry_nav_bt_test::PrintNode>("PrintNode");
     // 设置黑板值
     factory.registerNodeType<sentry_nav_bt_test::SetBlackboardValue>("SetBlackboardValue");
-    BT::NodeBuilder chase_builder =
-    [node](const std::string &name, const BT::NodeConfig &config)
-    {
-        return std::make_unique<sentry_nav_bt_test::ChaseTargetAction>(name, config, node);
-    };
-    factory.registerBuilder<sentry_nav_bt_test::ChaseTargetAction>("ChaseTarget", chase_builder);
 
 }
 

@@ -65,6 +65,18 @@ git clone --recursive https://github.com/XDU-IRobot/rm_referee_ros2.git
 
 裁判系统通过串口发送的数据会被封装成消息发布到对应话题上，反之可以通过请求`/rm_referee/tx`服务向裁判系统串口发送数据。
 
+### 原始数据回放
+
+`referee_replay_node` 可以按录制时间间隔读取 `record_raw_data` 生成的文件，复用串口节点的解包和话题发布逻辑。回放节点不会打开串口，也不会创建 `/rm_referee/tx` 服务。
+
+```bash
+ros2 launch rm_referee referee_replay.launch.py \
+  normal_data_file:=/tmp/rm_referee_data/normal_raw_data_YYYYMMDD_HHMMSS.bin \
+  replay_rate:=1.0
+```
+
+`normal_data_file` 和 `vt_data_file` 分别指定常规链路和图传链路的录制文件。`replay_rate` 为 `1.0` 时按原速回放，为 `2.0` 时两倍速回放，为 `0.0` 时不等待录制时间间隔。
+
 ### 话题列表
 
 #### 常规链路

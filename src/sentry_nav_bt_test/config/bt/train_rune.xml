@@ -235,9 +235,6 @@
     <Action ID="Wait" editable="true">
       <input_port name="wait_duration"/>
     </Action>
-    <Action ID="AutoAimAndFire" editable="true">
-      <input_port name="target_type"/>
-    </Action>
     <Decorator ID="RetryUntilSuccessful">
       <input_port name="num_attempts"/>
     </Decorator>

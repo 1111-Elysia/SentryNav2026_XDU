@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="UnderAttackVw">
+    <Sequence name="受击小陀螺速度控制">
+      <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
+      <Fallback name="按血量选择小陀螺速度">
+        <Sequence name="高血量受击速度">
+          <CheckCondition key_name="current_hp" comparison="gte" threshold="{high_hp_threshold}"/>
+          <PublishVw value="{high_hp_vw}" republish_interval_ms="{republish_interval_ms}"/>
+        </Sequence>
+        <Sequence name="低血量受击速度">
+          <CheckCondition key_name="current_hp" comparison="lt" threshold="{low_hp_threshold}"/>
+          <PublishVw value="{low_hp_vw}" republish_interval_ms="{republish_interval_ms}"/>
+        </Sequence>
+      </Fallback>
+    </Sequence>
+  </BehaviorTree>
+</root>

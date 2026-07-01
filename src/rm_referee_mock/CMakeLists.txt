@@ -30,6 +30,12 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_sentry_posture test/test_sentry_posture.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
   )
+  ament_add_pytest_test(test_sentry_protocol test/test_sentry_protocol.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  ament_add_pytest_test(test_match_rules test/test_match_rules.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+  )
 endif()
 
 ament_package()
