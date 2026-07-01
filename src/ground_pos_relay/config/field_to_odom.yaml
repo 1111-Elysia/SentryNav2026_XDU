@@ -3,13 +3,14 @@ field_to_odom_tf_node:
     field_frame: rm_field
     odom_frame: odom
 
-    # robot_id 7: red sentry. Values are odom origin pose in rm_field.
+    # 第三个参数单位为弧度
+    # robot_id 7: 红方哨兵机器人
     red:
       field_to_odom_x: 0.0
       field_to_odom_y: 0.0
       field_to_odom_yaw: 0.0
 
-    # robot_id 107: blue sentry. Values are odom origin pose in rm_field.
+    # robot_id 107: 蓝方哨兵机器人
     blue:
       field_to_odom_x: 0.0
       field_to_odom_y: 0.0
