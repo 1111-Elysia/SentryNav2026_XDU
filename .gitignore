@@ -8,3 +8,4 @@ src/bringup/map/
 *.pgm
 *.ply.vscode/
 can_comm_start.sh
+docs/

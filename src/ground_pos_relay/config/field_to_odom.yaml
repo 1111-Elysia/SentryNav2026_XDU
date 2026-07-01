@@ -1,0 +1,16 @@
+field_to_odom_tf_node:
+  ros__parameters:
+    field_frame: rm_field
+    odom_frame: odom
+
+    # robot_id 7: red sentry. Values are odom origin pose in rm_field.
+    red:
+      field_to_odom_x: 0.0
+      field_to_odom_y: 0.0
+      field_to_odom_yaw: 0.0
+
+    # robot_id 107: blue sentry. Values are odom origin pose in rm_field.
+    blue:
+      field_to_odom_x: 0.0
+      field_to_odom_y: 0.0
+      field_to_odom_yaw: 0.0

@@ -12,6 +12,9 @@
 #include <rm_referee_msgs/msg/ground_robot_position.hpp>
 #include <rm_referee_msgs/msg/robot_status.hpp>
 #include <rm_referee_msgs/srv/tx.hpp>
+#include <tf2/exceptions.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <atomic>
 #include <array>
@@ -129,6 +132,22 @@ static void append_float32_le(std::vector<uint8_t> &buffer, float value) {
 class GroundPosRelayNode : public rclcpp::Node {
  public:
   GroundPosRelayNode() : Node("ground_pos_relay_node") {
+    declare_parameter<bool>("use_tf_self_position", true);
+    declare_parameter<std::string>("field_frame", "rm_field");
+    declare_parameter<std::string>("robot_frame", "base_link");
+
+    use_tf_self_position_ = get_parameter("use_tf_self_position").as_bool();
+    field_frame_ = get_parameter("field_frame").as_string();
+    robot_frame_ = get_parameter("robot_frame").as_string();
+
+    if (use_tf_self_position_) {
+      tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
+      tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+      RCLCPP_INFO(get_logger(),
+                  "Self position relay enabled: querying TF %s -> %s and writing x/y to reserved fields",
+                  field_frame_.c_str(), robot_frame_.c_str());
+    }
+
     // 订阅本机器人状态，获取 robot_id
     robot_status_sub_ = create_subscription<rm_referee_msgs::msg::RobotStatus>(
         "/rm_referee/robot_status",
@@ -174,13 +193,29 @@ class GroundPosRelayNode : public rclcpp::Node {
     uint16_t sender_id = robot_id_;
     uint16_t receiver_id = (robot_id_ == 7) ? 9 : 109;
 
+    float sentry_x = msg->reserved;
+    float sentry_y = msg->reserved_2;
+    if (use_tf_self_position_) {
+      try {
+        const auto transform = tf_buffer_->lookupTransform(
+            field_frame_, robot_frame_, tf2::TimePointZero);
+        sentry_x = static_cast<float>(transform.transform.translation.x);
+        sentry_y = static_cast<float>(transform.transform.translation.y);
+      } catch (const tf2::TransformException &ex) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                             "No TF %s -> %s yet, skipping relay: %s",
+                             field_frame_.c_str(), robot_frame_.c_str(), ex.what());
+        return;
+      }
+    }
+
     // 0x020B 完整内容：10 个 float32，共 40 字节。
     const std::array<float, 10> payload_floats = {
         msg->hero_x, msg->hero_y,
         msg->engineer_x, msg->engineer_y,
         msg->standard_3_x, msg->standard_3_y,
         msg->standard_4_x, msg->standard_4_y,
-        msg->reserved, msg->reserved_2,
+        sentry_x, sentry_y,
     };
 
     for (const float value : payload_floats) {
@@ -258,11 +293,16 @@ class GroundPosRelayNode : public rclcpp::Node {
   rclcpp::Subscription<rm_referee_msgs::msg::RobotStatus>::SharedPtr robot_status_sub_;
   rclcpp::Subscription<rm_referee_msgs::msg::GroundRobotPosition>::SharedPtr ground_pos_sub_;
   rclcpp::Client<rm_referee_msgs::srv::Tx>::SharedPtr tx_client_;
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   // ---- 状态 ----
   uint8_t robot_id_{0};
   uint8_t seq_{0};
   std::atomic_bool first_tx_log_{true};
+  bool use_tf_self_position_{true};
+  std::string field_frame_{"rm_field"};
+  std::string robot_frame_{"base_link"};
 };
 
 // ============================================================================
