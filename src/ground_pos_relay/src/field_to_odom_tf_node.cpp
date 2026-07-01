@@ -20,9 +20,15 @@ class FieldToOdomTfNode : public rclcpp::Node {
     declare_parameter<std::string>("odom_frame", "odom");
     declare_parameter<double>("red.field_to_odom_x", 0.0);
     declare_parameter<double>("red.field_to_odom_y", 0.0);
+    declare_parameter<double>("red.field_to_odom_z", 0.0);
+    declare_parameter<double>("red.field_to_odom_roll", 0.0);
+    declare_parameter<double>("red.field_to_odom_pitch", 0.0);
     declare_parameter<double>("red.field_to_odom_yaw", 0.0);
     declare_parameter<double>("blue.field_to_odom_x", 0.0);
     declare_parameter<double>("blue.field_to_odom_y", 0.0);
+    declare_parameter<double>("blue.field_to_odom_z", 0.0);
+    declare_parameter<double>("blue.field_to_odom_roll", 0.0);
+    declare_parameter<double>("blue.field_to_odom_pitch", 0.0);
     declare_parameter<double>("blue.field_to_odom_yaw", 0.0);
 
     field_frame_ = get_parameter("field_frame").as_string();
@@ -46,6 +52,9 @@ class FieldToOdomTfNode : public rclcpp::Node {
   struct TransformConfig {
     double x{0.0};
     double y{0.0};
+    double z{0.0};
+    double roll{0.0};
+    double pitch{0.0};
     double yaw{0.0};
   };
 
@@ -72,6 +81,9 @@ class FieldToOdomTfNode : public rclcpp::Node {
     TransformConfig config;
     config.x = get_parameter(prefix + ".field_to_odom_x").as_double();
     config.y = get_parameter(prefix + ".field_to_odom_y").as_double();
+    config.z = get_parameter(prefix + ".field_to_odom_z").as_double();
+    config.roll = get_parameter(prefix + ".field_to_odom_roll").as_double();
+    config.pitch = get_parameter(prefix + ".field_to_odom_pitch").as_double();
     config.yaw = get_parameter(prefix + ".field_to_odom_yaw").as_double();
     return config;
   }
@@ -85,10 +97,10 @@ class FieldToOdomTfNode : public rclcpp::Node {
     transform.child_frame_id = odom_frame_;
     transform.transform.translation.x = config.x;
     transform.transform.translation.y = config.y;
-    transform.transform.translation.z = 0.0;
+    transform.transform.translation.z = config.z;
 
     tf2::Quaternion quaternion;
-    quaternion.setRPY(0.0, 0.0, config.yaw);
+    quaternion.setRPY(config.roll, config.pitch, config.yaw);
     transform.transform.rotation.x = quaternion.x();
     transform.transform.rotation.y = quaternion.y();
     transform.transform.rotation.z = quaternion.z();
@@ -96,9 +108,11 @@ class FieldToOdomTfNode : public rclcpp::Node {
 
     broadcaster_->sendTransform(transform);
     RCLCPP_INFO(get_logger(),
-                "发布 %s -> %s 哨兵机器人 (robot_id=%u): x=%.3f, y=%.3f, yaw=%.6f rad",
+                "发布 %s -> %s %s 哨兵机器人 (robot_id=%u): "
+                "x=%.3f, y=%.3f, z=%.3f, roll=%.6f, pitch=%.6f, yaw=%.6f rad",
                 field_frame_.c_str(), odom_frame_.c_str(), side.c_str(),
-                static_cast<unsigned>(robot_id), config.x, config.y, config.yaw);
+                static_cast<unsigned>(robot_id), config.x, config.y, config.z,
+                config.roll, config.pitch, config.yaw);
   }
 
   rclcpp::Subscription<rm_referee_msgs::msg::RobotStatus>::SharedPtr robot_status_sub_;
