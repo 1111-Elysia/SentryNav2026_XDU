@@ -1,6 +1,7 @@
 build/
 install/
 log/
+docs/
 .cache/
 data/
 src/bringup/map/

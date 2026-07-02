@@ -12,6 +12,9 @@
 #include <rm_referee_msgs/msg/ground_robot_position.hpp>
 #include <rm_referee_msgs/msg/robot_status.hpp>
 #include <rm_referee_msgs/srv/tx.hpp>
+#include<tf2_ros/transform_listener.h>
+#include<tf2/exceptions.h>
+#include<tf2_ros/buffer.h>
 
 #include <atomic>
 #include <array>
@@ -129,6 +132,34 @@ static void append_float32_le(std::vector<uint8_t> &buffer, float value) {
 class GroundPosRelayNode : public rclcpp::Node {
  public:
   GroundPosRelayNode() : Node("ground_pos_relay_node") {
+
+    // 初始化tf变换的成员变量
+    declare_parameter("use_self_position", true);
+    declare_parameter("odom_frame_id_", "odom");
+    declare_parameter("robot_frame_id_", "base_link");
+    declare_parameter("red.red_origin_x", 0.0);
+    declare_parameter("red.red_origin_y", 0.0);
+    declare_parameter("red.red_origin_yaw", 0.0);
+    declare_parameter("blue.blue_origin_x", 0.0);
+    declare_parameter("blue.blue_origin_y", 0.0);
+    declare_parameter("blue.blue_origin_yaw", 0.0);
+
+    use_self_position_ = get_parameter("use_self_position").as_bool();
+    odom_frame_id_ = get_parameter("odom_frame_id_").as_string();
+    robot_frame_id_ = get_parameter("robot_frame_id_").as_string();
+    
+    red_origin_x_ = get_parameter("red.red_origin_x").as_double();
+    red_origin_y_ = get_parameter("red.red_origin_y").as_double();
+    red_origin_yaw_ = get_parameter("red.red_origin_yaw").as_double();
+    blue_origin_x_ = get_parameter("blue.blue_origin_x").as_double();
+    blue_origin_y_ = get_parameter("blue.blue_origin_y").as_double();
+    blue_origin_yaw_ = get_parameter("blue.blue_origin_yaw").as_double();
+
+    if (use_self_position_) {
+      tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
+      tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    }
+
     // 订阅本机器人状态，获取 robot_id
     robot_status_sub_ = create_subscription<rm_referee_msgs::msg::RobotStatus>(
         "/rm_referee/robot_status",
@@ -161,7 +192,64 @@ class GroundPosRelayNode : public rclcpp::Node {
   }
 
  private:
-  void ground_pos_callback(const rm_referee_msgs::msg::GroundRobotPosition::SharedPtr msg) {
+
+     // 获取tf变换的成员变量
+     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+     bool use_self_position_{true};
+     std::string odom_frame_id_{"odom"};
+     std::string robot_frame_id_{"base_link"};
+ 
+     double red_origin_x_{0.0};
+     double red_origin_y_{0.0};
+     double red_origin_yaw_{0.0};
+ 
+     double blue_origin_x_{0.0};
+     double blue_origin_y_{0.0};
+     double blue_origin_yaw_{0.0};
+ 
+ 
+     //查询odom -> base_link 的 tf 变换
+     bool get_self_official_position(float &official_x, float &official_y){
+       if (robot_id_ != 7 && robot_id_ != 107){
+         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "robot_id=%d, not 7 or 107, skipping relay (waiting for valid id)", static_cast<int>(robot_id_));
+         return false;
+       }
+ 
+       double origin_x = 0.0;
+       double origin_y = 0.0;
+       double origin_yaw = 0.0;
+ 
+       if (robot_id_ == 7){
+         origin_x = red_origin_x_;
+         origin_y = red_origin_y_;
+         origin_yaw = red_origin_yaw_;
+       } 
+       else if (robot_id_ == 107){
+         origin_x = blue_origin_x_;
+         origin_y = blue_origin_y_;
+         origin_yaw = blue_origin_yaw_;
+       }
+ 
+       try{
+         const auto tf = tf_buffer_ -> lookupTransform(odom_frame_id_, robot_frame_id_, tf2::TimePointZero);
+         const double odom_x = tf.transform.translation.x;
+         const double odom_y = tf.transform.translation.y;
+         const double cos_yaw = std::cos(origin_yaw);
+         const double sin_yaw = std::sin(origin_yaw);
+ 
+         official_x = static_cast<float>(origin_x + cos_yaw * odom_x - sin_yaw * odom_y);
+         official_y = static_cast<float>(origin_y + sin_yaw * odom_x + cos_yaw * odom_y);
+         return true;
+       }
+       catch (const tf2::TransformException &ex){
+         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "查询tf变换失败：%s -> %s: %s", odom_frame_id_.c_str(), robot_frame_id_.c_str(), ex.what());
+         return false;
+       }
+     } 
+ 
+ 
+ void ground_pos_callback(const rm_referee_msgs::msg::GroundRobotPosition::SharedPtr msg) {
     // 仅在 robot_id 为 7 或 107 时发送
     if (robot_id_ != 7 && robot_id_ != 107) {
       RCLCPP_INFO_ONCE(get_logger(),
@@ -175,12 +263,20 @@ class GroundPosRelayNode : public rclcpp::Node {
     uint16_t receiver_id = (robot_id_ == 7) ? 9 : 109;
 
     // 0x020B 完整内容：10 个 float32，共 40 字节。
+    float sentry_x = msg->reserved;
+    float sentry_y = msg->reserved_2;
+    if (use_self_position_){
+      if (!get_self_official_position(sentry_x, sentry_y)){
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "获取self官方位置失败，仍发送保留位");
+      }
+    }
+
     const std::array<float, 10> payload_floats = {
         msg->hero_x, msg->hero_y,
         msg->engineer_x, msg->engineer_y,
         msg->standard_3_x, msg->standard_3_y,
         msg->standard_4_x, msg->standard_4_y,
-        msg->reserved, msg->reserved_2,
+        sentry_x, sentry_y,
     };
 
     for (const float value : payload_floats) {

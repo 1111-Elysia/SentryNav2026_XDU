@@ -1,0 +1,15 @@
+ground_pos_relay_node:
+  ros__parameters:
+    use_self_position: true
+    odom_frame_id_: odom
+    robot_frame_id_: base_link
+    
+    red:
+      red_origin_x: 3.725
+      red_origin_y: 7.5
+      red_origin_yaw: 0.0
+
+    blue:
+      blue_origin_x: 24.275
+      blue_origin_y: 7.5
+      blue_origin_yaw: 3.1415926
