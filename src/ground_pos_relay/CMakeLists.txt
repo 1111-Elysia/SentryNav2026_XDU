@@ -8,10 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rm_referee_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
 
 # ---- 原有：裁判系统位置中继节点 ----
 add_executable(ground_pos_relay_node src/ground_pos_relay_node.cpp)
@@ -20,8 +17,6 @@ ament_target_dependencies(ground_pos_relay_node
   rclcpp
   rm_referee_msgs
   std_msgs
-  tf2
-  tf2_ros
 )
 
 # ---- 新增：GUI 模拟器位置中继节点 ----
@@ -33,22 +28,10 @@ ament_target_dependencies(ground_pos_relay_sim_node
   std_msgs
 )
 
-# ---- 根据红蓝方发布官方场地坐标系到 odom 的静态 TF ----
-add_executable(field_to_odom_tf_node src/field_to_odom_tf_node.cpp)
-target_include_directories(field_to_odom_tf_node PRIVATE include)
-ament_target_dependencies(field_to_odom_tf_node
-  rclcpp
-  rm_referee_msgs
-  geometry_msgs
-  tf2
-  tf2_ros
-)
-
 # ---- 安装可执行文件 ----
 install(TARGETS
   ground_pos_relay_node
   ground_pos_relay_sim_node
-  field_to_odom_tf_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -60,10 +43,6 @@ install(PROGRAMS
 
 # ---- 安装 launch 文件 ----
 install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}
-)
-
-install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
