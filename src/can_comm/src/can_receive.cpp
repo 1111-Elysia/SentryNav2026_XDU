@@ -114,47 +114,46 @@ private:
     {
         if (socket_fd_ < 0) return;
 
-        // 非阻塞读取 CAN 帧
-        struct can_frame frame;
-        ssize_t nbytes = ::read(socket_fd_, &frame, sizeof(frame));
+        float yaw = 0.0f, pitch = 0.0f, distance = 0.0f;
+        bool got_frame = false;
 
-        if (nbytes <= 0) {
-            // 无数据或错误，静默跳过
+        // 循环读取所有待处理的 CAN 帧，只用最后一帧
+        while (true) {
+            struct can_frame frame;
+            ssize_t nbytes = ::read(socket_fd_, &frame, sizeof(frame));
+
+            if (nbytes <= 0) {
+                break;  // 无更多数据
+            }
+            if (nbytes != CAN_MTU) {
+                continue;
+            }
+            if (frame.can_id & (CAN_ERR_FLAG | CAN_EFF_FLAG)) {
+                continue;
+            }
+            if (frame.can_dlc < 6) {
+                continue;
+            }
+
+            int16_t yaw_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[0]) << 8) |
+                                                    static_cast<uint16_t>(frame.data[1]));
+            int16_t pitch_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[2]) << 8) |
+                                                      static_cast<uint16_t>(frame.data[3]));
+            int16_t distance_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[4]) << 8) |
+                                                         static_cast<uint16_t>(frame.data[5]));
+
+            yaw = static_cast<float>(yaw_raw) / 100.0f;
+            pitch = static_cast<float>(pitch_raw) / 100.0f;
+            distance = static_cast<float>(distance_raw) / 100.0f;
+            got_frame = true;
+            frame_count_++;
+        }
+
+        if (!got_frame) {
             return;
         }
 
-        if (nbytes != CAN_MTU) {
-            return;
-        }
-
-        // 检查是否为错误帧或扩展帧
-        if (frame.can_id & (CAN_ERR_FLAG | CAN_EFF_FLAG)) {
-            return;
-        }
-
-        // 需要至少 6 字节有效载荷
-        if (frame.can_dlc < 6) {
-            RCLCPP_WARN_THROTTLE(
-                this->get_logger(), *this->get_clock(), 5000,
-                "收到 CAN 帧但数据长度不足 6 字节: dlc=%u", frame.can_dlc);
-            return;
-        }
-
-        // 解析 yaw:   bytes[0]=高8位, bytes[1]=低8位 → int16_t → /100 → float
-        // 解析 pitch: bytes[2]=高8位, bytes[3]=低8位 → int16_t → /100 → float
-        // 解析 dist:  bytes[4]=高8位, bytes[5]=低8位 → int16_t → /100 → float
-        int16_t yaw_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[0]) << 8) |
-                                                static_cast<uint16_t>(frame.data[1]));
-        int16_t pitch_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[2]) << 8) |
-                                                  static_cast<uint16_t>(frame.data[3]));
-        int16_t distance_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[4]) << 8) |
-                                                     static_cast<uint16_t>(frame.data[5]));
-
-        float yaw = static_cast<float>(yaw_raw) / 100.0f;
-        float pitch = static_cast<float>(pitch_raw) / 100.0f;
-        float distance = static_cast<float>(distance_raw) / 100.0f;
-
-        // 发布
+        // 只发布最新一帧
         {
             std_msgs::msg::Float32 msg;
             msg.data = yaw;
@@ -172,7 +171,6 @@ private:
         }
 
         // 频率日志
-        frame_count_++;
         auto now = this->now();
         double dt = (now - last_log_).seconds();
         if (dt >= 1.0) {
