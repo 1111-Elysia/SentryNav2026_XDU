@@ -91,6 +91,11 @@ private:
       distance = distance_;
     }
 
+    // 距离 ≤ 0 表示无有效目标，不发布
+    if (distance <= 0.0f) {
+      return;
+    }
+
     const double pitch_rad = deg2rad(static_cast<double>(pitch_deg));
 
     // 水平距离
