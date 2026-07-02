@@ -31,6 +31,9 @@ void ElasticPlanner::configure(
   nav2_util::declare_parameter_if_not_declared(node, name + ".use_tracking", rclcpp::ParameterValue(true));
   nav2_util::declare_parameter_if_not_declared(node, name + ".target_timeout", rclcpp::ParameterValue(1.0));
   nav2_util::declare_parameter_if_not_declared(node, name + ".ekf_enabled", rclcpp::ParameterValue(true));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".ekf_alpha", rclcpp::ParameterValue(0.1));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".ekf_beta", rclcpp::ParameterValue(0.05));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".ekf_reset_dt", rclcpp::ParameterValue(3.0));
   nav2_util::declare_parameter_if_not_declared(node, name + ".target_topic", rclcpp::ParameterValue("/detected_target_pose"));
 
   node->get_parameter(name + ".tracking_dist", tracking_dist_);
@@ -39,6 +42,9 @@ void ElasticPlanner::configure(
   node->get_parameter(name + ".use_tracking", use_tracking_);
   node->get_parameter(name + ".target_timeout", target_timeout_);
   node->get_parameter(name + ".ekf_enabled", ekf_enabled_);
+  node->get_parameter(name + ".ekf_alpha", ekf_alpha_);
+  node->get_parameter(name + ".ekf_beta", ekf_beta_);
+  node->get_parameter(name + ".ekf_reset_dt", ekf_reset_dt_);
   std::string target_topic;
   node->get_parameter(name + ".target_topic", target_topic);
 
@@ -96,17 +102,21 @@ void ElasticPlanner::updateEKF(const geometry_msgs::msg::PoseStamped &msg) {
     return;
   }
   double dt = (now - last_ekf_time_).seconds();
-  if (dt <= 0.0 || dt > 1.0) {
+  if (dt <= 0.0 || dt > ekf_reset_dt_) {
+    // Large gap → reset state to avoid stale prediction
     last_ekf_time_ = now;
     ekf_pos_ = Eigen::Vector2d(msg.pose.position.x, msg.pose.position.y);
+    ekf_vel_.setZero();
     return;
   }
-  const double alpha = 0.3, beta = 0.1;
+  // Clamp dt to avoid divergence from irregular message intervals
+  if (dt > 0.5) dt = 0.5;
+
   Eigen::Vector2d z(msg.pose.position.x, msg.pose.position.y);
   Eigen::Vector2d pred = ekf_pos_ + ekf_vel_ * dt;
   Eigen::Vector2d inn = z - pred;
-  ekf_pos_ = pred + alpha * inn;
-  ekf_vel_ = ekf_vel_ + beta * inn / dt;
+  ekf_pos_ = pred + ekf_alpha_ * inn;
+  ekf_vel_ = ekf_vel_ + ekf_beta_ * inn / dt;
   last_ekf_time_ = now;
   latest_target_ = msg;
   latest_target_.pose.position.x = ekf_pos_.x();

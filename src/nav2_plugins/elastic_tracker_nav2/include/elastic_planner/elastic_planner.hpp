@@ -92,6 +92,9 @@ class ElasticPlanner : public nav2_core::GlobalPlanner {
 
   // EKF for target velocity estimation
   bool ekf_enabled_ = true;
+  double ekf_alpha_ = 0.1;      // position smoothing gain (lower = smoother)
+  double ekf_beta_  = 0.05;     // velocity smoothing gain
+  double ekf_reset_dt_ = 3.0;   // max dt before resetting EKF (s)
   Eigen::Vector2d ekf_pos_{0.0, 0.0};
   Eigen::Vector2d ekf_vel_{0.0, 0.0};
   rclcpp::Time last_ekf_time_;

@@ -33,18 +33,18 @@ def generate_launch_description():
             output="screen",
             parameters=[config_file],
         ),
-        Node(
-            package='can_comm',
-            executable='target_frame_node',
-            name='target_frame',
-            output='screen',
-            parameters=[config_file],
-        ),
-        Node(
-            package='can_comm',
-            executable='vyaw_tf_yaw_controller_node',
-            name='vyaw_tf_yaw_controller',
-            output='screen',
-            parameters=[config_file],
-        ),
+        # Node(
+        #     package='can_comm',
+        #     executable='target_frame_node',
+        #     name='target_frame',
+        #     output='screen',
+        #     parameters=[config_file],
+        # ),
+        # Node(
+        #     package='can_comm',
+        #     executable='vyaw_tf_yaw_controller_node',
+        #     name='vyaw_tf_yaw_controller',
+        #     output='screen',
+        #     parameters=[config_file],
+        # ),
     ])

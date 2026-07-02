@@ -14,6 +14,8 @@ find_package(rm_referee_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 add_executable(can_comm_node
   src/can_send.cpp
@@ -76,6 +78,8 @@ ament_target_dependencies(target_frame_node
   tf2
   tf2_ros
   tf2_geometry_msgs
+  nav2_msgs
+  rclcpp_action
 )
 
 add_subdirectory(librm)

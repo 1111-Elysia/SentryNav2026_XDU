@@ -98,12 +98,12 @@ controller_server:
       vy_std: 0.3
       wz_std: 0.2
 
-      vx_max: 2.0
-      vy_max: 2.0
+      vx_max: 0.6
+      vy_max: 0.6
       wz_max: 1.5
 
-      vx_min: -2.0
-      vy_min: -2.0
+      vx_min: -0.6
+      vy_min: -0.6
       wz_min: -1.5
 
       ax_max: 1.5 #加速度提高，高速时能快速响应
@@ -510,8 +510,13 @@ planner_server:
 
       # ── 功能开关 ───────────────────────────────────
       use_tracking: true        # 启用目标追踪模式（内部10Hz重规划定时器）
-      ekf_enabled: true         # 启用EKF从位置观测估计目标速度
+      ekf_enabled: false         # 启用EKF从位置观测估计目标速度
       target_timeout: 1.0       # 目标丢失超时 (s)，超时后原地悬停
+
+      # ── EKF 平滑参数 ───────────────────────────────
+      ekf_alpha: 0.1            # 位置平滑增益 (0~1, 越小越平滑, 默认0.1)
+      ekf_beta: 0.05            # 速度平滑增益 (0~1, 越小越平滑, 默认0.05)
+      ekf_reset_dt: 3.0         # EKF重置时间阈值 (s), 超过此间隔自动重置
 
       # ── 目标订阅 ───────────────────────────────────
       target_topic: "/detected_target_pose"  # 目标位置话题 (geometry_msgs/PoseStamped)

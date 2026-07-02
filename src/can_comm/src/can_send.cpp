@@ -244,7 +244,12 @@ private:
         // byte [5]: vw (int8_t)
         data[5] = static_cast<uint8_t>(vw_q);
 
-        can_->Write(id_scan_, data, sizeof(data));
+        try {
+            can_->Write(id_scan_, data, sizeof(data));
+        } catch (const std::exception &e) {
+            RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                "CAN Write failed: %s", e.what());
+        }
 
         // 频率日志
         send_count_++;

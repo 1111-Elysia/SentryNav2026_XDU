@@ -48,11 +48,11 @@ can_receive:
     yaw_topic: "/target/yaw"
     pitch_topic: "/target/pitch"
     distance_topic: "/target/distance"
-    publish_rate_hz: 50.0
+    publish_rate_hz: 500.0
 
 target_frame:
   ros__parameters:
-    publish_rate_hz: 50.0
+    publish_rate_hz: 500.0
     map_frame: "map"
     base_frame: "base_link"
     target_frame: "target_frame"
