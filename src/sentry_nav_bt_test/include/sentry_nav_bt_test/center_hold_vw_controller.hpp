@@ -121,7 +121,6 @@ private:
     const bool hold_vw_active = center_hold_active;
 
     if (!vw_command_initialized_) {
-      publishVwCommand(hold_vw_active ? 1.0f : 0.0f);
       vw_command_initialized_ = true;
       last_center_hold_vw_active_ = center_hold_active;
       return;

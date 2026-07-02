@@ -92,18 +92,19 @@
         </Fallback>
       </ForceFailure>
 
-      <ForceFailure>
-        <SubTree
-          ID="UnderAttackVw"
-          high_hp_threshold="250"
-          high_hp_vw="1.0"
-          low_hp_threshold="150"
-          low_hp_vw="0.3"
-          republish_interval_ms="50"
-          _autoremap="1"/>
-      </ForceFailure>
+      <ReactiveSequence name="局内响应循环">
+        <ForceSuccess>
+          <SubTree
+            ID="UnderAttackVw"
+            high_hp_threshold="150"
+            high_hp_vw="1.0"
+            low_hp_threshold="150"
+            low_hp_vw="0.3"
+            republish_interval_ms="50"
+            _autoremap="1"/>
+        </ForceSuccess>
 
-      <ReactiveFallback name="比赛开始">
+        <ReactiveFallback name="比赛开始">
         <!-- <Sequence name="复活机制">
           <CheckCondition key_name="current_hp"
                           comparison="eq"
@@ -260,7 +261,8 @@
             </Sequence>
           </Fallback>
         </ReactiveSequence>
-      </ReactiveFallback>
+        </ReactiveFallback>
+      </ReactiveSequence>
     </Fallback>
   </BehaviorTree>
 

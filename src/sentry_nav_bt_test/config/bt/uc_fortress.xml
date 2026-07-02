@@ -66,22 +66,22 @@
         </Fallback>
       </ForceFailure>
 
-      <ForceFailure>
-        <SubTree
-          ID="UnderAttackVw"
-          high_hp_threshold="150"
-          high_hp_vw="1.0"
-          low_hp_threshold="150"
-          low_hp_vw="0.3"
-          republish_interval_ms="50"
-          _autoremap="1"/>
-      </ForceFailure>
-
       <ReactiveSequence name="主循环_Root">
         <Sequence name="前置检查">
           <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
           <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
         </Sequence>
+
+        <ForceSuccess>
+          <SubTree
+            ID="UnderAttackVw"
+            high_hp_threshold="150"
+            high_hp_vw="1.0"
+            low_hp_threshold="150"
+            low_hp_vw="0.3"
+            republish_interval_ms="50"
+            _autoremap="1"/>
+        </ForceSuccess>
 
         <ReactiveFallback name="主逻辑_MainLogic">
           <SubTree ID="Resurrection" _autoremap="1"/>
