@@ -21,10 +21,6 @@ add_executable(can_comm_node
   src/can_send.cpp
 )
 
-add_executable(hurt_spin_vw_node
-  src/hurt_spin_vw_node.cpp
-)
-
 add_executable(vyaw_tf_yaw_controller_node
   src/vyaw_tf_yaw_controller_node.cpp
 )
@@ -45,14 +41,6 @@ ament_target_dependencies(can_comm_node
   rclcpp
   geometry_msgs
   std_msgs
-  sentry_msgs
-  rm_referee_msgs
-  tf2
-  tf2_ros
-)
-
-ament_target_dependencies(hurt_spin_vw_node
-  rclcpp
   sentry_msgs
   rm_referee_msgs
   tf2
@@ -86,10 +74,6 @@ add_subdirectory(librm)
 target_link_libraries(can_comm_node rm)
 
 install(TARGETS can_comm_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(TARGETS hurt_spin_vw_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

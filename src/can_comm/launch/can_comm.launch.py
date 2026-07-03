@@ -9,13 +9,6 @@ def generate_launch_description():
     config_file = os.path.join(can_comm_share, 'config', 'can_params.yaml')
 
     return LaunchDescription([
-        # Node(
-        #     package='can_comm',
-        #     executable='hurt_spin_vw_node',
-        #     name='hurt_spin_vw_node',
-        #     output='screen',
-        #     parameters=[config_file],
-        # ),
         Node(
             package='can_comm',
             executable='can_comm_node',
