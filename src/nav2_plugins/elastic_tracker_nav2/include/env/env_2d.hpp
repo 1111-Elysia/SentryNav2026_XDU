@@ -54,6 +54,7 @@ class Env2D {
   NodePtr data_[MAX_MEMORY];
   double resolution_, origin_x_, origin_y_;
   int size_x_, size_y_;
+  double cost_weight_ = 1.5;
 
   // Convert world to map index (Eigen row-major)
   inline Eigen::Vector2i world2idx(const Eigen::Vector2d &p) const {
@@ -109,44 +110,9 @@ class Env2D {
     size_x_ = costmap->getSizeInCellsX();
     size_y_ = costmap->getSizeInCellsY();
   }
+  void setCostWeight(double w) { cost_weight_ = w; }
 
-  // DDA ray casting for line-of-sight check
-  bool checkRayValid(const Eigen::Vector2d &p0, const Eigen::Vector2d &p1) const {
-    Eigen::Vector2d dp = p1 - p0;
-    double dist = dp.norm();
-    if (dist < resolution_) return true;
-
-    Eigen::Vector2i idx0 = world2idx(p0);
-    Eigen::Vector2i idx1 = world2idx(p1);
-    Eigen::Vector2i d_idx = idx1 - idx0;
-    Eigen::Vector2i step(
-      d_idx.x() > 0 ? 1 : (d_idx.x() < 0 ? -1 : 0),
-      d_idx.y() > 0 ? 1 : (d_idx.y() < 0 ? -1 : 0));
-
-    Eigen::Vector2d delta_t;
-    delta_t.x() = dp.x() == 0 ? std::numeric_limits<double>::max() : 1.0 / std::fabs(dp.x());
-    delta_t.y() = dp.y() == 0 ? std::numeric_limits<double>::max() : 1.0 / std::fabs(dp.y());
-
-    Eigen::Vector2d t_max;
-    t_max.x() = step.x() > 0 ? (idx0.x() + 1) - p0.x() / resolution_ : p0.x() / resolution_ - idx0.x();
-    t_max.y() = step.y() > 0 ? (idx0.y() + 1) - p0.y() / resolution_ : p0.y() / resolution_ - idx0.y();
-    t_max = t_max.cwiseProduct(delta_t);
-
-    Eigen::Vector2i rayIdx = idx0;
-    while ((rayIdx - idx1).squaredNorm() > 1) {
-      if (isOccupied(rayIdx)) return false;
-      if (t_max.x() < t_max.y()) {
-        rayIdx.x() += step.x();
-        t_max.x() += delta_t.x();
-      } else {
-        rayIdx.y() += step.y();
-        t_max.y() += delta_t.y();
-      }
-    }
-    return true;
-  }
-
-  // Standard A* path search
+  // Standard A* path search (cost-aware)
   bool astar_search(const Eigen::Vector2d &start_p, const Eigen::Vector2d &end_p,
                     std::vector<Eigen::Vector2d> &path,
                     double timeout_ms = 50.0) {
@@ -184,7 +150,10 @@ class Env2D {
         auto neighbor_idx = curPtr->idx + nb.first;
         NodePtr neighborPtr = visit(neighbor_idx);
         if (neighborPtr->state == CLOSE) continue;
-        double new_g = curPtr->g + nb.second;
+
+        // 代价感知边权重
+        unsigned char c = costmap_->getCost(neighbor_idx.x(), neighbor_idx.y());
+        double new_g = curPtr->g + nb.second * (1.0 + cost_weight_ * c / 254.0);
 
         if (neighborPtr->state == OPEN) {
           if (neighborPtr->g > new_g) {
@@ -222,65 +191,6 @@ class Env2D {
     return ret;
   }
 
-  // SFC generation: radial expansion along the path
-  void generateSFC(const std::vector<Eigen::Vector2d> &path,
-                   double bbox_width,
-                   std::vector<Eigen::MatrixXd> &hPolys,
-                   std::vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>> &keyPts) {
-    hPolys.clear();
-    keyPts.clear();
-    if (path.size() < 2) return;
-
-    int idx = 0;
-    int path_len = path.size();
-
-    while (idx < path_len - 1) {
-      // Greedy forward extension
-      int next_idx = idx;
-      while (next_idx + 1 < path_len && checkRayValid(path[idx], path[next_idx + 1]))
-        next_idx++;
-
-      Eigen::Vector2d p0 = path[idx];
-      Eigen::Vector2d p1 = path[next_idx];
-      keyPts.emplace_back(p0, p1);
-
-      // Generate a simple axis-aligned or rotated bounding box corridor
-      Eigen::Vector2d dir = p1 - p0;
-      double length = dir.norm();
-      if (length < 1e-6) length = bbox_width;
-      Eigen::Vector2d u = dir / length;       // forward direction
-      Eigen::Vector2d n(-u.y(), u.x());       // perpendicular (left normal)
-
-      // Build 4 half-planes forming a rectangular corridor around [p0, p1]
-      // Columns: [nx, ny, d]^T  where nx*x + ny*y <= d
-      Eigen::MatrixXd hPoly(3, 4);
-      double half_w = bbox_width / 2.0;
-
-      // n direction (left boundary): n·p <= n·p0 + half_w
-      hPoly.col(0) << n.x(), n.y(), n.dot(p0) + half_w;
-      // -n direction (right boundary): -n·p <= -n·p0 + half_w
-      hPoly.col(1) << -n.x(), -n.y(), -n.dot(p0) + half_w;
-      // -u direction (start): -u·p <= -u·p0
-      hPoly.col(2) << -u.x(), -u.y(), -u.dot(p0);
-      // u direction (end): u·p <= u·p1
-      hPoly.col(3) << u.x(), u.y(), u.dot(p1);
-
-      hPolys.push_back(hPoly);
-
-      // Find furthest idx inside this corridor
-      idx = next_idx;
-      // Simple check: verify path[idx+1] is inside (relaxed)
-      while (idx + 1 < path_len) {
-        Eigen::Vector2d pt = path[idx + 1];
-        bool inside = true;
-        for (int i = 0; i < 4; i++) {
-          double d = hPoly.col(i).head<2>().dot(pt) - hPoly.col(i)(2);
-          if (d > 1e-3) { inside = false; break; }
-        }
-        if (inside) idx++; else break;
-      }
-    }
-  }
 };
 
 }  // namespace env_2d

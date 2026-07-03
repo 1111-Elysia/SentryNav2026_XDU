@@ -3,6 +3,7 @@
     A*-based spring tracking with internal 10Hz replanning timer.
 */
 #include "elastic_planner/elastic_planner.hpp"
+#include "nav2_smac_planner/smoother.hpp"
 #include <chrono>
 #include <cmath>
 #include "pluginlib/class_list_macros.hpp"
@@ -35,6 +36,9 @@ void ElasticPlanner::configure(
   nav2_util::declare_parameter_if_not_declared(node, name + ".ekf_beta", rclcpp::ParameterValue(0.05));
   nav2_util::declare_parameter_if_not_declared(node, name + ".ekf_reset_dt", rclcpp::ParameterValue(3.0));
   nav2_util::declare_parameter_if_not_declared(node, name + ".target_topic", rclcpp::ParameterValue("/detected_target_pose"));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".minimum_turning_radius", rclcpp::ParameterValue(0.05));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".max_planning_time", rclcpp::ParameterValue(4.5));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".cost_weight", rclcpp::ParameterValue(1.5));
 
   node->get_parameter(name + ".tracking_dist", tracking_dist_);
   node->get_parameter(name + ".tracking_dur", tracking_dur_);
@@ -47,13 +51,24 @@ void ElasticPlanner::configure(
   node->get_parameter(name + ".ekf_reset_dt", ekf_reset_dt_);
   std::string target_topic;
   node->get_parameter(name + ".target_topic", target_topic);
-
+  smoother_params_.get(node, name);
+  min_turning_radius_ = 0.05;
+  node->get_parameter(name + ".minimum_turning_radius", min_turning_radius_);
+  node->get_parameter(name + ".max_planning_time", max_planning_time_);
   env_ = std::make_unique<env_2d::Env2D>();
   prediction_ = std::make_unique<prediction_2d::Predict2D>();
   prediction_->setParams(tracking_dt_, tracking_dur_, 1.0, 4.0);
 
-  RCLCPP_INFO(logger_, "[%s] Configured: tracking_dist=%.1fm dur=%.1fs",
-              planner_name_.c_str(), tracking_dist_, tracking_dur_);
+  double cost_weight;
+  node->get_parameter(name + ".cost_weight", cost_weight);
+  env_->setCostWeight(cost_weight);
+
+  smoother_ = std::make_unique<nav2_smac_planner::Smoother>(smoother_params_);
+  smoother_->initialize(min_turning_radius_);
+
+  RCLCPP_INFO(logger_, "[%s] Configured: tracking_dist=%.1fm dur=%.1fs smtr=(w_smooth=%.1f w_data=%.1f)",
+              planner_name_.c_str(), tracking_dist_, tracking_dur_,
+              smoother_params_.w_smooth_, smoother_params_.w_data_);
 }
 
 void ElasticPlanner::activate() {
@@ -188,7 +203,7 @@ void ElasticPlanner::planTimerCallback() {
       (now - last_plan_time_).seconds() < 1.0 / replan_hz_ * 0.9) return;
 
   auto *costmap = costmap_ros_->getCostmap();
-  if (!costmap) return;
+  if (!costmap || costmap->getSizeInCellsX() == 0 || costmap->getSizeInCellsY() == 0) return;
   env_->setCostmap(costmap);
   prediction_->setCostmap(costmap);
 
@@ -222,6 +237,38 @@ void ElasticPlanner::planTimerCallback() {
 
   { std::lock_guard<std::mutex> lk(path_mutex_); if (ok) cached_path_ = path; }
   last_plan_time_ = now;
+}
+
+// ==================== Path Smoothing ====================
+
+void ElasticPlanner::smoothPath(
+    nav_msgs::msg::Path &path,
+    const nav2_costmap_2d::Costmap2D *costmap)
+{
+  if (!costmap || !smoother_ || path.poses.size() < 2) return;
+
+  // Theta* 可能只输出 2 个点，先插值保证 Smoother 有素材
+  if (path.poses.size() < 3) {
+    nav_msgs::msg::Path dense;
+    dense.header = path.header;
+    const auto &p0 = path.poses[0].pose.position;
+    const auto &p1 = path.poses[1].pose.position;
+    double dx = p1.x - p0.x, dy = p1.y - p0.y;
+    double len = std::sqrt(dx * dx + dy * dy);
+    int n = std::max(3, static_cast<int>(len / 0.1));
+    for (int i = 0; i <= n; i++) {
+      double t = static_cast<double>(i) / n;
+      geometry_msgs::msg::PoseStamped pose;
+      pose.header = path.header;
+      pose.pose.position.x = p0.x + dx * t;
+      pose.pose.position.y = p0.y + dy * t;
+      pose.pose.orientation.w = 1.0;
+      dense.poses.push_back(pose);
+    }
+    path = dense;
+  }
+
+  smoother_->smooth(path, costmap, max_planning_time_);
 }
 
 // ==================== Planning ====================
@@ -281,6 +328,10 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     pose.pose.orientation.w = std::cos(yaw / 2.0);
     path.poses.push_back(pose);
   }
+
+  // 6. Smooth path (SmacPlanner2D Smoother)
+  smoothPath(path, costmap_ros_->getCostmap());
+
   return true;
 }
 
@@ -310,6 +361,9 @@ bool ElasticPlanner::planStatic(const Eigen::Vector2d &start_pos,
     pose.pose.orientation.w = std::cos(yaw / 2.0);
     path.poses.push_back(pose);
   }
+
+  smoothPath(path, costmap_ros_->getCostmap());
+
   return true;
 }
 

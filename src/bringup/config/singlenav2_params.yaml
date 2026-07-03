@@ -521,6 +521,18 @@ planner_server:
       # ── 目标订阅 ───────────────────────────────────
       target_topic: "/detected_target_pose"  # 目标位置话题 (geometry_msgs/PoseStamped)
 
+      # ── A* 代价感知 ─────────────────────────
+      cost_weight: 50.0               # 代价权重, 越大越远离障碍 (配合 cost_scaling_factor=5.0)
+
+      # ── 路径平滑 (SmacPlanner2D Smoother, 与 GridBased 同款) ──
+      minimum_turning_radius: 0.05   # 最小转弯半径 (哨兵全向≈0)
+      max_planning_time: 4.5        # 最大规划时间(s)
+      smoother.tolerance: 1.0e-10   # 收敛阈值
+      smoother.max_iterations: 10000
+      smoother.w_data: 0.1
+      smoother.w_smooth: 0.4
+      smoother.do_refinement: true
+
 smoother_server:
   ros__parameters:
     costmap_topic: global_costmap/costmap_raw

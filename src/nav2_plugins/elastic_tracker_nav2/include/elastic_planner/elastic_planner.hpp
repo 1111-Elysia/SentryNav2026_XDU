@@ -30,6 +30,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "tf2_ros/buffer.h"
 
+#include "nav2_smac_planner/smoother.hpp"
 #include "env/env_2d.hpp"
 #include "prediction/prediction_2d.hpp"
 
@@ -89,6 +90,10 @@ class ElasticPlanner : public nav2_core::GlobalPlanner {
   double tracking_dt_ = 0.2;
   bool use_tracking_ = true;
   double target_timeout_ = 1.0;
+  double min_turning_radius_ = 0.05;
+  double max_planning_time_ = 4.5;
+  nav2_smac_planner::SmootherParams smoother_params_;
+  std::unique_ptr<nav2_smac_planner::Smoother> smoother_;
 
   // EKF for target velocity estimation
   bool ekf_enabled_ = true;
@@ -106,6 +111,7 @@ class ElasticPlanner : public nav2_core::GlobalPlanner {
   void planTimerCallback();
   bool planTracked(const Eigen::Vector2d &start_pos, const Eigen::Vector2d &goal_pos, nav_msgs::msg::Path &path);
   bool planStatic(const Eigen::Vector2d &start_pos, const Eigen::Vector2d &goal_pos, nav_msgs::msg::Path &path);
+  void smoothPath(nav_msgs::msg::Path &path, const nav2_costmap_2d::Costmap2D *costmap);
 };
 
 }  // namespace elastic_planner
