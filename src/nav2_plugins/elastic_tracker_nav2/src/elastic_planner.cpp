@@ -299,6 +299,8 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
                                  const Eigen::Vector2d &goal_pos,
                                  nav_msgs::msg::Path &path)
 {
+  const auto plan_start = std::chrono::steady_clock::now();
+
   // 1. Predict target trajectory
   std::vector<Eigen::Vector2d> predicted;
   {
@@ -333,6 +335,10 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     Eigen::Vector2d mid = (start_pos + track_goal) * 0.5;
     if ((mid - start_pos).norm() > 0.1) raw_path.insert(raw_path.begin() + 1, mid);
   }
+  RCLCPP_INFO(
+    logger_,
+    "[%s] ElasticTracker raw_path points=%zu, minco_enabled=%s",
+    planner_name_.c_str(), raw_path.size(), minco_enabled_ ? "true" : "false");
 
   // minco optimization
   if (minco_enabled_ && minco_optimizer_){
@@ -345,6 +351,10 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
         planner_name_.c_str());
       corridors.clear();
     }
+    RCLCPP_INFO(
+      logger_,
+      "[%s] ElasticTracker corridors=%zu, corridor_width=%.2f",
+      planner_name_.c_str(), corridors.size(), corridor_width_);
 
     Eigen::Vector2d goal_vel = Eigen::Vector2d::Zero();
     {
@@ -356,7 +366,12 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     if (minco_optimizer_->generatePath(raw_path, Eigen::Vector2d::Zero(), goal_vel, "map", minco_path, corridors)){
       path = minco_path;
       path.header.stamp = rclcpp::Clock().now();
-      RCLCPP_INFO(logger_, "[%s] MINCO路径生成成功：raw=%zu, sampled=%zu", planner_name_.c_str(),raw_path.size(),path.poses.size());
+      const auto plan_end = std::chrono::steady_clock::now();
+      const auto plan_ms = std::chrono::duration_cast<std::chrono::milliseconds>(plan_end - plan_start).count();
+      RCLCPP_INFO(
+        logger_,
+        "[%s] MINCO路径生成成功：raw=%zu, sampled=%zu, plan_time=%ld ms",
+        planner_name_.c_str(), raw_path.size(), path.poses.size(), plan_ms);
       return true;
     }
     RCLCPP_WARN(logger_, "[%s] MINCO路径生成失败，回退至A*到点路径", planner_name_.c_str());
@@ -381,6 +396,13 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
 
   // 6. Smooth path (SmacPlanner2D Smoother)
   smoothPath(path, costmap_ros_->getCostmap());
+
+  const auto plan_end = std::chrono::steady_clock::now();
+  const auto plan_ms = std::chrono::duration_cast<std::chrono::milliseconds>(plan_end - plan_start).count();
+  RCLCPP_INFO(
+    logger_,
+    "[%s] ElasticTracker fallback output points=%zu, plan_time=%ld ms",
+    planner_name_.c_str(), path.poses.size(), plan_ms);
 
   return true;
 }

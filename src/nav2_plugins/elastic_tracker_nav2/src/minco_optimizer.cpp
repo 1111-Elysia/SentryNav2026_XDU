@@ -1,6 +1,7 @@
 #include "elastic_tracker/minco_optimizer.hpp"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <string>
 
 #include "gcopter/minco.hpp"
@@ -187,6 +188,10 @@ namespace elastic_tracker{
     bool MincoOptimizer::optimizerInnerPoints(Eigen::Matrix3Xd &inner_points, const Eigen::VectorXd &times, const Eigen::Matrix3d &head_state,
         const Eigen::Matrix3d &tail_state, const std::vector<Corridor> &corridors) const{
         if (!config_.lbfgs_enabled || inner_points.cols() == 0){
+            std::cout << "[MincoOptimizer] lbfgs skipped, enabled="
+                      << (config_.lbfgs_enabled ? "true" : "false")
+                      << ", inner_points=" << inner_points.cols()
+                      << std::endl;
             return true;
         }
 
@@ -237,6 +242,10 @@ namespace elastic_tracker{
 
         double final_cost = 0.0;
         const int ret = lbfgs::lbfgs_optimize(x, final_cost, evaluate, nullptr, nullptr, &context, params);
+        std::cout << "[MincoOptimizer] lbfgs ret=" << ret
+                  << ", final_cost=" << final_cost
+                  << ", variables=" << x.size()
+                  << std::endl;
         if(ret < 0){
             return false;
         }
