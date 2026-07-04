@@ -518,6 +518,10 @@ planner_server:
       ekf_beta: 0.05            # 速度平滑增益 (0~1, 越小越平滑, 默认0.05)
       ekf_reset_dt: 3.0         # EKF重置时间阈值 (s), 超过此间隔自动重置
 
+      # ── 追踪区域约束 ─────────────────────────
+      tracking_zone_vertices: [0.0, 0.0, 5.0, 0.0, 7.0, 5.0, 3.0, 5.0, 0.0, 3.0]
+      # 顶点 [x1,y1, x2,y2, ...] 构成闭合多边形, 空数组=不限
+
       # ── 目标订阅 ───────────────────────────────────
       target_topic: "/detected_target_pose"  # 目标位置话题 (geometry_msgs/PoseStamped)
 

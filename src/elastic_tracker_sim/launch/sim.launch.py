@@ -101,8 +101,7 @@ def generate_launch_description():
             TimerAction(
                 period=3.0, actions=[
                     Node(package="rviz2", executable="rviz2",
-                         arguments=["-d", os.path.join(pkg, "rviz", "sim.rviz")],
-                         parameters=[{"use_sim_time": True}]),
+                         arguments=["-d", os.path.join(pkg, "rviz", "sim.rviz")]),
                 ],
             ),
             # ======================================================

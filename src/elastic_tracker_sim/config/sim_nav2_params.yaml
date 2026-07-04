@@ -184,6 +184,21 @@ planner_server:
       ekf_enabled: true         # 启用EKF从位置观测估计目标速度
       target_timeout: 1.0       # 目标丢失超时 (s)，超时后原地悬停
 
+      # ── A* 代价感知 ─────────────────────────
+      cost_weight: 5.0
+
+      # ── 路径平滑 (SmacPlanner2D Smoother) ──
+      minimum_turning_radius: 0.05
+      max_planning_time: 4.5
+      smoother.tolerance: 1.0e-10
+      smoother.max_iterations: 10000
+      smoother.w_data: 0.1
+      smoother.w_smooth: 0.4
+      smoother.do_refinement: true
+
+      # ── 追踪区域约束 ─────────────────────────
+      tracking_zone_vertices: [0.0, 0.0, 5.0, 0.0, 7.0, 5.0, 3.0, 5.0, 0.0, 3.0]
+
       # ── 目标订阅 ───────────────────────────────────
       target_topic: "/detected_target_pose"  # 目标位置话题 (geometry_msgs/PoseStamped)
 

@@ -32,6 +32,7 @@
 
 #include "nav2_smac_planner/smoother.hpp"
 #include "env/env_2d.hpp"
+#include "env/polygon_zone.hpp"
 #include "prediction/prediction_2d.hpp"
 
 namespace elastic_planner {
@@ -94,6 +95,7 @@ class ElasticPlanner : public nav2_core::GlobalPlanner {
   double max_planning_time_ = 4.5;
   nav2_smac_planner::SmootherParams smoother_params_;
   std::unique_ptr<nav2_smac_planner::Smoother> smoother_;
+  PolygonZone tracking_zone_;
 
   // EKF for target velocity estimation
   bool ekf_enabled_ = true;
