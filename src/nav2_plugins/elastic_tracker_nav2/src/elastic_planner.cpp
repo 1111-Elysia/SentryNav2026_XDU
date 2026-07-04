@@ -49,6 +49,7 @@ void ElasticPlanner::configure(
   nav2_util::declare_parameter_if_not_declared(node, name + ".lbfgs_g_epsilon", rclcpp::ParameterValue(1e-4));
   nav2_util::declare_parameter_if_not_declared(node, name + ".finite_diff_eps", rclcpp::ParameterValue(1e-4));
   nav2_util::declare_parameter_if_not_declared(node, name + ".corridor_weight", rclcpp::ParameterValue(50.0));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".tracking_zone_vertices", rclcpp::ParameterValue(std::vector<double>{}));
 
   node->get_parameter(name + ".tracking_dist", tracking_dist_);
   node->get_parameter(name + ".tracking_dur", tracking_dur_);
@@ -84,6 +85,11 @@ void ElasticPlanner::configure(
   node->get_parameter(name + ".finite_diff_eps", minco_config_.finite_diff_eps);
   node->get_parameter(name + ".corridor_weight", minco_config_.corridor_weight);
 
+  // 多边形追踪区域
+  std::vector<double> zone_vertices;
+  node->get_parameter(name + ".tracking_zone_vertices", zone_vertices);
+  tracking_zone_.loadVertices(zone_vertices);
+
   smoother_ = std::make_unique<nav2_smac_planner::Smoother>(smoother_params_);
   smoother_->initialize(min_turning_radius_);
   minco_optimizer_ = std::make_unique<elastic_tracker::MincoOptimizer>(minco_config_);
@@ -107,6 +113,8 @@ void ElasticPlanner::activate() {
       std::bind(&ElasticPlanner::planTimerCallback, this));
     RCLCPP_INFO(logger_, "[%s] Timer %.0f Hz, sub %s", planner_name_.c_str(), replan_hz_, target_topic.c_str());
   }
+
+  tracking_zone_.activatePublisher(node.get());
 }
 
 void ElasticPlanner::deactivate() {
@@ -242,6 +250,11 @@ void ElasticPlanner::planTimerCallback() {
   {
     std::lock_guard<std::mutex> lk(target_mutex_);
     target_pos = {latest_target_.pose.position.x, latest_target_.pose.position.y};
+  }
+
+  // 多边形区域门控：目标在外 → 不发路径
+  if (tracking_zone_.enabled() && !tracking_zone_.isInside(target_pos.x(), target_pos.y())) {
+    return;
   }
 
   nav_msgs::msg::Path path;
