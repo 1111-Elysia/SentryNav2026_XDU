@@ -39,6 +39,10 @@ void ElasticPlanner::configure(
   nav2_util::declare_parameter_if_not_declared(node, name + ".minimum_turning_radius", rclcpp::ParameterValue(0.05));
   nav2_util::declare_parameter_if_not_declared(node, name + ".max_planning_time", rclcpp::ParameterValue(4.5));
   nav2_util::declare_parameter_if_not_declared(node, name + ".cost_weight", rclcpp::ParameterValue(1.5));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".minco_enabled", rclcpp::ParameterValue(true));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".minco_sample_dt", rclcpp::ParameterValue(0.05));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".minco_nominal_speed", rclcpp::ParameterValue(1.0));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".minco_min_piece_diration", rclcpp::ParameterValue(0.15));
 
   node->get_parameter(name + ".tracking_dist", tracking_dist_);
   node->get_parameter(name + ".tracking_dur", tracking_dur_);
@@ -63,8 +67,14 @@ void ElasticPlanner::configure(
   node->get_parameter(name + ".cost_weight", cost_weight);
   env_->setCostWeight(cost_weight);
 
+  node->get_parameter(name + ".minco_enabled", minco_enabled_);
+  node->get_parameter(name + ".minco_sample_dt", minco_config_.sample_dt);
+  node->get_parameter(name + ".minco_nominal_speed", minco_config_.nominal_speed);
+  node->get_parameter(name + ".minco_min_piece_duration",minco_config_.min_piece_duration);
+
   smoother_ = std::make_unique<nav2_smac_planner::Smoother>(smoother_params_);
   smoother_->initialize(min_turning_radius_);
+  minco_optimizer_ = std::make_unique<elastic_tracker::MincoOptimizer>(minco_config_);
 
   RCLCPP_INFO(logger_, "[%s] Configured: tracking_dist=%.1fm dur=%.1fs smtr=(w_smooth=%.1f w_data=%.1f)",
               planner_name_.c_str(), tracking_dist_, tracking_dur_,
@@ -310,6 +320,24 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     raw_path = {start_pos, track_goal};
     Eigen::Vector2d mid = (start_pos + track_goal) * 0.5;
     if ((mid - start_pos).norm() > 0.1) raw_path.insert(raw_path.begin() + 1, mid);
+  }
+
+  // minco optimization
+  if (minco_enabled_ && minco_optimizer_){
+    Eigen::Vector2d goal_vel = Eigen::Vector2d::Zero();
+    {
+      std::lock_guard<std::mutex> lk(target_mutex_);
+      goal_vel = target_vel_;
+    }
+
+    nav_msgs::msg::Path minco_path;
+    if (minco_optimizer_->generatePath(raw_path, Eigen::Vector2d::Zero(), goal_vel, "map", minco_path)){
+      path = minco_path;
+      path.header.stamp = rclcpp::Clock().now();
+      RCLCPP_INFO(logger_, "[%s] MINCO路径生成成功：raw=%zu, sampled=%zu", planner_name_.c_str(),raw_path.size(),path.poses.size());
+      return true;
+    }
+    RCLCPP_WARN(logger_, "[%s] MINCO路径生成失败，回退至A*到点路径", planner_name_.c_str());
   }
 
   // 5. Convert to nav_msgs::Path

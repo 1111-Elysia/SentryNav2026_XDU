@@ -508,6 +508,11 @@ planner_server:
       tracking_dur: 3.0         # 预测/规划时域 (s)
       tracking_dt: 0.2          # 预测时间步长 (s)
 
+      minco_enabled: true               # minco优化器开关
+      minco_sampled_dt: 0.05            # 采样时间间隔
+      minco_nominal_speed: 1.0          # minco每段采样速度
+      minco_min_piece_duration: 0.15    # 每段最短时间
+
       # ── 功能开关 ───────────────────────────────────
       use_tracking: true        # 启用目标追踪模式（内部10Hz重规划定时器）
       ekf_enabled: false         # 启用EKF从位置观测估计目标速度
