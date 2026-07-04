@@ -42,7 +42,13 @@ void ElasticPlanner::configure(
   nav2_util::declare_parameter_if_not_declared(node, name + ".minco_enabled", rclcpp::ParameterValue(true));
   nav2_util::declare_parameter_if_not_declared(node, name + ".minco_sample_dt", rclcpp::ParameterValue(0.05));
   nav2_util::declare_parameter_if_not_declared(node, name + ".minco_nominal_speed", rclcpp::ParameterValue(1.0));
-  nav2_util::declare_parameter_if_not_declared(node, name + ".minco_min_piece_diration", rclcpp::ParameterValue(0.15));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".minco_min_piece_duration", rclcpp::ParameterValue(0.15));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".corridor_width", rclcpp::ParameterValue(0.8));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".lbfgs_enabled", rclcpp::ParameterValue(true));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".lbfgs_max_iterations", rclcpp::ParameterValue(50));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".lbfgs_g_epsilon", rclcpp::ParameterValue(1e-4));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".finite_diff_eps", rclcpp::ParameterValue(1e-4));
+  nav2_util::declare_parameter_if_not_declared(node, name + ".corridor_weight", rclcpp::ParameterValue(50.0));
 
   node->get_parameter(name + ".tracking_dist", tracking_dist_);
   node->get_parameter(name + ".tracking_dur", tracking_dur_);
@@ -71,6 +77,12 @@ void ElasticPlanner::configure(
   node->get_parameter(name + ".minco_sample_dt", minco_config_.sample_dt);
   node->get_parameter(name + ".minco_nominal_speed", minco_config_.nominal_speed);
   node->get_parameter(name + ".minco_min_piece_duration",minco_config_.min_piece_duration);
+  node->get_parameter(name + ".corridor_width", corridor_width_);
+  node->get_parameter(name + ".lbfgs_enabled", minco_config_.lbfgs_enabled);
+  node->get_parameter(name + ".lbfgs_max_iterations", minco_config_.lbfgs_max_iterations);
+  node->get_parameter(name + ".lbfgs_g_epsilon", minco_config_.lbfgs_g_epsilon);
+  node->get_parameter(name + ".finite_diff_eps", minco_config_.finite_diff_eps);
+  node->get_parameter(name + ".corridor_weight", minco_config_.corridor_weight);
 
   smoother_ = std::make_unique<nav2_smac_planner::Smoother>(smoother_params_);
   smoother_->initialize(min_turning_radius_);
@@ -324,6 +336,16 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
 
   // minco optimization
   if (minco_enabled_ && minco_optimizer_){
+    std::vector<elastic_tracker::Corridor> corridors;
+    const auto *costmap = costmap_ros_ ? costmap_ros_->getCostmap() : nullptr;
+    if (!corridor_generator_.generate(raw_path, costmap, corridor_width_, corridors)) {
+      RCLCPP_WARN(
+        logger_,
+        "[%s] Corridor生成失败，MINCO暂时使用空走廊",
+        planner_name_.c_str());
+      corridors.clear();
+    }
+
     Eigen::Vector2d goal_vel = Eigen::Vector2d::Zero();
     {
       std::lock_guard<std::mutex> lk(target_mutex_);
@@ -331,7 +353,7 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     }
 
     nav_msgs::msg::Path minco_path;
-    if (minco_optimizer_->generatePath(raw_path, Eigen::Vector2d::Zero(), goal_vel, "map", minco_path)){
+    if (minco_optimizer_->generatePath(raw_path, Eigen::Vector2d::Zero(), goal_vel, "map", minco_path, corridors)){
       path = minco_path;
       path.header.stamp = rclcpp::Clock().now();
       RCLCPP_INFO(logger_, "[%s] MINCO路径生成成功：raw=%zu, sampled=%zu", planner_name_.c_str(),raw_path.size(),path.poses.size());

@@ -33,6 +33,7 @@
 #include "nav2_smac_planner/smoother.hpp"
 #include "env/env_2d.hpp"
 #include "prediction/prediction_2d.hpp"
+#include "elastic_tracker/corridor_2d.hpp"
 #include "elastic_tracker/minco_optimizer.hpp"
 
 namespace elastic_planner {
@@ -99,6 +100,8 @@ class ElasticPlanner : public nav2_core::GlobalPlanner {
   bool minco_enabled_{true};
   elastic_tracker::MincoOptimizerConfig minco_config_;
   std::unique_ptr<elastic_tracker::MincoOptimizer> minco_optimizer_;
+  elastic_tracker::CorridorGenerator corridor_generator_;
+  double corridor_width_{0.8};
 
   // EKF for target velocity estimation
   bool ekf_enabled_ = true;
