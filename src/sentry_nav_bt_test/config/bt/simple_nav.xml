@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="单点导航根节点">
+      <KeepRunningUntilFailure>
+        <Sequence name="等待裁判系统连接">
+          <Inverter>
+            <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
+          </Inverter>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <KeepRunningUntilFailure>
+        <Sequence name="赛前检查与回初始点">
+          <CheckCondition key_name="game_progress" comparison="lte" threshold="3"/>
+          <SetBlackboardValue key="simple_nav_initialized" value="0" type="int"/>
+          <SetBlackboardValue key="simple_nav_completed" value="0" type="int"/>
+          <Fallback name="准备阶段回到init">
+            <SubTree
+              ID="PrestartInitReturn"
+              game_progress_key="game_progress"
+              prepare_progress="1"
+              init_goal_name="init"
+              prestart_message="[SimpleNav] 准备阶段，返回 init"
+              log_throttle_ms="2000"
+              controller_name="{runtime_controller}"
+              reach_threshold="0.10"
+              nav_resend_interval="0.30"
+              nav_response_timeout="2.00"
+              nav_result_retry_delay="0.30"
+              _autoremap="1"/>
+            <CheckCondition key_name="game_progress" comparison="lte" threshold="3"/>
+          </Fallback>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <ForceFailure>
+        <Fallback name="比赛开始初始化">
+          <CheckCondition key_name="simple_nav_initialized" comparison="eq" threshold="1"/>
+          <Sequence>
+            <PrintNode message="[SimpleNav] 比赛开始，初始化单点导航"/>
+            <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+            <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+            <SetBlackboardValue key="simple_nav_completed" value="0" type="int"/>
+            <SetBlackboardValue key="simple_nav_initialized" value="1" type="int"/>
+          </Sequence>
+        </Fallback>
+      </ForceFailure>
+
+      <ReactiveSequence name="比赛中单点任务">
+        <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
+        <CheckCondition key_name="game_progress" comparison="eq" threshold="4"/>
+        <Fallback name="执行一次并保持完成状态">
+          <Sequence>
+            <CheckCondition key_name="simple_nav_completed" comparison="eq" threshold="0"/>
+            <SubTree
+              ID="GoWaitUntilTimeAbove"
+              rune_phase_key="in_rune_phase"
+              fortress_active_key="uc_fortress_hold_active"
+              point_goal_name="{runtime_effective_goal_name}"
+              point_controller_name="{runtime_controller}"
+              point_move_posture="{runtime_move_posture}"
+              point_wait_posture="{runtime_wait_posture}"
+              point_reach_threshold="{runtime_reach_threshold}"
+              point_wait_time_threshold="{runtime_wait_time_threshold}"
+              point_start_message="[SimpleNav] 前往当前目标点"
+              point_arrived_message="[SimpleNav] 已到点，等待时间阈值"
+              nav_resend_interval="0.30"
+              nav_response_timeout="2.00"
+              nav_result_retry_delay="0.30"
+              _autoremap="1"/>
+            <SetBlackboardValue key="simple_nav_completed" value="1" type="int"/>
+            <PrintNode message="[SimpleNav] 时间阈值已满足，单点任务完成"/>
+          </Sequence>
+          <KeepRunningUntilFailure>
+            <CheckCondition key_name="simple_nav_completed" comparison="eq" threshold="1"/>
+          </KeepRunningUntilFailure>
+        </Fallback>
+      </ReactiveSequence>
+    </Fallback>
+  </BehaviorTree>
+</root>

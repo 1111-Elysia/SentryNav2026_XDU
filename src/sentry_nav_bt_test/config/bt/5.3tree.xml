@@ -186,6 +186,7 @@
                              comparison="gt"
                              threshold="300"/>
                   <SubTree ID="GoWaitUntilTimeAbove"
+                               point_controller_name="FollowPath"
                                fortress_active_key="uc_fortress_hold_active"
                                nav_resend_interval="0.30"
                                nav_response_timeout="0.80"
@@ -206,6 +207,7 @@
                              comparison="gt"
                              threshold="240"/>
                   <SubTree ID="GoWaitUntilTimeAbove"
+                               point_controller_name="FollowPath"
                                fortress_active_key="uc_fortress_hold_active"
                                nav_resend_interval="0.30"
                                nav_response_timeout="0.80"

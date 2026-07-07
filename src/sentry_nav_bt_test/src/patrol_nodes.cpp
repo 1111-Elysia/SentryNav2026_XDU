@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <mutex>
 #include <sstream>
 
 namespace sentry_nav_bt_test
@@ -9,6 +11,29 @@ namespace sentry_nav_bt_test
 
 namespace
 {
+
+using ControllerPublisher = rclcpp::Publisher<std_msgs::msg::String>;
+
+ControllerPublisher::SharedPtr getSharedControllerPublisher(
+  const rclcpp::Node::SharedPtr &node, const std::string &topic_name)
+{
+  static std::mutex mutex;
+  static std::map<
+    const rclcpp::Node *,
+    std::map<std::string, std::weak_ptr<ControllerPublisher>>,
+    std::less<const rclcpp::Node *>> publishers;
+
+  std::lock_guard<std::mutex> lock(mutex);
+  auto &publisher_slot = publishers[node.get()][topic_name];
+  if (auto publisher = publisher_slot.lock()) {
+    return publisher;
+  }
+
+  const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  auto publisher = node->create_publisher<std_msgs::msg::String>(topic_name, qos);
+  publisher_slot = publisher;
+  return publisher;
+}
 
 std::string trim(const std::string &value)
 {
@@ -213,6 +238,8 @@ BT::PortsList PublishControllerName::providedPorts()
 {
   return {
     BT::InputPort<std::string>("controller_name", "Nav2 controller plugin id"),
+    BT::InputPort<std::string>(
+      "selection_key", "", "仅在 controller 或该任务选择键变化时重新发布"),
     BT::InputPort<std::string>("topic_name", "/controller_name", "ControllerSelector topic"),
     BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流")
   };
@@ -224,8 +251,7 @@ void PublishControllerName::ensurePublisher(const std::string &topic_name)
     return;
   }
 
-  const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
-  publisher_ = node_->create_publisher<std_msgs::msg::String>(topic_name, qos);
+  publisher_ = getSharedControllerPublisher(node_, topic_name);
   publisher_topic_ = topic_name;
 }
 
@@ -246,6 +272,32 @@ BT::NodeStatus PublishControllerName::tick()
     topic_name = trim(topic_name);
   }
 
+  std::string selection_key;
+  getInput("selection_key", selection_key);
+
+  std::string last_controller_name;
+  std::string last_selection_key;
+  std::string last_topic_name;
+  const bool has_published =
+    config().blackboard &&
+    config().blackboard->get("last_nav_controller_name", last_controller_name);
+  if (config().blackboard) {
+    if (!config().blackboard->get(
+        "last_nav_controller_selection_key", last_selection_key))
+    {
+      last_selection_key.clear();
+    }
+    if (!config().blackboard->get("last_nav_controller_topic", last_topic_name)) {
+      last_topic_name.clear();
+    }
+  }
+  const bool selection_changed =
+    !has_published || controller_name != last_controller_name ||
+    selection_key != last_selection_key || topic_name != last_topic_name;
+  if (!selection_changed) {
+    return BT::NodeStatus::SUCCESS;
+  }
+
   ensurePublisher(topic_name);
 
   std_msgs::msg::String msg;
@@ -254,6 +306,8 @@ BT::NodeStatus PublishControllerName::tick()
 
   if (config().blackboard) {
     config().blackboard->set("last_nav_controller_name", controller_name);
+    config().blackboard->set("last_nav_controller_selection_key", selection_key);
+    config().blackboard->set("last_nav_controller_topic", topic_name);
   }
 
   int log_throttle_ms = 0;
