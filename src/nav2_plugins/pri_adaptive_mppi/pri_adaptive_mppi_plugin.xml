@@ -1,0 +1,11 @@
+<library path="pri_adaptive_mppi">
+  <class name="pri_adaptive_mppi::PriAdaptiveMppi"
+         type="pri_adaptive_mppi::PriAdaptiveMppi"
+         base_class_type="nav2_core::Controller">
+    <description>
+      自适应MPPI控制器。根据全局规划路径与指定直线的穿越方向（左→右 / 右→左），
+      自动切换三套预配置的MPPI参数。直线两侧具有膨胀层，机器人未进入膨胀层时使用默认参数。
+      内部通过pluginlib动态加载nav2_mppi_controller::MPPIController。
+    </description>
+  </class>
+</library>

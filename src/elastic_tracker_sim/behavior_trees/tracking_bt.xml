@@ -6,7 +6,7 @@
         <RateController hz="10.0">
           <Sequence>
             <PlannerSelector selected_planner="{selected_planner}"
-                             default_planner="ElasticTracker"
+                             default_planner="GridBased"
                              topic_name="planner_name"/>
             <GoalUpdater input_goal="{goal}" output_goal="{updated_goal}">
               <ComputePathToPose goal="{updated_goal}" path="{path}"

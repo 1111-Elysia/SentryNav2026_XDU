@@ -72,7 +72,7 @@ controller_server:
     failure_tolerance: 0.3
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"] 
-    controller_plugins: ["FollowPath","HanBao"]
+    controller_plugins: ["FollowPath","AdaptiveMppi"]
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.1
@@ -177,99 +177,251 @@ controller_server:
         offset_from_furthest: 20
         use_path_orientations: false #omni机器人用运动方向而非朝向
 
-    HanBao:
-      plugin: "goal_approach_controller::GoalApproachController"
+    # ═══════════════════════════════════════════════
+    #  AdaptiveMppi — 自适应MPPI控制器
+    #  根据路径穿越直线方向自动切换上坡/下坡/普通三套参数
+    #  通过 behavior tree 的 ControllerSelector 节点切换到此控制器
+    # ═══════════════════════════════════════════════
+    AdaptiveMppi:
+      plugin: "pri_adaptive_mppi::PriAdaptiveMppi"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 0.5  #距目标时开始限速
-      approach_velocity: 0.7
-      direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
-      direct_approach_kp: 10.0  #直接驱动P控制增益
-      time_steps: 80  #增加到80，预测时域4.8s，让MPPI能看到冲过目标的后果
-      model_dt: 0.04  #稍微放大步长，配合time_steps延长预测时域
-      batch_size: 1500 #控制器的采样数。
+      max_path_age: 2.0
 
-      vx_std: 0.3 #增大采样多样性，让MPPI能采到更多减速/停止轨迹
-      vy_std: 0.3
-      wz_std: 0.2
+      # ── 直线列表（每条直线仅需 point_1, point_2, inflation_radius_uphill/downhill）──
+      lines: ["ramp_a"]
 
-      vx_max: 2.0
-      vy_max: 2.0
-      wz_max: 1.5
+      ramp_a.point_1: [0.0, 0.0]
+      ramp_a.point_2: [5.0, 0.0]
+      ramp_a.inflation_radius_uphill: 0.5
+      ramp_a.inflation_radius_downhill: 1.0
 
-      vx_min: -2.0
-      vy_min: -2.0
-      wz_min: -1.5
+      # ═══════════════════════════════════════════════
+      #  普通模式 MPPI 参数（未穿越任何直线时使用）
+      # ═══════════════════════════════════════════════
+      normal.time_steps: 80
+      normal.model_dt: 0.04
+      normal.batch_size: 1500
+      normal.vx_std: 0.3
+      normal.vy_std: 0.3
+      normal.wz_std: 0.2
+      normal.vx_max: 2.0
+      normal.vy_max: 2.0
+      normal.wz_max: 1.5
+      normal.vx_min: -2.0
+      normal.vy_min: -2.0
+      normal.wz_min: -1.5
+      normal.ax_max: 1.5
+      normal.ay_max: 1.5
+      normal.az_max: 3.0
+      normal.ax_min: -3.5
+      normal.ay_min: -3.5
+      normal.az_min: -3.0
+      normal.iteration_count: 1
+      normal.prune_distance: 1.7
+      normal.transform_tolerance: 0.1
+      normal.temperature: 0.25
+      normal.gamma: 0.015
+      normal.motion_model: "Omni"
+      normal.visualize: false
+      normal.reset_period: 0.08
 
-      ax_max: 1.5 #加速度提高，高速时能快速响应
-      ay_max: 1.5
-      az_max: 3.0
+      normal.critics: ["ConstraintCritic", "CostCritic",
+                        "GoalCritic", "PathFollowCritic",
+                        "PathAlignCritic", "ObstaclesCritic"]
 
-      ax_min: -3.5 #关键：制动力必须对称，高速下刹得住
-      ay_min: -3.5
-      az_min: -3.0
+      normal.ConstraintCritic.enabled: true
+      normal.ConstraintCritic.cost_power: 1
+      normal.ConstraintCritic.cost_weight: 4.0
 
-      iteration_count: 1
-      prune_distance: 1.7 #高速下提前剪枝已通过的路径点
-      transform_tolerance: 0.1
-      temperature: 0.25 #大幅降低：让 MPPI 更果断选最优轨迹，不在次优之间摇摆
-      gamma: 0.015 #稍微提高正则化，减少激进抖动
-      motion_model: "Omni" #控制器的运动模型。
-      visualize: false #是否可视化。
-      reset_period: 0.08 # (only in Humble)
-      TrajectoryVisualizer:
-        trajectory_step: 5 #是指在可视化轨迹时，每隔多少个轨迹点绘制一个点。
-        time_step: 3 #是指在可视化轨迹时，每隔多少个时间步长绘制一个点。
-      critics: ["ConstraintCritic", "CostCritic", 
-                "GoalCritic", "PathFollowCritic", 
-                "PathAlignCritic", "ObstaclesCritic"
-                ]
+      normal.GoalCritic.enabled: true
+      normal.GoalCritic.cost_power: 1
+      normal.GoalCritic.cost_weight: 25.0
+      normal.GoalCritic.threshold_to_consider: 4.0
 
-      ConstraintCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 4.0
+      normal.ObstaclesCritic.enabled: true
+      normal.ObstaclesCritic.cost_power: 1
+      normal.ObstaclesCritic.repulsion_weight: 1.5
+      normal.ObstaclesCritic.critical_weight: 20.0
+      normal.ObstaclesCritic.consider_footprint: false
+      normal.ObstaclesCritic.collision_cost: 10000.0
+      normal.ObstaclesCritic.collision_margin_distance: 0.25
+      normal.ObstaclesCritic.near_goal_distance: 0.5
 
-      GoalCritic: #必须开启，否则机器人没有到达目标的动力
-        enabled: true
-        cost_power: 1
-        cost_weight: 25.0 #提高权重，增强最终接近阶段的目标吸引力，防止弧线绕圈
-        threshold_to_consider: 4.0
-      ObstaclesCritic: #开启提供额外的障碍物排斥力
-        enabled: true
-        cost_power: 1
-        repulsion_weight: 1.5 #排斥权重
-        critical_weight: 20.0 #近距离障碍物惩罚
-        consider_footprint: false #用圆形近似，omni机器人更高效
-        collision_cost: 10000.0
-        collision_margin_distance: 0.25 #碰撞边界余量
-        near_goal_distance: 0.5
+      normal.CostCritic.enabled: true
+      normal.CostCritic.cost_power: 1
+      normal.CostCritic.cost_weight: 3.8
+      normal.CostCritic.critical_cost: 253.0
+      normal.CostCritic.consider_footprint: true
+      normal.CostCritic.collision_cost: 1000000.0
+      normal.CostCritic.near_goal_distance: 0.5
+      normal.CostCritic.trajectory_point_step: 2
 
-      CostCritic: #通过 costmap 梯度引导避障
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.8 #适当降低，配合修正后的 inflation 梯度
-        critical_cost: 253.0 #关键修正！只有 inscribed/lethal 才触发碰撞惩罚，不再把整个膨胀区都当碰撞
-        consider_footprint: true
-        collision_cost: 1000000.0
-        near_goal_distance: 0.5
-        trajectory_point_step: 2
+      normal.PathFollowCritic.enabled: true
+      normal.PathFollowCritic.cost_power: 1
+      normal.PathFollowCritic.cost_weight: 15.0
+      normal.PathFollowCritic.offset_from_furthest: 5
+      normal.PathFollowCritic.threshold_to_consider: 1.0
 
-      PathFollowCritic: #必须开启，这是防止乱跑的核心
-        enabled: true
-        cost_power: 1
-        cost_weight: 15.0
-        offset_from_furthest: 5 #关注路径前方更远的点
-        threshold_to_consider: 1.0 #放大关闭距离，让GoalCritic在近目标区域主导，防止画弧
+      normal.PathAlignCritic.enabled: true
+      normal.PathAlignCritic.cost_power: 1
+      normal.PathAlignCritic.cost_weight: 15.0
+      normal.PathAlignCritic.max_path_occupancy_ratio: 0.05
+      normal.PathAlignCritic.trajectory_point_step: 4
+      normal.PathAlignCritic.threshold_to_consider: 0.8
+      normal.PathAlignCritic.offset_from_furthest: 20
+      normal.PathAlignCritic.use_path_orientations: false
 
-      PathAlignCritic: #让轨迹方向与路径对齐，高速下更平滑
-        enabled: true
-        cost_power: 1
-        cost_weight: 15.0
-        max_path_occupancy_ratio: 0.05
-        trajectory_point_step: 4
-        threshold_to_consider: 0.8 #放大关闭距离，与PathFollowCritic同步，减少近目标干扰
-        offset_from_furthest: 20
-        use_path_orientations: false #omni机器人用运动方向而非朝向
+      # ═══════════════════════════════════════════════
+      #  上坡模式 MPPI 参数（上坡→下坡穿越时使用）
+      # ═══════════════════════════════════════════════
+      uphill.time_steps: 80
+      uphill.model_dt: 0.04
+      uphill.batch_size: 1500
+      uphill.vx_std: 0.3
+      uphill.vy_std: 0.3
+      uphill.wz_std: 0.2
+      uphill.vx_max: 2.0
+      uphill.vy_max: 2.0
+      uphill.wz_max: 1.5
+      uphill.vx_min: -2.0
+      uphill.vy_min: -2.0
+      uphill.wz_min: -1.5
+      uphill.ax_max: 1.5
+      uphill.ay_max: 1.5
+      uphill.az_max: 3.0
+      uphill.ax_min: -3.5
+      uphill.ay_min: -3.5
+      uphill.az_min: -3.0
+      uphill.iteration_count: 1
+      uphill.prune_distance: 1.7
+      uphill.transform_tolerance: 0.1
+      uphill.temperature: 0.25
+      uphill.gamma: 0.015
+      uphill.motion_model: "Omni"
+      uphill.visualize: false
+      uphill.reset_period: 0.08
+
+      uphill.critics: ["ConstraintCritic", "CostCritic",
+                        "GoalCritic", "PathFollowCritic",
+                        "PathAlignCritic", "ObstaclesCritic"]
+
+      uphill.ConstraintCritic.enabled: true
+      uphill.ConstraintCritic.cost_power: 1
+      uphill.ConstraintCritic.cost_weight: 4.0
+
+      uphill.GoalCritic.enabled: true
+      uphill.GoalCritic.cost_power: 1
+      uphill.GoalCritic.cost_weight: 25.0
+      uphill.GoalCritic.threshold_to_consider: 4.0
+
+      uphill.ObstaclesCritic.enabled: true
+      uphill.ObstaclesCritic.cost_power: 1
+      uphill.ObstaclesCritic.repulsion_weight: 1.5
+      uphill.ObstaclesCritic.critical_weight: 20.0
+      uphill.ObstaclesCritic.consider_footprint: false
+      uphill.ObstaclesCritic.collision_cost: 10000.0
+      uphill.ObstaclesCritic.collision_margin_distance: 0.25
+      uphill.ObstaclesCritic.near_goal_distance: 0.5
+
+      uphill.CostCritic.enabled: true
+      uphill.CostCritic.cost_power: 1
+      uphill.CostCritic.cost_weight: 3.8
+      uphill.CostCritic.critical_cost: 253.0
+      uphill.CostCritic.consider_footprint: true
+      uphill.CostCritic.collision_cost: 1000000.0
+      uphill.CostCritic.near_goal_distance: 0.5
+      uphill.CostCritic.trajectory_point_step: 2
+
+      uphill.PathFollowCritic.enabled: true
+      uphill.PathFollowCritic.cost_power: 1
+      uphill.PathFollowCritic.cost_weight: 15.0
+      uphill.PathFollowCritic.offset_from_furthest: 5
+      uphill.PathFollowCritic.threshold_to_consider: 1.0
+
+      uphill.PathAlignCritic.enabled: true
+      uphill.PathAlignCritic.cost_power: 1
+      uphill.PathAlignCritic.cost_weight: 15.0
+      uphill.PathAlignCritic.max_path_occupancy_ratio: 0.05
+      uphill.PathAlignCritic.trajectory_point_step: 4
+      uphill.PathAlignCritic.threshold_to_consider: 0.8
+      uphill.PathAlignCritic.offset_from_furthest: 20
+      uphill.PathAlignCritic.use_path_orientations: false
+
+      # ═══════════════════════════════════════════════
+      #  下坡模式 MPPI 参数（下坡→上坡穿越时使用）
+      # ═══════════════════════════════════════════════
+      downhill.time_steps: 80
+      downhill.model_dt: 0.04
+      downhill.batch_size: 1500
+      downhill.vx_std: 0.3
+      downhill.vy_std: 0.3
+      downhill.wz_std: 0.2
+      downhill.vx_max: 2.0
+      downhill.vy_max: 2.0
+      downhill.wz_max: 1.5
+      downhill.vx_min: -2.0
+      downhill.vy_min: -2.0
+      downhill.wz_min: -1.5
+      downhill.ax_max: 1.5
+      downhill.ay_max: 1.5
+      downhill.az_max: 3.0
+      downhill.ax_min: -3.5
+      downhill.ay_min: -3.5
+      downhill.az_min: -3.0
+      downhill.iteration_count: 1
+      downhill.prune_distance: 1.7
+      downhill.transform_tolerance: 0.1
+      downhill.temperature: 0.25
+      downhill.gamma: 0.015
+      downhill.motion_model: "Omni"
+      downhill.visualize: false
+      downhill.reset_period: 0.08
+
+      downhill.critics: ["ConstraintCritic", "CostCritic",
+                          "GoalCritic", "PathFollowCritic",
+                          "PathAlignCritic", "ObstaclesCritic"]
+
+      downhill.ConstraintCritic.enabled: true
+      downhill.ConstraintCritic.cost_power: 1
+      downhill.ConstraintCritic.cost_weight: 4.0
+
+      downhill.GoalCritic.enabled: true
+      downhill.GoalCritic.cost_power: 1
+      downhill.GoalCritic.cost_weight: 25.0
+      downhill.GoalCritic.threshold_to_consider: 4.0
+
+      downhill.ObstaclesCritic.enabled: true
+      downhill.ObstaclesCritic.cost_power: 1
+      downhill.ObstaclesCritic.repulsion_weight: 1.5
+      downhill.ObstaclesCritic.critical_weight: 20.0
+      downhill.ObstaclesCritic.consider_footprint: false
+      downhill.ObstaclesCritic.collision_cost: 10000.0
+      downhill.ObstaclesCritic.collision_margin_distance: 0.25
+      downhill.ObstaclesCritic.near_goal_distance: 0.5
+
+      downhill.CostCritic.enabled: true
+      downhill.CostCritic.cost_power: 1
+      downhill.CostCritic.cost_weight: 3.8
+      downhill.CostCritic.critical_cost: 253.0
+      downhill.CostCritic.consider_footprint: true
+      downhill.CostCritic.collision_cost: 1000000.0
+      downhill.CostCritic.near_goal_distance: 0.5
+      downhill.CostCritic.trajectory_point_step: 2
+
+      downhill.PathFollowCritic.enabled: true
+      downhill.PathFollowCritic.cost_power: 1
+      downhill.PathFollowCritic.cost_weight: 15.0
+      downhill.PathFollowCritic.offset_from_furthest: 5
+      downhill.PathFollowCritic.threshold_to_consider: 1.0
+
+      downhill.PathAlignCritic.enabled: true
+      downhill.PathAlignCritic.cost_power: 1
+      downhill.PathAlignCritic.cost_weight: 15.0
+      downhill.PathAlignCritic.max_path_occupancy_ratio: 0.05
+      downhill.PathAlignCritic.trajectory_point_step: 4
+      downhill.PathAlignCritic.threshold_to_consider: 0.8
+      downhill.PathAlignCritic.offset_from_furthest: 20
+      downhill.PathAlignCritic.use_path_orientations: false
 
 local_costmap:
   local_costmap:
