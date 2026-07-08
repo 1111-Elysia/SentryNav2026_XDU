@@ -33,6 +33,7 @@
 #include "sentry_nav_bt_test/patrol_nodes.hpp"
 #include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
 #include "sentry_nav_bt_test/publish_vw_action.hpp"
+#include "sentry_nav_bt_test/runtime_config.hpp"
 
 namespace
 {
@@ -434,6 +435,21 @@ int main(int argc, char **argv)
 
     bb_manager->bb_manager_init();
 
+    if (waypoints_file.empty())
+    {
+        RCLCPP_ERROR(node->get_logger(), "路径点文件参数 'waypoints_file' 未设置！");
+        return 1;
+    }
+
+    RCLCPP_INFO(node->get_logger(), "加载路径点: %s", waypoints_file.c_str());
+    bb_manager->load_waypoints(waypoints_file);
+
+    auto runtime_config = std::make_shared<sentry_nav_bt_test::RuntimeConfigManager>(
+        node, blackboard);
+    if (!runtime_config->applyCurrentParameters()) {
+        return 1;
+    }
+
     if (validate_bt_only)
     {
         try
@@ -474,6 +490,7 @@ int main(int argc, char **argv)
     auto start_time = node->now();
     while (rclcpp::ok() && !server_available)
     {
+        rclcpp::spin_some(node);
         server_available = navigate_action_client->wait_for_action_server(std::chrono::seconds(1));
         if (!server_available)
         {
@@ -488,15 +505,6 @@ int main(int argc, char **argv)
     }
 
     RCLCPP_INFO(node->get_logger(), "导航服务器已可用");
-
-    if (waypoints_file.empty())
-    {
-        RCLCPP_ERROR(node->get_logger(), "路径点文件参数 'waypoints_file' 未设置！");
-        return 1;
-    }
-
-    RCLCPP_INFO(node->get_logger(), "加载路径点: %s", waypoints_file.c_str());
-    bb_manager->load_waypoints(waypoints_file);
 
     // 加载路径点后，发布初始位姿
     auto initial_pose_pub = node->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(

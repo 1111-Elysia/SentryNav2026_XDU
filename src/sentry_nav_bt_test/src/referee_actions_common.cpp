@@ -293,6 +293,9 @@ BT::NodeStatus MaintainSentryPosture::tick()
         getBlackboardIntLike(config().blackboard, "current_posture", current_real_posture);
     }
     if (current_real_posture == target_mode_int) {
+        double last_request_time_s = -1.0;
+        getBlackboardDoubleLike(
+            config().blackboard, kLastPostureRequestTimeKey, last_request_time_s);
         if (last_confirmed_mode_ != target_mode_int) {
             RCLCPP_INFO(
                 node_->get_logger(),
@@ -308,7 +311,7 @@ BT::NodeStatus MaintainSentryPosture::tick()
             true,
             false,
             "already_target",
-            now_s);
+            last_request_time_s > 0.0 ? last_request_time_s : now_s);
         return BT::NodeStatus::SUCCESS;
     }
     last_confirmed_mode_ = -1;

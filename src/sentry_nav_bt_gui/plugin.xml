@@ -1,0 +1,16 @@
+<library path="sentry_nav_bt_gui">
+  <class name="SimpleNavControl"
+         type="sentry_nav_bt_gui.rqt_plugin.SimpleNavControlPlugin"
+         base_class_type="rqt_gui_py::Plugin">
+    <description>Runtime target, posture, controller, and timing controls for SimpleNav.</description>
+    <qtgui>
+      <group>
+        <label>Sentry Navigation</label>
+        <icon type="theme">applications-engineering</icon>
+      </group>
+      <label>Simple Nav Control</label>
+      <icon type="theme">go-jump</icon>
+      <statustip>Control the single-goal sentry behavior tree</statustip>
+    </qtgui>
+  </class>
+</library>
