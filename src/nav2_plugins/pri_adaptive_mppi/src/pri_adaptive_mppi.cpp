@@ -194,15 +194,14 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     }
   }
 
-  // ── 2. 确定穿越模式（滞留策略：进入穿越后保持直到离开膨胀区）──
+  // ── 2. 确定穿越模式（滞留 + 方向反转检测）──
   if (best_line >= 0) {
-    // 机器人在膨胀层内
-    if (active_line_index_ < 0 || active_crossing_ == CrossingMode::NORMAL) {
-      // 刚进入膨胀区（或之前是 normal）—— 检测穿越方向
-      const auto & line = lines_[best_line];
-      int crossing = detectPathCrossing(
-        current_path_, line.x1, line.y1, line.x2, line.y2);
+    const auto & line = lines_[best_line];
+    int crossing = detectPathCrossing(
+      current_path_, line.x1, line.y1, line.x2, line.y2);
 
+    if (active_crossing_ == CrossingMode::NORMAL) {
+      // 首次进入膨胀区 —— 检测穿越方向
       if (crossing > 0) {
         best_mode = CrossingMode::UPHILL;
       } else if (crossing < 0) {
@@ -210,8 +209,18 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
       }
       // crossing == 0: 在膨胀区内但路径未穿越 → 保持 normal
     } else {
-      // 已经在穿越模式中 —— 保持当前模式，直到离开膨胀区
-      best_mode = active_crossing_;
+      // 已在穿越模式中 —— 保持，除非检测到方向反转
+      if (crossing != 0) {
+        CrossingMode new_dir = (crossing > 0)
+          ? CrossingMode::UPHILL : CrossingMode::DOWNHILL;
+        if (new_dir != active_crossing_) {
+          best_mode = new_dir;  // 方向反转：允许切换
+        } else {
+          best_mode = active_crossing_;  // 同方向：保持
+        }
+      } else {
+        best_mode = active_crossing_;  // 未穿越：保持滞留
+      }
     }
   }
   // best_line < 0: 不在任何膨胀区内 → best_mode 已是 NORMAL
