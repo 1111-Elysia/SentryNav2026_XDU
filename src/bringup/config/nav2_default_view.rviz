@@ -253,6 +253,17 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /local_plan
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Adaptive MPPI Lines
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /FollowPath/adaptive_line_visualization
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
