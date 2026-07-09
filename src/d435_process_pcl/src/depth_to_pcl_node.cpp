@@ -33,6 +33,7 @@ public:
         this->declare_parameter<std::string>("camera_info_topic", "/camera/camera/depth/camera_info");
         this->declare_parameter<std::string>("frame_id", "d435_frame");
         this->declare_parameter<int>("step", 2);
+        this->declare_parameter<int>("edge_margin", 5);
         this->declare_parameter<float>("min_distance", 0.2f);
         this->declare_parameter<float>("max_distance", 3.0f);
 
@@ -47,6 +48,7 @@ public:
         this->get_parameter("camera_info_topic", camera_info_topic_);
         this->get_parameter("frame_id", frame_id_);
         this->get_parameter("step", step_);
+        this->get_parameter("edge_margin", edge_margin_);
         this->get_parameter("min_distance", min_distance_);
         this->get_parameter("max_distance", max_distance_);
         this->get_parameter("median_kernel_size", median_kernel_size_);
@@ -191,9 +193,15 @@ private:
 
         cloud->points.reserve(rows * cols / (step_ * step_));
 
-        // ===== 2. projection =====
-        for (int v = 0; v < rows; v += step_) {
-            for (int u = 0; u < cols; u += step_) {
+        // ===== 2. projection (跳过图像边缘 margin 像素，避免边界伪影) =====
+        int margin = std::max(0, edge_margin_);
+        int v_start = margin;
+        int v_end = rows - margin;
+        int u_start = margin;
+        int u_end = cols - margin;
+
+        for (int v = v_start; v < v_end; v += step_) {
+            for (int u = u_start; u < u_end; u += step_) {
 
                 float d = current_float.at<float>(v, u);
 
@@ -249,6 +257,7 @@ private:
     std::string camera_info_topic_;
     std::string frame_id_;
     int step_;
+    int edge_margin_;
     float min_distance_;
     float max_distance_;
     int median_kernel_size_;
