@@ -1,5 +1,7 @@
 import json
 
+import yaml
+
 
 PARAMETER_NAMES = (
     "runtime_goal_name",
@@ -13,6 +15,21 @@ PARAMETER_NAMES = (
     "runtime_reach_threshold",
     "runtime_wait_time_threshold",
 )
+
+DEFAULT_CONTROLLERS = ("FollowPath",)
+
+
+def normalize_controller_plugins(plugins, default=DEFAULT_CONTROLLERS):
+    if isinstance(plugins, str):
+        plugins = [plugins]
+
+    controllers = []
+    for plugin in plugins or []:
+        controller = str(plugin).strip()
+        if controller and controller not in controllers:
+            controllers.append(controller)
+
+    return controllers or list(default)
 
 
 def load_waypoints(json_path):
@@ -30,6 +47,18 @@ def load_waypoints(json_path):
             float(item["yaw"]),
         )
     return waypoints
+
+
+def load_controller_plugins(yaml_path, default=DEFAULT_CONTROLLERS):
+    with open(yaml_path, "r", encoding="utf-8") as params_file:
+        document = yaml.safe_load(params_file) or {}
+
+    return normalize_controller_plugins(
+        document.get("controller_server", {})
+        .get("ros__parameters", {})
+        .get("controller_plugins", []),
+        default,
+    )
 
 
 def config_values(

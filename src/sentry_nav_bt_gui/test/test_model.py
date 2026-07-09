@@ -1,6 +1,13 @@
 import json
 
-from sentry_nav_bt_gui.model import config_values, load_waypoints
+import yaml
+
+from sentry_nav_bt_gui.model import (
+    config_values,
+    load_controller_plugins,
+    load_waypoints,
+    normalize_controller_plugins,
+)
 
 
 def test_load_waypoints(tmp_path):
@@ -10,6 +17,38 @@ def test_load_waypoints(tmp_path):
         encoding="utf-8",
     )
     assert load_waypoints(waypoint_file) == {"init": (1.0, 2.0, 0.5)}
+
+
+def test_load_controller_plugins(tmp_path):
+    params_file = tmp_path / "nav2_params.yaml"
+    params_file.write_text(
+        yaml.safe_dump(
+            {
+                "controller_server": {
+                    "ros__parameters": {
+                        "controller_plugins": [
+                            "FollowPath",
+                            "AdaptiveMppi",
+                            "FollowPath",
+                            "",
+                        ]
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert load_controller_plugins(params_file) == ["FollowPath", "AdaptiveMppi"]
+
+
+def test_load_controller_plugins_uses_default_for_empty_config(tmp_path):
+    params_file = tmp_path / "nav2_params.yaml"
+    params_file.write_text("controller_server:\n  ros__parameters: {}\n", encoding="utf-8")
+    assert load_controller_plugins(params_file, default=("Fallback",)) == ["Fallback"]
+
+
+def test_normalize_controller_plugins_accepts_string_value():
+    assert normalize_controller_plugins(" AdaptiveMppi ") == ["AdaptiveMppi"]
 
 
 def test_config_values_normalizes_types():
