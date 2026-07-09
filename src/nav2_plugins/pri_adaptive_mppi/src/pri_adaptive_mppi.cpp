@@ -200,6 +200,17 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     int crossing = detectPathCrossing(
       current_path_, line.x1, line.y1, line.x2, line.y2);
 
+    // 若 best_line 未检测到穿越，轮询所有边（可能路径穿的是另一条边）
+    if (crossing == 0 && active_crossing_ != CrossingMode::NORMAL) {
+      for (size_t i = 0; i < lines_.size(); ++i) {
+        if (static_cast<int>(i) == best_line) continue;
+        crossing = detectPathCrossing(
+          current_path_, lines_[i].x1, lines_[i].y1,
+          lines_[i].x2, lines_[i].y2);
+        if (crossing != 0) break;
+      }
+    }
+
     if (active_crossing_ == CrossingMode::NORMAL) {
       // 首次进入膨胀区 —— 检测穿越方向
       if (crossing > 0) {
