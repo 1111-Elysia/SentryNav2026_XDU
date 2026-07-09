@@ -7,7 +7,7 @@ def generate_launch_description():
         Node(
             package="rqt_gui",
             executable="rqt_gui",
-            arguments=["--standalone", "sentry_nav_bt_gui/SimpleNavControl"],
+            arguments=["--force-discover", "--standalone", "sentry_nav_bt_gui/SimpleNavControl"],
             output="screen",
         )
     ])
