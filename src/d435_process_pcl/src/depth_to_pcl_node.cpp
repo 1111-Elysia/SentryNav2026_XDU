@@ -131,7 +131,11 @@ private:
         // ===== 1. Spatial Filter (空间滤波，去散粒噪点) =====
         cv::Mat depth_filtered;
         if (depth.type() == CV_16U || depth.type() == CV_8U) {
+            // 记录中值滤波前的无效像素 (值为0)
+            // 防止 medianBlur 将有效深度扩散到无效区域产生虚假点云
+            cv::Mat invalid_mask = (depth == 0);
             cv::medianBlur(depth, depth_filtered, median_kernel_size_);
+            depth_filtered.setTo(0, invalid_mask);  // 恢复无效像素为0
         } else {
             depth_filtered = depth;
         }
