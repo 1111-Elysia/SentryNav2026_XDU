@@ -279,10 +279,21 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     switchMode(best_line, best_mode);
   }
 
-  // ── 4. 上坡卡住检测 + Vw 输出 ──
+  // ── 4. 穿越卡住检测 + Vw 输出（UPHILL & DOWNHILL 通用）──
   auto now_stuck = rclcpp::Clock(RCL_ROS_TIME).now();
-  if (active_crossing_ == CrossingMode::UPHILL) {
-    // 记录起点
+  bool in_crossing = (active_crossing_ == CrossingMode::UPHILL ||
+                      active_crossing_ == CrossingMode::DOWNHILL);
+
+  static CrossingMode last_crossing_st = CrossingMode::NORMAL;
+  if (in_crossing) {
+    // 模式反转（UPHILL↔DOWNHILL）→ 重置计时
+    if (active_crossing_ != last_crossing_st) {
+      last_crossing_st = active_crossing_;
+      uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);  // 强制重新记录
+      stuck_override_ = false;
+    }
+
+    // 首次进入穿越模式 / 从另一种穿越模式反转过来 → 记录起点
     if (uphill_start_time_.seconds() == 0.0) {
       uphill_start_time_ = now_stuck;
       uphill_start_pose_ = pose.pose;
@@ -296,13 +307,14 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
       double moved = std::hypot(dx, dy);
 
       if (elapsed >= uphill_stuck_time_ && moved < uphill_stuck_distance_) {
-        // 卡住了：激活 Vw 输出
         stuck_override_ = true;
         stuck_override_end_ = now_stuck +
           rclcpp::Duration::from_seconds(uphill_stuck_duration_);
+        const char * mode_str = (active_crossing_ == CrossingMode::UPHILL)
+          ? "UPHILL" : "DOWNHILL";
         RCLCPP_WARN(logger_,
-          "UPHILL stuck: 耗时%.1fs 仅移动%.3fm < %.3fm, 输出 Vw=%.2f 持续%.1fs",
-          elapsed, moved, uphill_stuck_distance_,
+          "%s stuck: 耗时%.1fs 仅移动%.3fm < %.3fm, 输出 Vw=%.2f 持续%.1fs",
+          mode_str, elapsed, moved, uphill_stuck_distance_,
           uphill_stuck_vw_, uphill_stuck_duration_);
       }
     }
@@ -317,9 +329,10 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
       }
     }
   } else {
-    // 退出 UPHILL → 重置
+    // 退出穿越模式 → 重置
     uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
     stuck_override_ = false;
+    last_crossing_st = CrossingMode::NORMAL;
   }
 
   // ── 5. 发布可视化 ──
