@@ -186,7 +186,13 @@ controller_server:
       plugin: "pri_adaptive_mppi::PriAdaptiveMppi"
       inner_plugin: "nav2_mppi_controller::MPPIController"
       max_path_age: 2.0
-      uphill_braking_distance: 0.5
+      
+      uphill_braking_distance: 1.0
+
+      uphill_stuck_time: 1.0
+      uphill_stuck_distance: 0.25
+      uphill_stuck_vw: 0.25
+      uphill_stuck_duration: 1.0
 
       # 正六边形 中心(3.0,0) 边长1.13m, 对角线在x轴
       # 顺时针: 外侧(左)=上坡(R=1.0)  内侧(右)=下坡(R=0.5)

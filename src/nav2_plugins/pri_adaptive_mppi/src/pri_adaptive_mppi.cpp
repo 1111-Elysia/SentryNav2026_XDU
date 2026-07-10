@@ -41,6 +41,30 @@ void PriAdaptiveMppi::configure(
   uphill_braking_distance_ = node->get_parameter(
     name + ".uphill_braking_distance").as_double();
 
+  nav2_util::declare_parameter_if_not_declared(
+    node, name + ".uphill_stuck_time",
+    rclcpp::ParameterValue(2.0));
+  uphill_stuck_time_ = node->get_parameter(
+    name + ".uphill_stuck_time").as_double();
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, name + ".uphill_stuck_distance",
+    rclcpp::ParameterValue(0.1));
+  uphill_stuck_distance_ = node->get_parameter(
+    name + ".uphill_stuck_distance").as_double();
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, name + ".uphill_stuck_vw",
+    rclcpp::ParameterValue(0.5));
+  uphill_stuck_vw_ = node->get_parameter(
+    name + ".uphill_stuck_vw").as_double();
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, name + ".uphill_stuck_duration",
+    rclcpp::ParameterValue(1.0));
+  uphill_stuck_duration_ = node->get_parameter(
+    name + ".uphill_stuck_duration").as_double();
+
   // ── 2. 读取直线列表 ──
   std::vector<std::string> line_names;
   node->get_parameter(name + ".lines", line_names);
@@ -112,6 +136,9 @@ void PriAdaptiveMppi::configure(
   viz_pub_ = node->create_publisher<visualization_msgs::msg::Marker>(
     plugin_name_ + "/adaptive_line_visualization",
     rclcpp::QoS(10).transient_local().reliable());
+
+  vw_pub_ = node->create_publisher<sentry_msgs::msg::Vw>(
+    "/vw", rclcpp::QoS(10));
 
   RCLCPP_INFO(logger_,
     "PriAdaptiveMppi 配置完成: %zu 条直线, 内部控制器=%s",
@@ -252,10 +279,53 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     switchMode(best_line, best_mode);
   }
 
-  // ── 3. 发布可视化 ──
+  // ── 4. 上坡卡住检测 + Vw 输出 ──
+  auto now_stuck = rclcpp::Clock(RCL_ROS_TIME).now();
+  if (active_crossing_ == CrossingMode::UPHILL) {
+    // 记录起点
+    if (uphill_start_time_.seconds() == 0.0) {
+      uphill_start_time_ = now_stuck;
+      uphill_start_pose_ = pose.pose;
+      stuck_override_ = false;
+    }
+
+    if (!stuck_override_) {
+      double elapsed = (now_stuck - uphill_start_time_).seconds();
+      double dx = pose.pose.position.x - uphill_start_pose_.position.x;
+      double dy = pose.pose.position.y - uphill_start_pose_.position.y;
+      double moved = std::hypot(dx, dy);
+
+      if (elapsed >= uphill_stuck_time_ && moved < uphill_stuck_distance_) {
+        // 卡住了：激活 Vw 输出
+        stuck_override_ = true;
+        stuck_override_end_ = now_stuck +
+          rclcpp::Duration::from_seconds(uphill_stuck_duration_);
+        RCLCPP_WARN(logger_,
+          "UPHILL stuck: 耗时%.1fs 仅移动%.3fm < %.3fm, 输出 Vw=%.2f 持续%.1fs",
+          elapsed, moved, uphill_stuck_distance_,
+          uphill_stuck_vw_, uphill_stuck_duration_);
+      }
+    }
+
+    if (stuck_override_) {
+      if (now_stuck < stuck_override_end_) {
+        sentry_msgs::msg::Vw vw_msg;
+        vw_msg.vw = static_cast<float>(uphill_stuck_vw_);
+        vw_pub_->publish(vw_msg);
+      } else {
+        stuck_override_ = false;
+      }
+    }
+  } else {
+    // 退出 UPHILL → 重置
+    uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+    stuck_override_ = false;
+  }
+
+  // ── 5. 发布可视化 ──
   publishVisualization();
 
-  // ── 4. 委托给内部 MPPI ──
+  // ── 6. 委托给内部 MPPI ──
   if (!inner_controller_) {
     geometry_msgs::msg::TwistStamped empty_cmd;
     empty_cmd.header = pose.header;
@@ -264,7 +334,7 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
 
   auto cmd_vel = inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
 
-  // ── 5. 上坡急停：越线后在下坡侧距离比例刹车 ──
+  // ── 7. 上坡急停：越线后在下坡侧距离比例刹车 ──
   if (active_crossing_ == CrossingMode::UPHILL &&
       active_line_index_ >= 0 &&
       static_cast<size_t>(active_line_index_) < lines_.size()) {
@@ -369,6 +439,22 @@ void PriAdaptiveMppi::declareCommonParams()
   nav2_util::declare_parameter_if_not_declared(
     node, plugin_name_ + ".uphill_braking_distance",
     rclcpp::ParameterValue(0.5));
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".uphill_stuck_time",
+    rclcpp::ParameterValue(2.0));
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".uphill_stuck_distance",
+    rclcpp::ParameterValue(0.1));
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".uphill_stuck_vw",
+    rclcpp::ParameterValue(0.5));
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".uphill_stuck_duration",
+    rclcpp::ParameterValue(1.0));
 
   // lines 列表 — 每条直线的名称
   nav2_util::declare_parameter_if_not_declared(

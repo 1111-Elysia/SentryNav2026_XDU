@@ -16,6 +16,7 @@ find_package(nav2_mppi_controller REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(sentry_msgs REQUIRED)
 
 set(dependencies
   rclcpp
@@ -28,6 +29,7 @@ set(dependencies
   pluginlib
   tf2_ros
   visualization_msgs
+  sentry_msgs
 )
 
 add_library(${PROJECT_NAME} SHARED
