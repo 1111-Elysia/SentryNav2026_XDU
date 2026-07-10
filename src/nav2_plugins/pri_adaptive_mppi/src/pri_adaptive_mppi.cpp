@@ -42,28 +42,10 @@ void PriAdaptiveMppi::configure(
     name + ".uphill_braking_distance").as_double();
 
   nav2_util::declare_parameter_if_not_declared(
-    node, name + ".uphill_stuck_time",
-    rclcpp::ParameterValue(2.0));
-  uphill_stuck_time_ = node->get_parameter(
-    name + ".uphill_stuck_time").as_double();
-
-  nav2_util::declare_parameter_if_not_declared(
-    node, name + ".uphill_stuck_distance",
-    rclcpp::ParameterValue(0.1));
-  uphill_stuck_distance_ = node->get_parameter(
-    name + ".uphill_stuck_distance").as_double();
-
-  nav2_util::declare_parameter_if_not_declared(
     node, name + ".uphill_stuck_vw",
     rclcpp::ParameterValue(0.5));
   uphill_stuck_vw_ = node->get_parameter(
     name + ".uphill_stuck_vw").as_double();
-
-  nav2_util::declare_parameter_if_not_declared(
-    node, name + ".uphill_stuck_duration",
-    rclcpp::ParameterValue(1.0));
-  uphill_stuck_duration_ = node->get_parameter(
-    name + ".uphill_stuck_duration").as_double();
 
   // ── 2. 读取直线列表 ──
   std::vector<std::string> line_names;
@@ -270,51 +252,12 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
 
   auto cmd_vel = inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
 
-  // ── 6. 膨胀区内卡住检测 + Vw 输出（用 cmd_vel 判断是否有输出意图）──
-  auto now_stuck = rclcpp::Clock(RCL_ROS_TIME).now();
-  static int prev_best_line = -1;
-
+  // ── 6. 膨胀区内持续输出 Vw ──
   if (best_line >= 0) {
-    if (prev_best_line < 0) {
-      uphill_start_time_ = now_stuck;
-      uphill_start_pose_ = pose.pose;
-      stuck_override_ = false;
-    }
-
-    // 用 MPPI 输出速度判断车辆是否在尝试移动
-    bool is_moving = (std::abs(cmd_vel.twist.linear.x) > 1e-3 ||
-                      std::abs(cmd_vel.twist.linear.y) > 1e-3);
-
-    if (is_moving && !stuck_override_) {
-      double elapsed = (now_stuck - uphill_start_time_).seconds();
-      double dx = pose.pose.position.x - uphill_start_pose_.position.x;
-      double dy = pose.pose.position.y - uphill_start_pose_.position.y;
-      double moved = std::hypot(dx, dy);
-
-      if (elapsed >= uphill_stuck_time_ && moved < uphill_stuck_distance_) {
-        stuck_override_ = true;
-        stuck_override_end_ = now_stuck +
-          rclcpp::Duration::from_seconds(uphill_stuck_duration_);
-        RCLCPP_WARN(logger_,
-          "Stuck(cmd_vel): %.1fs 移动%.3fm < %.3fm, Vw=%.2f x%.1fs",
-          elapsed, moved, uphill_stuck_distance_,
-          uphill_stuck_vw_, uphill_stuck_duration_);
-      }
-    }
-
-    if (stuck_override_) {
-      if (now_stuck < stuck_override_end_) {
-        sentry_msgs::msg::Vw vw_msg;
-        vw_msg.vw = static_cast<float>(uphill_stuck_vw_);
-        vw_pub_->publish(vw_msg);
-      } else {
-        stuck_override_ = false;
-        uphill_start_time_ = now_stuck;
-        uphill_start_pose_ = pose.pose;
-      }
-    }
+    sentry_msgs::msg::Vw vw_msg;
+    vw_msg.vw = static_cast<float>(uphill_stuck_vw_);
+    vw_pub_->publish(vw_msg);
   }
-  prev_best_line = best_line;
 
   // ── 7. 上坡急停：越线后在下坡侧距离比例刹车 ──
   if (active_crossing_ == CrossingMode::UPHILL &&
@@ -436,20 +379,8 @@ void PriAdaptiveMppi::declareCommonParams()
     rclcpp::ParameterValue(0.5));
 
   nav2_util::declare_parameter_if_not_declared(
-    node, plugin_name_ + ".uphill_stuck_time",
-    rclcpp::ParameterValue(2.0));
-
-  nav2_util::declare_parameter_if_not_declared(
-    node, plugin_name_ + ".uphill_stuck_distance",
-    rclcpp::ParameterValue(0.1));
-
-  nav2_util::declare_parameter_if_not_declared(
     node, plugin_name_ + ".uphill_stuck_vw",
     rclcpp::ParameterValue(0.5));
-
-  nav2_util::declare_parameter_if_not_declared(
-    node, plugin_name_ + ".uphill_stuck_duration",
-    rclcpp::ParameterValue(1.0));
 
   // lines 列表 — 每条直线的名称
   nav2_util::declare_parameter_if_not_declared(

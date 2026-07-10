@@ -294,14 +294,7 @@ private:
 
   // ── 上坡卡住检测 + Vw 输出 ──
   rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
-  double uphill_stuck_time_{2.0};       // 时间窗口(s)
-  double uphill_stuck_distance_{0.1};   // 最小移动距离(m)
-  double uphill_stuck_vw_{0.5};         // 卡住时输出的 Vw
-  double uphill_stuck_duration_{1.0};   // Vw 持续时长(s)
-  geometry_msgs::msg::Pose uphill_start_pose_;  // UPHILL 起点
-  rclcpp::Time uphill_start_time_{0, 0, RCL_ROS_TIME};
-  bool stuck_override_{false};
-  rclcpp::Time stuck_override_end_{0, 0, RCL_ROS_TIME};
+  double uphill_stuck_vw_{0.5};  // 膨胀区内持续输出 Vw
 
   // ── 当前状态 ──
   int active_line_index_{-1};        // -1 = 无活跃直线（使用 normal）
