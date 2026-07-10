@@ -512,7 +512,7 @@ planner_server:
       minco_sample_dt: 0.05             # 采样时间间隔
       minco_nominal_speed: 1.0          # minco每段采样速度
       minco_min_piece_duration: 0.15    # 每段最短时间
-      corridor_width: 0.8               # A*路径走廊宽度
+      corridor_width: 0.8               # 安全走廊宽度
       lbfgs_enabled: true               # 启用L-BFGS优化MINCO中间点
       lbfgs_max_iterations: 50          # L-BFGS最大迭代次数
       lbfgs_g_epsilon: 0.0001           # L-BFGS梯度收敛阈值
