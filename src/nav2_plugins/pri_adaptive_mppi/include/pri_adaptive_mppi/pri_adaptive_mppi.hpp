@@ -136,8 +136,7 @@ struct LineConfig
   double x2 = 5.0, y2 = 0.0;
   double inflation_radius_uphill = 1.0;    // 上坡侧(左)膨胀半径
   double inflation_radius_downhill = 1.0;  // 下坡侧(右)膨胀半径
-
-  // ── 预计算 ──
+  bool enable_braking = false;             // 上坡穿越后是否急停
   double dx = 0.0, dy = 0.0, length = 0.0;
 
   // ── 可视化 Marker ──
@@ -236,6 +235,7 @@ private:
   // ── 直线配置 ──
   std::vector<LineConfig> lines_;
   double max_path_age_{2.0};
+  double uphill_braking_distance_{0.5};  // 上坡越线后急停距离(m)
 
   // ── 当前状态 ──
   int active_line_index_{-1};        // -1 = 无活跃直线（使用 normal）

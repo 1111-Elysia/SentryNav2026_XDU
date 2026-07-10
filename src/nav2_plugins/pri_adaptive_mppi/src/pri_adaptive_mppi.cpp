@@ -35,6 +35,12 @@ void PriAdaptiveMppi::configure(
   node->get_parameter(name + ".inner_plugin", inner_plugin_type_);
   node->get_parameter(name + ".max_path_age", max_path_age_);
 
+  nav2_util::declare_parameter_if_not_declared(
+    node, name + ".uphill_braking_distance",
+    rclcpp::ParameterValue(0.5));
+  uphill_braking_distance_ = node->get_parameter(
+    name + ".uphill_braking_distance").as_double();
+
   // ── 2. 读取直线列表 ──
   std::vector<std::string> line_names;
   node->get_parameter(name + ".lines", line_names);
@@ -71,6 +77,11 @@ void PriAdaptiveMppi::configure(
       node, prefix + ".inflation_radius_downhill",
       rclcpp::ParameterValue(1.0));
     node->get_parameter(prefix + ".inflation_radius_downhill", lc.inflation_radius_downhill);
+
+    nav2_util::declare_parameter_if_not_declared(
+      node, prefix + ".enable_braking",
+      rclcpp::ParameterValue(false));
+    node->get_parameter(prefix + ".enable_braking", lc.enable_braking);
 
     // 预计算几何
     lc.dx = lc.x2 - lc.x1;
@@ -251,7 +262,29 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     return empty_cmd;
   }
 
-  return inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
+  auto cmd_vel = inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
+
+  // ── 5. 上坡急停：越线后在下坡侧距离比例刹车 ──
+  if (active_crossing_ == CrossingMode::UPHILL &&
+      active_line_index_ >= 0 &&
+      static_cast<size_t>(active_line_index_) < lines_.size()) {
+    const auto & line = lines_[active_line_index_];
+    if (line.enable_braking && uphill_braking_distance_ > 0.0) {
+      double d_signed = signedDistanceToLine(
+        pose.pose.position.x, pose.pose.position.y,
+        line.x1, line.y1, line.x2, line.y2);
+      // 仅在下坡侧（内侧, d_signed < 0）刹车
+      if (d_signed < 0.0) {
+        double d_perp = std::abs(d_signed) / line.length;
+        double scale = std::clamp(d_perp / uphill_braking_distance_, 0.0, 1.0);
+        cmd_vel.twist.linear.x  *= scale;
+        cmd_vel.twist.linear.y  *= scale;
+        cmd_vel.twist.angular.z *= scale;
+      }
+    }
+  }
+
+  return cmd_vel;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -332,6 +365,10 @@ void PriAdaptiveMppi::declareCommonParams()
   nav2_util::declare_parameter_if_not_declared(
     node, plugin_name_ + ".max_path_age",
     rclcpp::ParameterValue(2.0));
+
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".uphill_braking_distance",
+    rclcpp::ParameterValue(0.5));
 
   // lines 列表 — 每条直线的名称
   nav2_util::declare_parameter_if_not_declared(
