@@ -258,21 +258,32 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     switchMode(best_line, best_mode);
   }
 
-  // ── 4. 膨胀区内卡住检测 + Vw 输出（与上下坡模式无关）──
+  // ── 4. 发布可视化 ──
+  publishVisualization();
+
+  // ── 5. 委托给内部 MPPI ──
+  if (!inner_controller_) {
+    geometry_msgs::msg::TwistStamped empty_cmd;
+    empty_cmd.header = pose.header;
+    return empty_cmd;
+  }
+
+  auto cmd_vel = inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
+
+  // ── 6. 膨胀区内卡住检测 + Vw 输出（用 cmd_vel 判断是否有输出意图）──
   auto now_stuck = rclcpp::Clock(RCL_ROS_TIME).now();
   static int prev_best_line = -1;
 
   if (best_line >= 0) {
-    // 刚进入膨胀区（含离开后重进）→ 重置计时
     if (prev_best_line < 0) {
       uphill_start_time_ = now_stuck;
       uphill_start_pose_ = pose.pose;
       stuck_override_ = false;
     }
 
-    // 仅当车辆有非零速度（在尝试移动）时才检测卡住
-    bool is_moving = (std::abs(velocity.linear.x) > 1e-3 ||
-                      std::abs(velocity.linear.y) > 1e-3);
+    // 用 MPPI 输出速度判断车辆是否在尝试移动
+    bool is_moving = (std::abs(cmd_vel.twist.linear.x) > 1e-3 ||
+                      std::abs(cmd_vel.twist.linear.y) > 1e-3);
 
     if (is_moving && !stuck_override_) {
       double elapsed = (now_stuck - uphill_start_time_).seconds();
@@ -285,7 +296,7 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
         stuck_override_end_ = now_stuck +
           rclcpp::Duration::from_seconds(uphill_stuck_duration_);
         RCLCPP_WARN(logger_,
-          "Stuck in zone: %.1fs 移动%.3fm < %.3fm, Vw=%.2f x%.1fs",
+          "Stuck(cmd_vel): %.1fs 移动%.3fm < %.3fm, Vw=%.2f x%.1fs",
           elapsed, moved, uphill_stuck_distance_,
           uphill_stuck_vw_, uphill_stuck_duration_);
       }
@@ -298,25 +309,12 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
         vw_pub_->publish(vw_msg);
       } else {
         stuck_override_ = false;
-        // Vw 结束 → 重置，本轮可再次触发
         uphill_start_time_ = now_stuck;
         uphill_start_pose_ = pose.pose;
       }
     }
   }
   prev_best_line = best_line;
-
-  // ── 5. 发布可视化 ──
-  publishVisualization();
-
-  // ── 6. 委托给内部 MPPI ──
-  if (!inner_controller_) {
-    geometry_msgs::msg::TwistStamped empty_cmd;
-    empty_cmd.header = pose.header;
-    return empty_cmd;
-  }
-
-  auto cmd_vel = inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
 
   // ── 7. 上坡急停：越线后在下坡侧距离比例刹车 ──
   if (active_crossing_ == CrossingMode::UPHILL &&
