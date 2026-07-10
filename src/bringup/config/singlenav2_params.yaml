@@ -86,7 +86,7 @@ controller_server:
     FollowPath:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 1.5  #距目标时开始限速
+      approach_distance: 0.2  #距目标时开始限速
       approach_velocity: 0.2
       direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
       direct_approach_kp: 10.0  #直接驱动P控制增益
@@ -194,32 +194,32 @@ controller_server:
       h0.point_1: [4.130, 0.000]
       h0.point_2: [3.565, -0.979]
       h0.inflation_radius_uphill: 1.0
-      h0.inflation_radius_downhill: 0.5
+      h0.inflation_radius_downhill: 1.0
 
       h1.point_1: [3.565, -0.979]
       h1.point_2: [2.435, -0.979]
       h1.inflation_radius_uphill: 1.0
-      h1.inflation_radius_downhill: 0.5
+      h1.inflation_radius_downhill: 1.0
 
       h2.point_1: [2.435, -0.979]
       h2.point_2: [1.870, 0.000]
       h2.inflation_radius_uphill: 1.0
-      h2.inflation_radius_downhill: 0.5
+      h2.inflation_radius_downhill: 1.0
 
       h3.point_1: [1.870, 0.000]
       h3.point_2: [2.435, 0.979]
       h3.inflation_radius_uphill: 1.0
-      h3.inflation_radius_downhill: 0.5
+      h3.inflation_radius_downhill: 1.0
 
       h4.point_1: [2.435, 0.979]
       h4.point_2: [3.565, 0.979]
       h4.inflation_radius_uphill: 1.0
-      h4.inflation_radius_downhill: 0.5
+      h4.inflation_radius_downhill: 1.0
 
       h5.point_1: [3.565, 0.979]
       h5.point_2: [4.130, 0.000]
       h5.inflation_radius_uphill: 1.0
-      h5.inflation_radius_downhill: 0.5
+      h5.inflation_radius_downhill: 1.0
 
       # ═══════════════════════════════════════════════
       #  普通模式 MPPI 参数（未穿越任何直线时使用）
@@ -382,11 +382,11 @@ controller_server:
       downhill.vx_std: 0.3
       downhill.vy_std: 0.3
       downhill.wz_std: 0.2
-      downhill.vx_max: 2.0
-      downhill.vy_max: 2.0
+      downhill.vx_max: 0.3
+      downhill.vy_max: 0.3
       downhill.wz_max: 1.5
-      downhill.vx_min: -2.0
-      downhill.vy_min: -2.0
+      downhill.vx_min: -0.3
+      downhill.vy_min: -0.3
       downhill.wz_min: -1.5
       downhill.ax_max: 1.5
       downhill.ay_max: 1.5
@@ -541,7 +541,7 @@ local_costmap:
         cost_value: 0
         corner_radius: 0.5
         corner_cost_value: 252
-        corner_gradient_power: 2.0
+        corner_gradient_power: 1.5
         lines: ["h0","h1","h2","h3","h4","h5"]
         h0.point_1: [4.130, 0.000]
         h0.point_2: [3.565, -0.979]
@@ -648,11 +648,11 @@ global_costmap:
       line_crossing_layer:
         plugin: "line_crossing_layer::LineCrossingLayer"
         enabled: true
-        band_width: 0.5
-        cost_value: 150
+        band_width: 0.1
+        cost_value: 100
         corner_radius: 0.5
-        corner_cost_value: 252
-        corner_gradient_power: 1.0
+        corner_cost_value: 253
+        corner_gradient_power: 0.5
         lines: ["h0","h1","h2","h3","h4","h5"]
         h0.point_1: [4.130, 0.000]
         h0.point_2: [3.565, -0.979]
