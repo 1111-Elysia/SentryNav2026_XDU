@@ -279,44 +279,13 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     switchMode(best_line, best_mode);
   }
 
-  // ── 4. 穿越卡住检测 + Vw 输出（UPHILL & DOWNHILL 通用）──
+  // ── 4. 上坡卡住检测 + Vw 输出（仅 UPHILL）──
   auto now_stuck = rclcpp::Clock(RCL_ROS_TIME).now();
-  bool in_crossing = (active_crossing_ == CrossingMode::UPHILL ||
-                      active_crossing_ == CrossingMode::DOWNHILL);
+  static CrossingMode prev_crossing = CrossingMode::NORMAL;
 
-  static CrossingMode last_crossing_st = CrossingMode::NORMAL;
-  static double last_d_signed = 0.0;
-  if (in_crossing) {
-    // 模式反转（UPHILL↔DOWNHILL）→ 重置计时
-    if (active_crossing_ != last_crossing_st) {
-      last_crossing_st = active_crossing_;
-      last_d_signed = 0.0;
-      uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
-      stuck_override_ = false;
-    }
-
-    // 计算到活跃直线的有符号距离（越线检测）
-    double d_signed_now = 0.0;
-    bool has_line = (active_line_index_ >= 0 &&
-                     static_cast<size_t>(active_line_index_) < lines_.size());
-    if (has_line) {
-      const auto & aline = lines_[active_line_index_];
-      d_signed_now = signedDistanceToLine(
-        pose.pose.position.x, pose.pose.position.y,
-        aline.x1, aline.y1, aline.x2, aline.y2);
-    }
-
-    // 越线瞬间（符号翻转）→ 重置计时，从越线后开始测卡住
-    if (uphill_start_time_.seconds() > 0.0 &&
-        last_d_signed * d_signed_now < 0.0) {
-      uphill_start_time_ = now_stuck;
-      uphill_start_pose_ = pose.pose;
-      stuck_override_ = false;
-    }
-    if (d_signed_now != 0.0) last_d_signed = d_signed_now;
-
-    // 首次进入穿越模式 → 记录起点
-    if (uphill_start_time_.seconds() == 0.0) {
+  if (active_crossing_ == CrossingMode::UPHILL) {
+    // 刚进入 UPHILL（含退出后重进）→ 重置计时，保证每次上坡独立检测
+    if (prev_crossing != CrossingMode::UPHILL) {
       uphill_start_time_ = now_stuck;
       uphill_start_pose_ = pose.pose;
       stuck_override_ = false;
@@ -332,11 +301,9 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
         stuck_override_ = true;
         stuck_override_end_ = now_stuck +
           rclcpp::Duration::from_seconds(uphill_stuck_duration_);
-        const char * mode_str = (active_crossing_ == CrossingMode::UPHILL)
-          ? "UPHILL" : "DOWNHILL";
         RCLCPP_WARN(logger_,
-          "%s stuck: 耗时%.1fs 仅移动%.3fm < %.3fm, 输出 Vw=%.2f 持续%.1fs",
-          mode_str, elapsed, moved, uphill_stuck_distance_,
+          "UPHILL stuck: %.1fs 移动%.3fm < %.3fm, Vw=%.2f x%.1fs",
+          elapsed, moved, uphill_stuck_distance_,
           uphill_stuck_vw_, uphill_stuck_duration_);
       }
     }
@@ -348,14 +315,13 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
         vw_pub_->publish(vw_msg);
       } else {
         stuck_override_ = false;
+        // Vw 结束后重置计时，继续监控本轮上坡
+        uphill_start_time_ = now_stuck;
+        uphill_start_pose_ = pose.pose;
       }
     }
-  } else {
-    // 退出穿越模式 → 重置
-    uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
-    stuck_override_ = false;
-    last_crossing_st = CrossingMode::NORMAL;
   }
+  prev_crossing = active_crossing_;
 
   // ── 5. 发布可视化 ──
   publishVisualization();
