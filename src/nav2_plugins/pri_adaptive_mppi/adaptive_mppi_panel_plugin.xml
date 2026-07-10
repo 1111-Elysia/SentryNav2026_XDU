@@ -1,5 +1,5 @@
 <library path="pri_adaptive_mppi_panel">
-  <class name="pri_adaptive_mppi::AdaptiveMppiPanel"
+  <class name="pri_adaptive_mppi/AdaptiveMppiPanel"
          type="pri_adaptive_mppi::AdaptiveMppiPanel"
          base_class_type="rviz_common::Panel">
     <description>

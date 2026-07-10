@@ -19,7 +19,7 @@ Panels:
     Splitter Ratio: 0.5
   - Class: nav2_rviz_plugins/Navigation 2
     Name: Navigation 2
-  - Class: pri_adaptive_mppi::AdaptiveMppiPanel
+  - Class: pri_adaptive_mppi/AdaptiveMppiPanel
     Name: Adaptive MPPI Dashboard
 Visualization Manager:
   Class: ""
