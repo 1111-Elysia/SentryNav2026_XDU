@@ -199,9 +199,9 @@ controller_server:
 
       ramp_a.point_1: [4.01, 2.59]
       ramp_a.point_2: [1.29, 2.18]
-      ramp_a.inflation_radius_uphill: 1.0
-      ramp_a.inflation_radius_downhill: 0.5
-      ramp_a.enable_braking: true
+      ramp_a.inflation_radius_uphill: 2.0
+      ramp_a.inflation_radius_downhill: 2.0
+      ramp_a.enable_braking: false
 
       # ═══════════════════════════════════════════════
       #  普通模式 MPPI 参数（未穿越任何直线时使用）
