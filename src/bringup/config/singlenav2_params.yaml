@@ -200,7 +200,7 @@ controller_server:
       ramp_a.point_1: [4.01, 2.59]
       ramp_a.point_2: [1.29, 2.18]
       ramp_a.inflation_radius_uphill: 2.0
-      ramp_a.inflation_radius_downhill: 2.0
+      ramp_a.inflation_radius_downhill: 2.5
       ramp_a.enable_braking: false
 
       # ═══════════════════════════════════════════════
@@ -294,8 +294,8 @@ controller_server:
       uphill.vx_min: -5.0
       uphill.vy_min: -5.0
       uphill.wz_min: -1.5
-      uphill.ax_max: 1.5
-      uphill.ay_max: 1.5
+      uphill.ax_max: 5.0
+      uphill.ay_max: 5.0
       uphill.az_max: 3.0
       uphill.ax_min: -3.5
       uphill.ay_min: -3.5
@@ -482,7 +482,7 @@ local_costmap:
           obstacle_range: 8.0
           raytrace_range: 9.0
 
-          min_obstacle_height: -0.15     #default 0, meters
+          min_obstacle_height: -0.05     #default 0, meters
           max_obstacle_height: 1.0     #defaule 3, meters
           expected_update_rate: 0.0    #default 0, if not updating at this rate at least, remove from buffer
           observation_persistence: 0.0 #default 0, use all measurements taken during now-value, 0=latest
@@ -583,7 +583,7 @@ global_costmap:
           obstacle_range: 8.0
           raytrace_range: 9.0
 
-          min_obstacle_height: -0.1     #default 0, meters
+          min_obstacle_height: -0.05     #default 0, meters
           max_obstacle_height: 1.0     #defaule 3, meters
           expected_update_rate: 0.0    #default 0, if not updating at this rate at least, remove from buffer
           observation_persistence: 0.0 #default 0, use all measurements taken during now-value, 0=latest
