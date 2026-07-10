@@ -201,38 +201,38 @@ controller_server:
       ramp_a.inflation_radius_downhill: 2.5
       ramp_a.enable_braking: false
 
-      h0.point_1: [4.130, 0.000]
-      h0.point_2: [3.565, -0.979]
+      h0.point_1: [3.653, 0.000]
+      h0.point_2: [3.327, -0.566]
       h0.inflation_radius_uphill: 1.0
       h0.inflation_radius_downhill: 1.5
       h0.enable_braking: true
 
-      h1.point_1: [3.565, -0.979]
-      h1.point_2: [2.435, -0.979]
+      h1.point_1: [3.327, -0.566]
+      h1.point_2: [2.674, -0.566]
       h1.inflation_radius_uphill: 1.0
       h1.inflation_radius_downhill: 1.5
       h1.enable_braking: true
 
-      h2.point_1: [2.435, -0.979]
-      h2.point_2: [1.870, 0.000]
+      h2.point_1: [2.674, -0.566]
+      h2.point_2: [2.347, 0.000]
       h2.inflation_radius_uphill: 1.0
       h2.inflation_radius_downhill: 1.5
       h2.enable_braking: true
 
-      h3.point_1: [1.870, 0.000]
-      h3.point_2: [2.435, 0.979]
+      h3.point_1: [2.347, 0.000]
+      h3.point_2: [2.674, 0.566]
       h3.inflation_radius_uphill: 1.0
       h3.inflation_radius_downhill: 1.5
       h3.enable_braking: true
 
-      h4.point_1: [2.435, 0.979]
-      h4.point_2: [3.565, 0.979]
+      h4.point_1: [2.674, 0.566]
+      h4.point_2: [3.327, 0.566]
       h4.inflation_radius_uphill: 1.0
       h4.inflation_radius_downhill: 1.5
       h4.enable_braking: true
 
-      h5.point_1: [3.565, 0.979]
-      h5.point_2: [4.130, 0.000]
+      h5.point_1: [3.327, 0.566]
+      h5.point_2: [3.653, 0.000]
       h5.inflation_radius_uphill: 1.0
       h5.inflation_radius_downhill: 1.5
       h5.enable_braking: true
@@ -561,18 +561,18 @@ local_costmap:
         lines: ["ramp_a", "h0", "h1", "h2", "h3", "h4", "h5"]
         ramp_a.point_1: [4.01, 2.59]
         ramp_a.point_2: [1.29, 2.18]
-        h0.point_1: [4.130, 0.000]
-        h0.point_2: [3.565, -0.979]
-        h1.point_1: [3.565, -0.979]
-        h1.point_2: [2.435, -0.979]
-        h2.point_1: [2.435, -0.979]
-        h2.point_2: [1.870, 0.000]
-        h3.point_1: [1.870, 0.000]
-        h3.point_2: [2.435, 0.979]
-        h4.point_1: [2.435, 0.979]
-        h4.point_2: [3.565, 0.979]
-        h5.point_1: [3.565, 0.979]
-        h5.point_2: [4.130, 0.000]
+        h0.point_1: [3.653, 0.000]
+        h0.point_2: [3.327, -0.566]
+        h1.point_1: [3.327, -0.566]
+        h1.point_2: [2.674, -0.566]
+        h2.point_1: [2.674, -0.566]
+        h2.point_2: [2.347, 0.000]
+        h3.point_1: [2.347, 0.000]
+        h3.point_2: [2.674, 0.566]
+        h4.point_1: [2.674, 0.566]
+        h4.point_2: [3.327, 0.566]
+        h5.point_1: [3.327, 0.566]
+        h5.point_2: [3.653, 0.000]
       always_send_full_costmap: False
 
 
@@ -674,18 +674,18 @@ global_costmap:
         lines: ["ramp_a", "h0", "h1", "h2", "h3", "h4", "h5"]
         ramp_a.point_1: [4.01, 2.59]
         ramp_a.point_2: [1.29, 2.18]
-        h0.point_1: [4.130, 0.000]
-        h0.point_2: [3.565, -0.979]
-        h1.point_1: [3.565, -0.979]
-        h1.point_2: [2.435, -0.979]
-        h2.point_1: [2.435, -0.979]
-        h2.point_2: [1.870, 0.000]
-        h3.point_1: [1.870, 0.000]
-        h3.point_2: [2.435, 0.979]
-        h4.point_1: [2.435, 0.979]
-        h4.point_2: [3.565, 0.979]
-        h5.point_1: [3.565, 0.979]
-        h5.point_2: [4.130, 0.000]
+        h0.point_1: [3.653, 0.000]
+        h0.point_2: [3.327, -0.566]
+        h1.point_1: [3.327, -0.566]
+        h1.point_2: [2.674, -0.566]
+        h2.point_1: [2.674, -0.566]
+        h2.point_2: [2.347, 0.000]
+        h3.point_1: [2.347, 0.000]
+        h3.point_2: [2.674, 0.566]
+        h4.point_1: [2.674, 0.566]
+        h4.point_2: [3.327, 0.566]
+        h5.point_1: [3.327, 0.566]
+        h5.point_2: [3.653, 0.000]
       always_send_full_costmap: False
 
 map_server:
