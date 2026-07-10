@@ -1,6 +1,7 @@
 #include "elastic_tracker/corridor_2d.hpp"
 #include <algorithm>
 #include <cmath>
+#include <nav2_costmap_2d/cost_values.hpp>
 
 namespace elastic_tracker{
     bool CorridorGenerator::generate(const std::vector<Eigen::Vector2d> &path, const nav2_costmap_2d::Costmap2D *costmap,
@@ -43,7 +44,10 @@ namespace elastic_tracker{
             }
 
             const unsigned char cost = costmap->getCost(mx, my);
-            if(cost >= 254){
+            // Only lethal obstacles (254) block the corridor — same policy as
+            // A* in env_2d.hpp.  NO_INFORMATION (255) is traversable so the
+            // corridor generator does not reject paths the planner accepted.
+            if (cost == nav2_costmap_2d::LETHAL_OBSTACLE) {
                 return false;
             }
         }

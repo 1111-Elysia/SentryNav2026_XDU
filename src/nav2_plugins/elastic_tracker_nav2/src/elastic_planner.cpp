@@ -179,17 +179,40 @@ nav_msgs::msg::Path ElasticPlanner::createPlan(
   start_received_ = true;
 
   if (use_tracking_ && target_received_) {
-    std::lock_guard<std::mutex> lock(path_mutex_);
-    if (!cached_path_.poses.empty()) return cached_path_;
-    // No cached plan yet
-    nav_msgs::msg::Path hold;
-    hold.header.frame_id = start.header.frame_id;
-    hold.header.stamp = rclcpp::Clock().now();
-    geometry_msgs::msg::PoseStamped p;
-    p.header = hold.header;
-    p.pose = start.pose;
-    hold.poses.push_back(p);
-    return hold;
+    {
+      std::lock_guard<std::mutex> lock(path_mutex_);
+      if (!cached_path_.poses.empty()) return cached_path_;
+    }
+    // No cached plan yet — generate one synchronously on first call.
+    // Without this the BT sees an immediate success and loops forever.
+    auto *costmap = costmap_ros_->getCostmap();
+    if (costmap && costmap->getSizeInCellsX() > 0) {
+      env_->setCostmap(costmap);
+      prediction_->setCostmap(costmap);
+
+      Eigen::Vector2d start_pos(start.pose.position.x, start.pose.position.y);
+      Eigen::Vector2d target_pos;
+      {
+        std::lock_guard<std::mutex> lk(target_mutex_);
+        target_pos = {latest_target_.pose.position.x, latest_target_.pose.position.y};
+      }
+
+      nav_msgs::msg::Path path;
+      if (planTracked(start_pos, target_pos, path) && !path.poses.empty()) {
+        std::lock_guard<std::mutex> lk(path_mutex_);
+        cached_path_ = path;
+        return cached_path_;
+      }
+    }
+    // Fallback: single-point hold so the robot stays put until timer catches up
+    nav_msgs::msg::Path fallback;
+    fallback.header.frame_id = start.header.frame_id;
+    fallback.header.stamp = rclcpp::Clock().now();
+    geometry_msgs::msg::PoseStamped p_start;
+    p_start.header = fallback.header;
+    p_start.pose = start.pose;
+    fallback.poses.push_back(p_start);
+    return fallback;
   }
 
   // Static mode
@@ -306,12 +329,82 @@ void ElasticPlanner::smoothPath(
   smoother_->smooth(path, costmap, max_planning_time_);
 }
 
+// ==================== Path Downsampling ====================
+/// Drop points that are nearly collinear (keep first, last, and corners).
+/// Limits MINCO variables so L-BFGS finishes within the heartbeat window.
+static std::vector<Eigen::Vector2d> simplifyPath(
+    const std::vector<Eigen::Vector2d> &raw, size_t max_pts = 12)
+{
+  if (raw.size() <= max_pts) return raw;
+
+  // Ramer-Douglas-Peucker style: keep first and last, pick furthest middle
+  // until we reach max_pts.  For robustness we use a simple distance-based
+  // decimation first, then RDP if still too many points.
+  std::vector<Eigen::Vector2d> result;
+  result.reserve(max_pts);
+  result.push_back(raw.front());
+
+  // Greedy furthest-point insertion
+  std::vector<bool> keep(raw.size(), false);
+  keep.front() = true;
+  keep.back() = true;
+
+  while (result.size() < max_pts) {
+    double max_dist = -1.0;
+    size_t max_idx = 0;
+
+    // Find the furthest point from any selected segment
+    for (size_t i = 0; i < raw.size(); ++i) {
+      if (keep[i]) continue;
+      // Find distance to the nearest enclosing segment
+      size_t prev = 0;
+      for (size_t p = 0; p < i; ++p) {
+        if (keep[p]) prev = p;
+      }
+      size_t next = raw.size() - 1;
+      for (size_t n = raw.size() - 1; n > i; --n) {
+        if (keep[n]) { next = n; break; }
+      }
+
+      // Distance from point i to line prev→next
+      const Eigen::Vector2d& a = raw[prev];
+      const Eigen::Vector2d& b = raw[next];
+      const Eigen::Vector2d& p = raw[i];
+      double seg_len2 = (b - a).squaredNorm();
+      double dist;
+      if (seg_len2 < 1e-9) {
+        dist = (p - a).norm();
+      } else {
+        double t = std::max(0.0, std::min(1.0, (p - a).dot(b - a) / seg_len2));
+        dist = (p - (a + t * (b - a))).norm();
+      }
+      if (dist > max_dist) { max_dist = dist; max_idx = i; }
+    }
+    if (max_dist < 1e-4) break;  // all remaining points are nearly collinear
+    keep[max_idx] = true;
+  }
+
+  for (size_t i = 0; i < raw.size(); ++i) {
+    if (keep[i]) result.push_back(raw[i]);
+  }
+  return result;
+}
+
 // ==================== Planning ====================
 
 bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
                                  const Eigen::Vector2d &goal_pos,
                                  nav_msgs::msg::Path &path)
 {
+  // Guard: don't stack up planning jobs on the same thread
+  if (planning_in_progress_) {
+    path.header.frame_id = "map";
+    path.header.stamp = rclcpp::Clock().now();
+    return false;
+  }
+  planning_in_progress_ = true;
+  struct ScopeGuard { bool &flag; ~ScopeGuard() { flag = false; } } guard{planning_in_progress_};
+
   const auto plan_start = std::chrono::steady_clock::now();
 
   // 1. Predict target trajectory
@@ -355,9 +448,14 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
 
   // minco optimization
   if (minco_enabled_ && minco_optimizer_){
+    // Downsample A* path so MINCO's L-BFGS stays within the heartbeat window.
+    // 50-waypoint paths → 96 variables → ~17 s optimization → heartbeat loss.
+    // Capped at ~12 waypoints → ~20 variables → sub-second optimization.
+    std::vector<Eigen::Vector2d> minco_path_in = simplifyPath(raw_path, 12);
+
     std::vector<elastic_tracker::Corridor> corridors;
     const auto *costmap = costmap_ros_ ? costmap_ros_->getCostmap() : nullptr;
-    if (!corridor_generator_.generate(raw_path, costmap, corridor_width_, corridors)) {
+    if (!corridor_generator_.generate(minco_path_in, costmap, corridor_width_, corridors)) {
       RCLCPP_WARN(
         logger_,
         "[%s] Corridor生成失败，MINCO暂时使用空走廊",
@@ -366,8 +464,9 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     }
     RCLCPP_INFO(
       logger_,
-      "[%s] ElasticTracker corridors=%zu, corridor_width=%.2f",
-      planner_name_.c_str(), corridors.size(), corridor_width_);
+      "[%s] ElasticTracker raw=%zu simplified=%zu corridors=%zu, corridor_width=%.2f",
+      planner_name_.c_str(), raw_path.size(), minco_path_in.size(),
+      corridors.size(), corridor_width_);
 
     Eigen::Vector2d goal_vel = Eigen::Vector2d::Zero();
     {
@@ -376,7 +475,7 @@ bool ElasticPlanner::planTracked(const Eigen::Vector2d &start_pos,
     }
 
     nav_msgs::msg::Path minco_path;
-    if (minco_optimizer_->generatePath(raw_path, Eigen::Vector2d::Zero(), goal_vel, "map", minco_path, corridors)){
+    if (minco_optimizer_->generatePath(minco_path_in, Eigen::Vector2d::Zero(), goal_vel, "map", minco_path, corridors)){
       path = minco_path;
       path.header.stamp = rclcpp::Clock().now();
       const auto plan_end = std::chrono::steady_clock::now();

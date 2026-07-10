@@ -105,6 +105,8 @@ class ElasticPlanner : public nav2_core::GlobalPlanner {
   double corridor_width_{0.8};
   PolygonZone tracking_zone_;
 
+  bool planning_in_progress_ = false;  // guards against heartbeat-killing reentry
+
   // EKF for target velocity estimation
   bool ekf_enabled_ = true;
   double ekf_alpha_ = 0.1;      // position smoothing gain (lower = smoother)

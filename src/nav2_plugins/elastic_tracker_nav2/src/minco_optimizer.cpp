@@ -41,7 +41,7 @@ namespace elastic_tracker{
     bool MincoOptimizer::generatePath(const std::vector<Eigen::Vector2d> &raw_path, const Eigen::Vector2d &start_vel,
         const Eigen::Vector2d &goal_vel, const std::string &frame_id, nav_msgs::msg::Path &path, const std::vector<Corridor> &corridors) const{
         (void)corridors;
-        
+
         path.poses.clear();
         path.header.frame_id = frame_id;
 
@@ -134,9 +134,12 @@ namespace elastic_tracker{
         return inner_points;
     }
 
+    // ──────────────────────────────────────────────────────
+    //  Value-only evaluate (debug / quick checks only)
+    // ──────────────────────────────────────────────────────
     double MincoOptimizer::evaluateCost(const Eigen::VectorXd &x, const Eigen::VectorXd &times, const Eigen::Matrix3d &head_state,
         const Eigen::Matrix3d &tail_state, const std::vector<Corridor> &corridors) const{
-        
+
         const Eigen::Matrix3Xd inner_points = unpackInnerPoints(x);
         const int piece_num = static_cast<int>(times.size());
 
@@ -154,6 +157,9 @@ namespace elastic_tracker{
         return energy + config_.corridor_weight * corridor_penalty;
     }
 
+    // ──────────────────────────────────────────────────────
+    //  Corridor penalty (value only)
+    // ──────────────────────────────────────────────────────
     double MincoOptimizer::computeCorridorPenalty(const Trajectory<5> &trajectory, const std::vector<Corridor> &corridors) const{
         if (corridors.empty() || trajectory.getPieceNum() <= 0){
             return 0.0;
@@ -185,8 +191,149 @@ namespace elastic_tracker{
         return penalty;
     }
 
-    bool MincoOptimizer::optimizerInnerPoints(Eigen::Matrix3Xd &inner_points, const Eigen::VectorXd &times, const Eigen::Matrix3d &head_state,
-        const Eigen::Matrix3d &tail_state, const std::vector<Corridor> &corridors) const{
+    // ──────────────────────────────────────────────────────────────────
+    //  Analytical corridor penalty gradient w.r.t. MINCO coefficients b.
+    //
+    //  For each piece i at sample time t (normalised to [0, duration] × by
+    //  cumulative piece offset):
+    //
+    //    p(t) = c5·t⁵ + c4·t⁴ + c3·t³ + c2·t² + c1·t + c0
+    //
+    //    ∂p/∂c_{5-k} = t^k   (k∈[0,5], coeff row 6*i+5-k)
+    //
+    //    violation v = A·p − b   (4 half-plane constraints)
+    //    ∂(v³)/∂c = 3·v²·Aᵀ·∂p/∂c
+    //
+    //  Accumulated over all samples, then passed to MINCO::propogateGrad.
+    // ──────────────────────────────────────────────────────────────────
+    void MincoOptimizer::computeCorridorPenaltyGradByCoeffs(
+        const minco::MINCO_S3NU &minco, const Trajectory<5> &trajectory,
+        const std::vector<Corridor> &corridors,
+        Eigen::MatrixX3d &gdC_corridor) const
+    {
+        const int piece_num = trajectory.getPieceNum();
+        gdC_corridor.resize(6 * piece_num, 3);
+        gdC_corridor.setZero();
+
+        if (corridors.empty() || piece_num <= 0) return;
+
+        const double sample_dt = std::max(config_.sample_dt, 0.01);
+
+        for (int i = 0; i < piece_num; i++){
+            const auto &piece = trajectory[i];
+            const double duration = piece.getDuration();
+            const int sample_count = std::max(1, static_cast<int>(std::ceil(duration / sample_dt)));
+            const Corridor &corridor = corridors[std::min<int>(i, corridors.size() - 1)];
+
+            for (int j = 0; j <= sample_count; j++){
+                const double tau = duration * static_cast<double>(j) / static_cast<double>(sample_count);
+                const Eigen::Vector3d pos3 = piece.getPos(tau);
+                const Eigen::Vector2d p(pos3.x(), pos3.y());
+
+                const Eigen::Matrix<double, 4, 1> v = corridor.A * p - corridor.b;
+
+                // ∇_p penalty = Σ 3·v_k²·Aₖᵀ   (only for active half-planes)
+                Eigen::Vector2d dp_dp = Eigen::Vector2d::Zero();
+                for (int k = 0; k < 4; k++){
+                    if (v(k) > 0.0){
+                        dp_dp += 3.0 * v(k) * v(k) * corridor.A.row(k).transpose();
+                    }
+                }
+                if (dp_dp.squaredNorm() < 1e-18) continue;
+
+                // Map ∇_p penalty → ∇_{coeffs} penalty for this piece.
+                // Row 6*i+k stores c_{5-k} → ∂p/∂c_{5-k} = tau^{k}
+                double tk[6];
+                tk[0] = 1.0;           // k=0: ∂p/∂c5 = τ⁰ = 1    -> row 6*i
+                tk[1] = tau;           // k=1: ∂p/∂c4 = τ¹         -> row 6*i+1
+                tk[2] = tk[1] * tau;   // k=2: ∂p/∂c3 = τ²         -> row 6*i+2
+                tk[3] = tk[2] * tau;   // k=3: ∂p/∂c2 = τ³         -> row 6*i+3
+                tk[4] = tk[3] * tau;   // k=4: ∂p/∂c1 = τ⁴         -> row 6*i+4
+                tk[5] = tk[4] * tau;   // k=5: ∂p/∂c0 = τ⁵         -> row 6*i+5
+
+                for (int k = 0; k < 6; k++){
+                    gdC_corridor(6 * i + k, 0) += tk[k] * dp_dp.x();
+                    gdC_corridor(6 * i + k, 1) += tk[k] * dp_dp.y();
+                }
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  Unified cost + analytical gradient via MINCO adjoint propagation.
+    //
+    //  Energy gradient:   getEnergyPartialGradByCoeffs → propogateGrad
+    //  Corridor gradient: computeCorridorPenaltyGradByCoeffs → propogateGrad
+    //
+    //  Both are summed, then mapped back to the flat inner-point vector.
+    // ──────────────────────────────────────────────────────────────────
+    double MincoOptimizer::evaluateCostWithGrad(
+        const Eigen::VectorXd &x, const Eigen::VectorXd &times,
+        const Eigen::Matrix3d &head_state, const Eigen::Matrix3d &tail_state,
+        const std::vector<Corridor> &corridors,
+        Eigen::VectorXd &grad) const
+    {
+        const Eigen::Matrix3Xd inner_points = unpackInnerPoints(x);
+        const int piece_num = static_cast<int>(times.size());
+
+        minco::MINCO_S3NU minco;
+        minco.setConditions(head_state, tail_state, piece_num);
+        minco.setParameters(inner_points, times);
+
+        // ── Energy ────────────────────────────────────────────────
+        double energy = 0.0;
+        minco.getEnergy(energy);
+
+        Eigen::MatrixX3d gdC_energy;
+        minco.getEnergyPartialGradByCoeffs(gdC_energy);
+
+        Eigen::VectorXd gdT_energy;
+        minco.getEnergyPartialGradByTimes(gdT_energy);
+
+        // ── Corridor penalty ──────────────────────────────────────
+        Trajectory<5> trajectory;
+        minco.getTrajectory(trajectory);
+
+        double corridor_penalty = 0.0;
+        Eigen::MatrixX3d gdC_corridor;
+        if (!corridors.empty()){
+            corridor_penalty = computeCorridorPenalty(trajectory, corridors);
+            computeCorridorPenaltyGradByCoeffs(minco, trajectory, corridors, gdC_corridor);
+        }
+
+        const double cost = energy + config_.corridor_weight * corridor_penalty;
+
+        // ── Sum gradients in coefficient space ────────────────────
+        Eigen::MatrixX3d gdC_total = gdC_energy;
+        if (!corridors.empty()){
+            gdC_total += config_.corridor_weight * gdC_corridor;
+        }
+        // gdT_corridor is harder and minor — skip; just use energy part
+        Eigen::VectorXd gdT_total = gdT_energy;
+
+        // ── Adjoint: coefficient gradient → inner-point gradient ──
+        Eigen::Matrix3Xd gradByPoints;
+        Eigen::VectorXd gradByTimes;  // unused for our problem (times fixed)
+        minco.propogateGrad(gdC_total, gdT_total, gradByPoints, gradByTimes);
+
+        // ── Pack into flat gradient ───────────────────────────────
+        grad.resize(x.size());
+        for (int i = 0; i < piece_num - 1; i++){
+            grad(2 * i)     = gradByPoints(0, i);  // x
+            grad(2 * i + 1) = gradByPoints(1, i);  // y
+        }
+
+        return cost;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  L-BFGS optimization wrapper (uses analytical gradient)
+    // ──────────────────────────────────────────────────────────────
+    bool MincoOptimizer::optimizerInnerPoints(
+        Eigen::Matrix3Xd &inner_points, const Eigen::VectorXd &times,
+        const Eigen::Matrix3d &head_state, const Eigen::Matrix3d &tail_state,
+        const std::vector<Corridor> &corridors) const
+    {
         if (!config_.lbfgs_enabled || inner_points.cols() == 0){
             std::cout << "[MincoOptimizer] lbfgs skipped, enabled="
                       << (config_.lbfgs_enabled ? "true" : "false")
@@ -203,26 +350,12 @@ namespace elastic_tracker{
             const std::vector<Corridor> *corridors;
         };
 
+        // Analytical gradient — one base evaluation + one adjoint solve per iteration.
         auto evaluate = [](void *instance, const Eigen::VectorXd &x, Eigen::VectorXd &grad) -> double {
             auto *ctx = static_cast<OptimizeContext *>(instance);
-            const auto *self = ctx->self;
-
-            const double cost = self->evaluateCost(x, *ctx->times, *ctx->head_state, *ctx->tail_state, *ctx->corridors);
-            grad.resize(x.size());
-
-            const double eps = std::max(self->config_.finite_diff_eps, 1e-6);
-            for(int i = 0; i < x.size(); i++){
-                Eigen::VectorXd xp = x;
-                Eigen::VectorXd xm = x;
-                xp(i) += eps;
-                xm(i) -= eps;
-
-                const double fp = self->evaluateCost(xp, *ctx->times, *ctx->head_state, *ctx->tail_state, *ctx->corridors);
-                const double fm = self->evaluateCost(xm, *ctx->times, *ctx->head_state, *ctx->tail_state, *ctx->corridors);
-
-                grad(i) = (fp - fm) / (2.0 * eps);
-            }
-            return cost;
+            return ctx->self->evaluateCostWithGrad(
+                x, *ctx->times, *ctx->head_state, *ctx->tail_state,
+                *ctx->corridors, grad);
         };
 
         Eigen::VectorXd x = packInnerPoints(inner_points);
@@ -252,5 +385,5 @@ namespace elastic_tracker{
         inner_points = unpackInnerPoints(x);
         return true;
     }
-    
+
 }
