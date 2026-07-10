@@ -217,7 +217,10 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
         double d_signed = signedDistanceToLine(
           pose.pose.position.x, pose.pose.position.y,
           line.x1, line.y1, line.x2, line.y2);
-        double d_perp = std::abs(d_signed) / line.length;
+        // 用线段距离（非无限直线）限定膨胀区范围
+        double d_perp = distanceToSegment(
+          pose.pose.position.x, pose.pose.position.y,
+          line.x1, line.y1, line.x2, line.y2, line.length);
 
         // 根据所在侧选择对应的膨胀半径
         double inflation = (d_signed > 0.0)

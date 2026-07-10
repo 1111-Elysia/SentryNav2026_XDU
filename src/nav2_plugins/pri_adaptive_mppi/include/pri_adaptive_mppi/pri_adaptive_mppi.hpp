@@ -66,6 +66,22 @@ inline double signedDistanceToLine(
   return (line_dx * (py - ly1) - line_dy * (px - lx1));
 }
 
+/// 计算点 P 到线段 P1-P2 的最短距离（含端点约束）
+inline double distanceToSegment(
+  double px, double py,
+  double lx1, double ly1, double lx2, double ly2,
+  double line_length)
+{
+  if (line_length < 1e-9) {
+    return std::hypot(px - lx1, py - ly1);
+  }
+  double dx = lx2 - lx1;
+  double dy = ly2 - ly1;
+  double t = ((px - lx1) * dx + (py - ly1) * dy) / (line_length * line_length);
+  t = std::clamp(t, 0.0, 1.0);
+  return std::hypot(px - (lx1 + t * dx), py - (ly1 + t * dy));
+}
+
 /// 计算点 P 到线段 P1-P2 的垂直距离（绝对值）
 inline double perpendicularDistanceToLine(
   double px, double py,
