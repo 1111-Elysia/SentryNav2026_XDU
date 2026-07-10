@@ -252,8 +252,8 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
 
   auto cmd_vel = inner_controller_->computeVelocityCommands(pose, velocity, goal_checker);
 
-  // ── 6. 膨胀区内持续输出 Vw ──
-  if (best_line >= 0) {
+  // ── 6. 上坡阶段持续输出 Vw ──
+  if (active_crossing_ == CrossingMode::UPHILL) {
     sentry_msgs::msg::Vw vw_msg;
     vw_msg.vw = static_cast<float>(uphill_stuck_vw_);
     vw_pub_->publish(vw_msg);
