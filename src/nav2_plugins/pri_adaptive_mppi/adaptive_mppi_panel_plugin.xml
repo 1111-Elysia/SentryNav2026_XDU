@@ -1,0 +1,9 @@
+<library path="pri_adaptive_mppi_panel">
+  <class name="pri_adaptive_mppi::AdaptiveMppiPanel"
+         type="pri_adaptive_mppi::AdaptiveMppiPanel"
+         base_class_type="rviz_common::Panel">
+    <description>
+      Adaptive MPPI 仪表盘：显示当前模式和速度
+    </description>
+  </class>
+</library>

@@ -22,11 +22,14 @@
   <depend>visualization_msgs</depend>
   <depend>sentry_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>rviz_common</depend>
+  <depend>libqt5-widgets</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
+    <rviz plugin="${prefix}/adaptive_mppi_panel_plugin.xml"/>
   </export>
 </package>

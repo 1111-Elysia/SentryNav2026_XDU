@@ -18,6 +18,8 @@ find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(sentry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(rviz_common REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 set(dependencies
   rclcpp
@@ -47,7 +49,28 @@ ament_target_dependencies(${PROJECT_NAME} ${dependencies})
 
 pluginlib_export_plugin_description_file(nav2_core pri_adaptive_mppi_plugin.xml)
 
-install(TARGETS ${PROJECT_NAME}
+# ── RViz 面板插件 ──
+set(panel_deps
+  rclcpp
+  std_msgs
+  rviz_common
+)
+
+add_library(pri_adaptive_mppi_panel SHARED
+  src/adaptive_mppi_panel.cpp
+)
+
+target_include_directories(pri_adaptive_mppi_panel PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(pri_adaptive_mppi_panel ${panel_deps})
+target_link_libraries(pri_adaptive_mppi_panel Qt5::Widgets)
+
+pluginlib_export_plugin_description_file(rviz_common adaptive_mppi_panel_plugin.xml)
+
+install(TARGETS ${PROJECT_NAME} pri_adaptive_mppi_panel
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
