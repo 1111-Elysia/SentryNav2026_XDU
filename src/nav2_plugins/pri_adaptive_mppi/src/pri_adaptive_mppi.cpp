@@ -204,7 +204,7 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
   const geometry_msgs::msg::Twist & velocity,
   nav2_core::GoalChecker * goal_checker)
 {
-  // ── 1. 遍历所有直线，判断当前应使用的模式 ──
+  // ── 1. 区域判定 + 穿越检测 + 方向 → 模式直通 ──
   int best_line = -1;
   CrossingMode best_mode = CrossingMode::NORMAL;
   double best_dist = std::numeric_limits<double>::max();
@@ -216,72 +216,44 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     if (path_age <= max_path_age_) {
       for (size_t i = 0; i < lines_.size(); ++i) {
         const auto & line = lines_[i];
-
-        // 使用有符号距离判断机器人处于上坡侧还是下坡侧
-        double d_signed = signedDistanceToLine(
-          pose.pose.position.x, pose.pose.position.y,
-          line.x1, line.y1, line.x2, line.y2);
-        // 用线段距离（非无限直线）限定膨胀区范围
-        double d_perp = distanceToSegment(
-          pose.pose.position.x, pose.pose.position.y,
-          line.x1, line.y1, line.x2, line.y2, line.length);
-
-        // 根据所在侧选择对应的膨胀半径
-        double inflation = (d_signed > 0.0)
-          ? line.inflation_radius_uphill
-          : line.inflation_radius_downhill;
-
-        if (d_perp <= inflation && d_perp < best_dist) {
-          best_line = static_cast<int>(i);
-          best_dist = d_perp;
+        // 射线投射判定：机器人是否在膨胀矩形内
+        auto poly = buildInflationPolygon(
+          line.x1, line.y1, line.x2, line.y2,
+          line.inflation_radius_uphill, line.inflation_radius_downhill,
+          line.length);
+        if (isPointInPolygon(pose.pose.position.x, pose.pose.position.y, poly)) {
+          double d = distanceToSegment(
+            pose.pose.position.x, pose.pose.position.y,
+            line.x1, line.y1, line.x2, line.y2, line.length);
+          if (d < best_dist) {
+            best_line = static_cast<int>(i);
+            best_dist = d;
+          }
         }
       }
     }
   }
 
-  // ── 2. 确定穿越模式（滞留 + 方向反转检测）──
-  if (best_line >= 0) {
-    const auto & line = lines_[best_line];
+  if (best_line < 0) {
+    // 不在任何膨胀区内 → 直接 NORMAL
+    best_mode = CrossingMode::NORMAL;
+  } else {
+    // 在膨胀区内 → 检测穿越方向
     int crossing = detectPathCrossing(
-      current_path_, line.x1, line.y1, line.x2, line.y2);
+      current_path_, lines_[best_line].x1, lines_[best_line].y1,
+      lines_[best_line].x2, lines_[best_line].y2);
 
-    // 若 best_line 未检测到穿越，轮询所有边（可能路径穿的是另一条边）
-    if (crossing == 0 && active_crossing_ != CrossingMode::NORMAL) {
-      for (size_t i = 0; i < lines_.size(); ++i) {
-        if (static_cast<int>(i) == best_line) continue;
-        crossing = detectPathCrossing(
-          current_path_, lines_[i].x1, lines_[i].y1,
-          lines_[i].x2, lines_[i].y2);
-        if (crossing != 0) break;
-      }
-    }
-
-    if (active_crossing_ == CrossingMode::NORMAL) {
-      // 首次进入膨胀区 —— 检测穿越方向
-      if (crossing > 0) {
-        best_mode = CrossingMode::UPHILL;
-      } else if (crossing < 0) {
-        best_mode = CrossingMode::DOWNHILL;
-      }
-      // crossing == 0: 在膨胀区内但路径未穿越 → 保持 normal
+    if (crossing > 0) {
+      best_mode = CrossingMode::UPHILL;
+    } else if (crossing < 0) {
+      best_mode = CrossingMode::DOWNHILL;
     } else {
-      // 已在穿越模式中 —— 保持，除非检测到方向反转
-      if (crossing != 0) {
-        CrossingMode new_dir = (crossing > 0)
-          ? CrossingMode::UPHILL : CrossingMode::DOWNHILL;
-        if (new_dir != active_crossing_) {
-          best_mode = new_dir;  // 方向反转：允许切换
-        } else {
-          best_mode = active_crossing_;  // 同方向：保持
-        }
-      } else {
-        best_mode = active_crossing_;  // 未穿越：保持滞留
-      }
+      // 在区内但路径未穿线 → 保持当前模式
+      best_mode = active_crossing_;
     }
   }
-  // best_line < 0: 不在任何膨胀区内 → best_mode 已是 NORMAL
 
-  // ── 3. 模式改变时切换 ──
+  // ── 2. 模式改变时切换 ──
   if (best_line != active_line_index_ || best_mode != active_crossing_) {
     switchMode(best_line, best_mode);
   }

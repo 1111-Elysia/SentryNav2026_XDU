@@ -95,6 +95,42 @@ inline double perpendicularDistanceToLine(
   return std::abs(signedDistanceToLine(px, py, lx1, ly1, lx2, ly2)) / line_length;
 }
 
+/// 射线投射：点是否在多边形内部（与elastic_tracker同款算法）
+inline bool isPointInPolygon(double px, double py,
+    const std::vector<std::pair<double, double>> & poly)
+{
+  if (poly.size() < 3) return false;
+  int count = 0;
+  size_t n = poly.size();
+  for (size_t i = 0; i < n; i++) {
+    const auto & a = poly[i];
+    const auto & b = poly[(i + 1) % n];
+    if ((a.second > py) != (b.second > py) &&
+        px < (b.first - a.first) * (py - a.second) / (b.second - a.second) + a.first)
+      count++;
+  }
+  return count & 1;
+}
+
+/// 构建线段的膨胀区多边形（矩形，4顶点）
+inline std::vector<std::pair<double, double>> buildInflationPolygon(
+    double x1, double y1, double x2, double y2,
+    double radius_up, double radius_down, double length)
+{
+  double nx = 0.0, ny = 1.0;
+  if (length > 1e-9) {
+    nx = -(y2 - y1) / length;
+    ny =  (x2 - x1) / length;
+  }
+  // 逆时针: 上坡-左 → 上坡-右 → 下坡-右 → 下坡-左
+  return {
+    {x1 + radius_up * nx, y1 + radius_up * ny},
+    {x2 + radius_up * nx, y2 + radius_up * ny},
+    {x2 - radius_down * nx, y2 - radius_down * ny},
+    {x1 - radius_down * nx, y1 - radius_down * ny}
+  };
+}
+
 /// 判断线段 AB 与线段 CD 是否严格相交（不包括端点接触）
 inline bool segmentsIntersect(
   double ax, double ay, double bx, double by,
