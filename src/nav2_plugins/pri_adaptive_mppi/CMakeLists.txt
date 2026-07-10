@@ -17,6 +17,7 @@ find_package(pluginlib REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(sentry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 set(dependencies
   rclcpp
@@ -30,6 +31,7 @@ set(dependencies
   tf2_ros
   visualization_msgs
   sentry_msgs
+  std_msgs
 )
 
 add_library(${PROJECT_NAME} SHARED

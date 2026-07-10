@@ -30,6 +30,7 @@
 #include "tf2_ros/buffer.h"
 #include "visualization_msgs/msg/marker.hpp"
 #include "sentry_msgs/msg/vw.hpp"
+#include "std_msgs/msg/string.hpp"
 
 namespace pri_adaptive_mppi
 {
@@ -248,6 +249,7 @@ private:
 
   // ── 可视化 ──
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr viz_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr dash_pub_;
 
   // ── 直线配置 ──
   std::vector<LineConfig> lines_;

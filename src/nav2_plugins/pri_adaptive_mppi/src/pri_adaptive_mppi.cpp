@@ -137,6 +137,10 @@ void PriAdaptiveMppi::configure(
     plugin_name_ + "/adaptive_line_visualization",
     rclcpp::QoS(10).transient_local().reliable());
 
+  dash_pub_ = node->create_publisher<std_msgs::msg::String>(
+    plugin_name_ + "/dashboard",
+    rclcpp::QoS(10));
+
   vw_pub_ = node->create_publisher<sentry_msgs::msg::Vw>(
     "/vw", rclcpp::QoS(10));
 
@@ -360,6 +364,19 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
         cmd_vel.twist.angular.z *= scale;
       }
     }
+  }
+
+  // ── 8. 仪表盘数据 ──
+  if (dash_pub_) {
+    const char * dm = "NORMAL";
+    if (active_crossing_ == CrossingMode::UPHILL) dm = "UPHILL";
+    else if (active_crossing_ == CrossingMode::DOWNHILL) dm = "DOWNHILL";
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s,%.3f,%.3f",
+      dm, cmd_vel.twist.linear.x, cmd_vel.twist.linear.y);
+    std_msgs::msg::String msg;
+    msg.data = buf;
+    dash_pub_->publish(msg);
   }
 
   return cmd_vel;
