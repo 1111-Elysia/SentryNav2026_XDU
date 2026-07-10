@@ -61,6 +61,7 @@ bt_navigator:
       - nav2_assisted_teleop_cancel_bt_node
       - nav2_drive_on_heading_cancel_bt_node
       - nav2_is_battery_charging_condition_bt_node
+
 controller_server:
   ros__parameters:
     publish_critics_stats: True
@@ -187,7 +188,7 @@ controller_server:
       inner_plugin: "nav2_mppi_controller::MPPIController"
       max_path_age: 2.0
       
-      uphill_braking_distance: 1.0
+      uphill_braking_distance: 2.0
 
       uphill_stuck_vw: 0.2
 
@@ -203,38 +204,38 @@ controller_server:
       h0.point_1: [4.130, 0.000]
       h0.point_2: [3.565, -0.979]
       h0.inflation_radius_uphill: 1.0
-      h0.inflation_radius_downhill: 0.5
-      h0.enable_braking: false
+      h0.inflation_radius_downhill: 1.5
+      h0.enable_braking: true
 
       h1.point_1: [3.565, -0.979]
       h1.point_2: [2.435, -0.979]
       h1.inflation_radius_uphill: 1.0
-      h1.inflation_radius_downhill: 0.5
-      h1.enable_braking: false
+      h1.inflation_radius_downhill: 1.5
+      h1.enable_braking: true
 
       h2.point_1: [2.435, -0.979]
       h2.point_2: [1.870, 0.000]
       h2.inflation_radius_uphill: 1.0
-      h2.inflation_radius_downhill: 0.5
-      h2.enable_braking: false
+      h2.inflation_radius_downhill: 1.5
+      h2.enable_braking: true
 
       h3.point_1: [1.870, 0.000]
       h3.point_2: [2.435, 0.979]
       h3.inflation_radius_uphill: 1.0
-      h3.inflation_radius_downhill: 0.5
-      h3.enable_braking: false
+      h3.inflation_radius_downhill: 1.5
+      h3.enable_braking: true
 
       h4.point_1: [2.435, 0.979]
       h4.point_2: [3.565, 0.979]
       h4.inflation_radius_uphill: 1.0
-      h4.inflation_radius_downhill: 0.5
-      h4.enable_braking: false
+      h4.inflation_radius_downhill: 1.5
+      h4.enable_braking: true
 
       h5.point_1: [3.565, 0.979]
       h5.point_2: [4.130, 0.000]
       h5.inflation_radius_uphill: 1.0
-      h5.inflation_radius_downhill: 0.5
-      h5.enable_braking: false
+      h5.inflation_radius_downhill: 1.5
+      h5.enable_braking: true
 
       # ═══════════════════════════════════════════════
       #  普通模式 MPPI 参数（未穿越任何直线时使用）
