@@ -10,8 +10,8 @@ bt_navigator:
     robot_base_frame: base_link
     odom_topic: odom
     goal_updater_topic: "/target_goal"
-    default_nav_to_pose_bt_xml: /home/pgd/SentryNav2026_XDU/install/elastic_tracker_sim/share/elastic_tracker_sim/behavior_trees/tracking_bt.xml
-    default_nav_through_poses_bt_xml: /home/pgd/SentryNav2026_XDU/install/elastic_tracker_sim/share/elastic_tracker_sim/behavior_trees/tracking_bt.xml
+    default_nav_to_pose_bt_xml: /home/mac/Desktop/SentryNav2026_XDU/install/elastic_tracker_sim/share/elastic_tracker_sim/behavior_trees/tracking_bt.xml
+    default_nav_through_poses_bt_xml: /home/mac/Desktop/SentryNav2026_XDU/install/elastic_tracker_sim/share/elastic_tracker_sim/behavior_trees/tracking_bt.xml
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_follow_path_action_bt_node
@@ -20,7 +20,7 @@ bt_navigator:
       - nav2_back_up_action_bt_node
       - nav2_clear_costmap_service_bt_node
       - nav2_is_stuck_condition_bt_node
-      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_reached_condition_bt_node 
       - nav2_goal_updated_condition_bt_node
       - nav2_is_path_valid_condition_bt_node
       - nav2_rate_controller_bt_node
