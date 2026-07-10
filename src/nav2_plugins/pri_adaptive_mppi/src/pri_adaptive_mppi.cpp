@@ -285,15 +285,37 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
                       active_crossing_ == CrossingMode::DOWNHILL);
 
   static CrossingMode last_crossing_st = CrossingMode::NORMAL;
+  static double last_d_signed = 0.0;
   if (in_crossing) {
     // 模式反转（UPHILL↔DOWNHILL）→ 重置计时
     if (active_crossing_ != last_crossing_st) {
       last_crossing_st = active_crossing_;
-      uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);  // 强制重新记录
+      last_d_signed = 0.0;
+      uphill_start_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
       stuck_override_ = false;
     }
 
-    // 首次进入穿越模式 / 从另一种穿越模式反转过来 → 记录起点
+    // 计算到活跃直线的有符号距离（越线检测）
+    double d_signed_now = 0.0;
+    bool has_line = (active_line_index_ >= 0 &&
+                     static_cast<size_t>(active_line_index_) < lines_.size());
+    if (has_line) {
+      const auto & aline = lines_[active_line_index_];
+      d_signed_now = signedDistanceToLine(
+        pose.pose.position.x, pose.pose.position.y,
+        aline.x1, aline.y1, aline.x2, aline.y2);
+    }
+
+    // 越线瞬间（符号翻转）→ 重置计时，从越线后开始测卡住
+    if (uphill_start_time_.seconds() > 0.0 &&
+        last_d_signed * d_signed_now < 0.0) {
+      uphill_start_time_ = now_stuck;
+      uphill_start_pose_ = pose.pose;
+      stuck_override_ = false;
+    }
+    if (d_signed_now != 0.0) last_d_signed = d_signed_now;
+
+    // 首次进入穿越模式 → 记录起点
     if (uphill_start_time_.seconds() == 0.0) {
       uphill_start_time_ = now_stuck;
       uphill_start_pose_ = pose.pose;

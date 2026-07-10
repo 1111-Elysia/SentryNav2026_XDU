@@ -319,11 +319,11 @@ controller_server:
       uphill.vx_std: 0.3
       uphill.vy_std: 0.3
       uphill.wz_std: 0.2
-      uphill.vx_max: 2.0
-      uphill.vy_max: 2.0
+      uphill.vx_max: 5.0
+      uphill.vy_max: 5.0
       uphill.wz_max: 1.5
-      uphill.vx_min: -2.0
-      uphill.vy_min: -2.0
+      uphill.vx_min: -5.0
+      uphill.vy_min: -5.0
       uphill.wz_min: -1.5
       uphill.ax_max: 1.5
       uphill.ay_max: 1.5
