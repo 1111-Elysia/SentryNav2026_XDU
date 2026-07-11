@@ -322,4 +322,76 @@ BT::NodeStatus PublishControllerName::tick()
   return BT::NodeStatus::SUCCESS;
 }
 
+UseTrackingPlanner::UseTrackingPlanner(
+  const std::string &name, const BT::NodeConfig &config)
+: BT::StatefulActionNode(name, config),
+  logger_(rclcpp::get_logger("UseTrackingPlanner"))
+{
+  if (!config.blackboard || !config.blackboard->get("node", node_)) {
+    throw BT::RuntimeError("UseTrackingPlanner: missing 'node' in blackboard");
+  }
+}
+
+BT::PortsList UseTrackingPlanner::providedPorts()
+{
+  return {
+    BT::InputPort<std::string>(
+      "tracking_planner", "ElasticTracker", "追击使用的 Nav2 planner plugin id"),
+    BT::InputPort<std::string>(
+      "fallback_planner", "GridBased", "退出追击后恢复的 Nav2 planner plugin id"),
+    BT::InputPort<std::string>(
+      "topic_name", "/planner_name", "Nav2 PlannerSelector 话题")
+  };
+}
+
+bool UseTrackingPlanner::publishPlanner(const std::string &planner_name)
+{
+  if (!publisher_) {
+    std::string topic_name = "/planner_name";
+    getInput("topic_name", topic_name);
+    topic_name = trim(topic_name);
+    if (topic_name.empty()) {
+      topic_name = "/planner_name";
+    }
+    publisher_ = getSharedControllerPublisher(node_, topic_name);
+  }
+
+  const std::string selected = trim(planner_name);
+  if (selected.empty()) {
+    RCLCPP_ERROR(logger_, "planner id 不能为空");
+    return false;
+  }
+
+  std_msgs::msg::String msg;
+  msg.data = selected;
+  publisher_->publish(msg);
+  RCLCPP_INFO(logger_, "切换 Nav2 planner -> %s", selected.c_str());
+  return true;
+}
+
+BT::NodeStatus UseTrackingPlanner::onStart()
+{
+  if (!getInput("tracking_planner", tracking_planner_)) {
+    tracking_planner_ = "ElasticTracker";
+  }
+  if (!getInput("fallback_planner", fallback_planner_)) {
+    fallback_planner_ = "GridBased";
+  }
+
+  return publishPlanner(tracking_planner_)
+    ? BT::NodeStatus::RUNNING
+    : BT::NodeStatus::FAILURE;
+}
+
+BT::NodeStatus UseTrackingPlanner::onRunning()
+{
+  return BT::NodeStatus::RUNNING;
+}
+
+void UseTrackingPlanner::onHalted()
+{
+  // target_frame_node 监听该切换，并在离开 ElasticTracker 时取消追击 goal。
+  publishPlanner(fallback_planner_);
+}
+
 }  // namespace sentry_nav_bt_test

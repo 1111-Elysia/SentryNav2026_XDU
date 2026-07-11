@@ -59,8 +59,9 @@
             <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
-            <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
-            <SetBlackboardValue key="uc_fortress_goal_name" value="fortress" type="string"/>
+            <SetBlackboardValue key="uc_chase_active" value="0" type="int"/>
+            <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
+            <SetBlackboardValue key="uc_fortress_goal_name" value="myhero" type="string"/>
             <SetBlackboardValue key="uc_initialized" value="1" type="int"/>
           </Sequence>
         </Fallback>
@@ -132,11 +133,11 @@
               <Sequence name="普通姿态目标更新">
                 <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
                 <Fallback name="普通姿态目标选择">
-                  <Sequence name="普通受击目标进攻">
-                    <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
+                  <Sequence name="17mm热量维持_切进攻姿态">
+                    <CheckCondition key_name="shooter_17mm_heat_firing" comparison="eq" threshold="1"/>
                     <SetBlackboardValue key="uc_normal_posture" value="1" type="int"/>
                   </Sequence>
-                  <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
+                  <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
                 </Fallback>
               </Sequence>
 
@@ -253,22 +254,20 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_堡垒_Phase4">
+                <ReactiveSequence name="中期_梯形高地追击_Phase4">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Phase 4 | 5:00-4:00] 不需要打符，回堡垒点位持续驻守"
-                    fortress_enemy_move_message="[Phase 4 | 5:00-4:00] 堡垒被敌方占领，转守基地前点位"
+                    ID="HighlandChase"
+                    highland_goal_name="trapezoid_highland"
+                    highland_reach_threshold="0.25"
+                    highland_move_posture="1"
+                    highland_start_message="[Phase 4 | 5:00-4:00] 前往梯形高地"
+                    highland_arrived_message="[Phase 4 | 5:00-4:00] 已到达梯形高地，开始追击"
+                    chase_active_key="uc_chase_active"
+                    chase_posture="1"
+                    chase_message="[Phase 4 | 5:00-4:00] 梯形高地动态追击"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -319,22 +318,20 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_堡垒_Phase6">
+                <ReactiveSequence name="中期_梯形高地追击_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Phase 6 | 3:30-2:45] 前往堡垒点位并进入驻守"
-                    fortress_enemy_move_message="[Phase 6 | 3:30-2:45] 堡垒被敌方占领，转守基地前点位"
+                    ID="HighlandChase"
+                    highland_goal_name="trapezoid_highland"
+                    highland_reach_threshold="0.25"
+                    highland_move_posture="1"
+                    highland_start_message="[Phase 6 | 3:30-2:45] 前往梯形高地"
+                    highland_arrived_message="[Phase 6 | 3:30-2:45] 已到达梯形高地，开始追击"
+                    chase_active_key="uc_chase_active"
+                    chase_posture="1"
+                    chase_message="[Phase 6 | 3:30-2:45] 梯形高地动态追击"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -385,22 +382,20 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="后期_堡垒_Phase8">
+                <ReactiveSequence name="后期_梯形高地追击_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Phase 8 | 2:15-1:30] 后期回到堡垒点位持续驻守"
-                    fortress_enemy_move_message="[Phase 8 | 2:15-1:30] 堡垒被敌方占领，转守基地前点位"
+                    ID="HighlandChase"
+                    highland_goal_name="trapezoid_highland"
+                    highland_reach_threshold="0.25"
+                    highland_move_posture="1"
+                    highland_start_message="[Phase 8 | 2:15-1:30] 前往梯形高地"
+                    highland_arrived_message="[Phase 8 | 2:15-1:30] 已到达梯形高地，开始追击"
+                    chase_active_key="uc_chase_active"
+                    chase_posture="1"
+                    chase_message="[Phase 8 | 2:15-1:30] 梯形高地动态追击"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"
@@ -451,21 +446,19 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="全局_堡垒驻守">
+                <ReactiveSequence name="全局_梯形高地追击">
                   <SubTree
-                    ID="FortressHold"
-                    fortress_goal_name="fortress"
-                    fortress_enemy_goal_name="init"
-                    fortress_arrive_threshold="0.25"
-                    fortress_hold_exit_threshold="0.30"
-                    fortress_move_posture="3"
-                    fortress_hold_posture="3"
-                    fortress_wait_duration="0.5"
-                    fortress_move_message="[Fallback] 不需要打符，回堡垒点位持续驻守"
-                    fortress_enemy_move_message="[Fallback] 堡垒被敌方占领，转守基地前点位"
+                    ID="HighlandChase"
+                    highland_goal_name="trapezoid_highland"
+                    highland_reach_threshold="0.25"
+                    highland_move_posture="1"
+                    highland_start_message="[Fallback] 前往梯形高地"
+                    highland_arrived_message="[Fallback] 已到达梯形高地，开始追击"
+                    chase_active_key="uc_chase_active"
+                    chase_posture="1"
+                    chase_message="[Fallback] 梯形高地动态追击"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
-                    fortress_goal_name_key="uc_fortress_goal_name"
                     nav_resend_interval="0.30"
                     nav_response_timeout="0.80"
                     nav_result_retry_delay="0.30"

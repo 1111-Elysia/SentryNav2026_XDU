@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="Chase">
+    <!--
+      target_frame_node 将视觉目标发布到 /detected_target_pose；ElasticTracker
+      负责目标速度估计、轨迹预测和 10 Hz 动态重规划。子树被抢占时，
+      UseTrackingPlanner 会切回 GridBased，target_frame_node 随即取消追击 goal。
+    -->
+    <ReactiveSequence name="动态目标追击">
+      <CheckCondition
+        key_name="{chase_active_key}"
+        comparison="eq"
+        threshold="1"/>
+      <PrintNode
+        message="{chase_message}"
+        throttle_ms="{chase_log_throttle_ms}"/>
+      <Parallel name="维持追击" success_count="-1" failure_count="1">
+        <MaintainSentryPosture mode="{chase_posture}"/>
+        <UseTrackingPlanner
+          tracking_planner="{chase_planner}"
+          fallback_planner="{chase_fallback_planner}"
+          topic_name="{chase_planner_topic}"/>
+      </Parallel>
+    </ReactiveSequence>
+  </BehaviorTree>
+</root>

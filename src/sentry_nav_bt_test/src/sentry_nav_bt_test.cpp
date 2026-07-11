@@ -335,6 +335,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     factory.registerNodeType<sentry_nav_bt_test::PatrolGoalSelector>("PatrolGoalSelector");
     factory.registerNodeType<sentry_nav_bt_test::CheckGoalReached>("CheckGoalReached");
     factory.registerNodeType<sentry_nav_bt_test::PublishControllerName>("PublishControllerName");
+    factory.registerNodeType<sentry_nav_bt_test::UseTrackingPlanner>("UseTrackingPlanner");
     // 打印节点
     factory.registerNodeType<sentry_nav_bt_test::PrintNode>("PrintNode");
     // 设置黑板值

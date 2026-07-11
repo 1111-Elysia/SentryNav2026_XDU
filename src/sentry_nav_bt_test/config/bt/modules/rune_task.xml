@@ -27,7 +27,7 @@
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{rune_start_message}"/>
       <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
-      <PublishControllerName controller_name="FollowPath"/>
+      <PublishControllerName controller_name="AdaptiveMppi"/>
       <ReactiveSequence name="前往符点并维持移动姿态">
         <MaintainSentryPosture mode="{rune_move_posture}"/>
         <ReliableNavigateToPose

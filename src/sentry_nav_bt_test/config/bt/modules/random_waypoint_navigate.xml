@@ -13,7 +13,7 @@
             avoid_repeat="{random_avoid_repeat}"
             goal="{random_goal}"
             goal_name="{random_goal_name}"/>
-          <PublishControllerName controller_name="FollowPath"/>
+          <PublishControllerName controller_name="AdaptiveMppi"/>
           <ReactiveSequence name="随机巡逻_移动到点">
             <MaintainSentryPosture mode="3"/>
             <ReliableNavigateToPose
