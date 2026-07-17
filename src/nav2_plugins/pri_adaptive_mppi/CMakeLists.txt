@@ -3,6 +3,7 @@ project(pri_adaptive_mppi)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -58,6 +59,7 @@ set(panel_deps
 
 add_library(pri_adaptive_mppi_panel SHARED
   src/adaptive_mppi_panel.cpp
+  include/pri_adaptive_mppi/adaptive_mppi_panel.hpp
 )
 
 target_include_directories(pri_adaptive_mppi_panel PUBLIC
