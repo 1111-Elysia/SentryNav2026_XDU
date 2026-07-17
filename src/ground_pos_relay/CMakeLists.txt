@@ -32,10 +32,20 @@ ament_target_dependencies(ground_pos_relay_sim_node
   std_msgs
 )
 
+# ---- 新增：队友坐标帧转换节点（官方地图系 → odom 系） ----
+add_executable(teammate_frame_converter_node src/teammate_frame_converter.cpp)
+target_include_directories(teammate_frame_converter_node PRIVATE include)
+ament_target_dependencies(teammate_frame_converter_node
+  rclcpp
+  rm_referee_msgs
+  std_msgs
+)
+
 # ---- 安装可执行文件 ----
 install(TARGETS
   ground_pos_relay_node
   ground_pos_relay_sim_node
+  teammate_frame_converter_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
