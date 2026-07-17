@@ -69,7 +69,6 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("runtime_effective_goal_name", std::string("init"));
     bb->set("runtime_move_posture", 3);
     bb->set("runtime_wait_posture", 1);
-    bb->set("runtime_controller", std::string("FollowPath"));
     bb->set("runtime_reach_threshold", 0.25);
     bb->set("runtime_wait_time_threshold", 5.0);
     bb->set("runtime_use_custom_pose", false);

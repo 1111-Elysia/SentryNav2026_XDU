@@ -5,10 +5,6 @@
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <GoalSelector goal_name="{point_goal_name}" goal="{point_goal}"/>
-      <PublishControllerName
-        controller_name="{point_controller_name}"
-        selection_key="{point_goal_name}"
-        log_throttle_ms="2000"/>
       <ReactiveFallback name="动态导航或到点等待">
         <ReactiveSequence name="已到点并等待阶段切换">
           <CheckGoalReached goal="{point_goal}" threshold="{point_reach_threshold}"/>

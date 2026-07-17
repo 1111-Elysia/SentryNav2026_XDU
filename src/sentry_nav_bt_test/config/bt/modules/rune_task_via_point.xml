@@ -27,7 +27,6 @@
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <PrintNode message="{rune_via_start_message}"/>
       <GoalSelector goal_name="{rune_via_goal_name}" goal="{rune_via_goal}"/>
-      <PublishControllerName controller_name="AdaptiveMppi"/>
       <ReactiveSequence name="前往减速点并维持对应姿态">
         <MaintainSentryPosture mode="{rune_move_posture}"/>
         <ReliableNavigateToPose
@@ -40,7 +39,6 @@
       </ReactiveSequence>
       <PrintNode message="{rune_start_message}"/>
       <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
-      <PublishControllerName controller_name="AdaptiveMppi"/>
       <ReactiveSequence name="前往符点并维持对应姿态">
         <MaintainSentryPosture mode="{rune_move_posture}"/>
         <ReliableNavigateToPose

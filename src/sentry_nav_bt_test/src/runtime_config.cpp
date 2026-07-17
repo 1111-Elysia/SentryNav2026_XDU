@@ -19,7 +19,6 @@ constexpr char kGoalY[] = "runtime_goal_y";
 constexpr char kGoalYaw[] = "runtime_goal_yaw";
 constexpr char kMovePosture[] = "runtime_move_posture";
 constexpr char kWaitPosture[] = "runtime_wait_posture";
-constexpr char kController[] = "runtime_controller";
 constexpr char kReachThreshold[] = "runtime_reach_threshold";
 constexpr char kWaitTimeThreshold[] = "runtime_wait_time_threshold";
 
@@ -27,7 +26,7 @@ bool isRuntimeParameter(const std::string & name)
 {
   return name == kGoalName || name == kUseCustomPose || name == kGoalX ||
          name == kGoalY || name == kGoalYaw || name == kMovePosture ||
-         name == kWaitPosture || name == kController ||
+         name == kWaitPosture ||
          name == kReachThreshold || name == kWaitTimeThreshold;
 }
 
@@ -55,7 +54,6 @@ RuntimeConfigManager::RuntimeConfigManager(
   node_->declare_parameter<double>(kGoalYaw, 0.0);
   node_->declare_parameter<int>(kMovePosture, 3);
   node_->declare_parameter<int>(kWaitPosture, 1);
-  node_->declare_parameter<std::string>(kController, "FollowPath");
   node_->declare_parameter<double>(kReachThreshold, 0.25);
   node_->declare_parameter<double>(kWaitTimeThreshold, 5.0);
 
@@ -73,7 +71,6 @@ RuntimeConfigManager::Config RuntimeConfigManager::currentConfig() const
   config.goal_yaw = node_->get_parameter(kGoalYaw).as_double();
   config.move_posture = static_cast<int>(node_->get_parameter(kMovePosture).as_int());
   config.wait_posture = static_cast<int>(node_->get_parameter(kWaitPosture).as_int());
-  config.controller = node_->get_parameter(kController).as_string();
   config.reach_threshold = node_->get_parameter(kReachThreshold).as_double();
   config.wait_time_threshold = node_->get_parameter(kWaitTimeThreshold).as_double();
   return config;
@@ -95,10 +92,6 @@ bool RuntimeConfigManager::validate(const Config & config, std::string & reason)
       config.wait_posture < 1 || config.wait_posture > 6)
   {
     reason = "姿态必须位于 1..6";
-    return false;
-  }
-  if (trim(config.controller).empty()) {
-    reason = "runtime_controller 不能为空";
     return false;
   }
   if (!std::isfinite(config.reach_threshold) || config.reach_threshold <= 0.0) {
@@ -143,7 +136,6 @@ void RuntimeConfigManager::applyToBlackboard(const Config & config)
   blackboard_->set("runtime_effective_goal_name", effective_goal_name);
   blackboard_->set("runtime_move_posture", config.move_posture);
   blackboard_->set("runtime_wait_posture", config.wait_posture);
-  blackboard_->set("runtime_controller", trim(config.controller));
   blackboard_->set("runtime_reach_threshold", config.reach_threshold);
   blackboard_->set("runtime_wait_time_threshold", config.wait_time_threshold);
   blackboard_->set("runtime_use_custom_pose", config.use_custom_pose);
@@ -152,9 +144,9 @@ void RuntimeConfigManager::applyToBlackboard(const Config & config)
 
   RCLCPP_INFO(
     node_->get_logger(),
-    "运行配置已更新: goal=%s%s, move_posture=%d, wait_posture=%d, controller=%s, reach=%.3f, wait_time=%.1f",
+    "运行配置已更新: goal=%s%s, move_posture=%d, wait_posture=%d, reach=%.3f, wait_time=%.1f",
     effective_goal_name.c_str(), config.use_custom_pose ? "(custom)" : "",
-    config.move_posture, config.wait_posture, trim(config.controller).c_str(),
+    config.move_posture, config.wait_posture,
     config.reach_threshold, config.wait_time_threshold);
 }
 
@@ -193,7 +185,6 @@ rcl_interfaces::msg::SetParametersResult RuntimeConfigManager::onParametersChang
       else if (name == kGoalYaw) candidate.goal_yaw = parameter.as_double();
       else if (name == kMovePosture) candidate.move_posture = static_cast<int>(parameter.as_int());
       else if (name == kWaitPosture) candidate.wait_posture = static_cast<int>(parameter.as_int());
-      else if (name == kController) candidate.controller = parameter.as_string();
       else if (name == kReachThreshold) candidate.reach_threshold = parameter.as_double();
       else if (name == kWaitTimeThreshold) candidate.wait_time_threshold = parameter.as_double();
     }

@@ -9,13 +9,11 @@
           <CheckCondition key_name="fortress_gain_point_occupancy_status" comparison="gte" threshold="2"/>
           <SetBlackboardValue key="{fortress_goal_name_key}" value="{fortress_enemy_goal_name}" type="string"/>
           <SetBlackboardValue key="fortress_selected_goal_name" value="{fortress_enemy_goal_name}" type="string"/>
-          <SetBlackboardValue key="fortress_selected_controller" value="AdaptiveMppi" type="string"/>
           <GoalSelector goal_name="{fortress_enemy_goal_name}" goal="{fortress_goal}"/>
         </Sequence>
         <Sequence name="堡垒正常驻守点">
           <SetBlackboardValue key="{fortress_goal_name_key}" value="{fortress_goal_name}" type="string"/>
           <SetBlackboardValue key="fortress_selected_goal_name" value="{fortress_goal_name}" type="string"/>
-          <SetBlackboardValue key="fortress_selected_controller" value="AdaptiveMppi" type="string"/>
           <GoalSelector goal_name="{fortress_goal_name}" goal="{fortress_goal}"/>
         </Sequence>
       </Fallback>
@@ -33,7 +31,6 @@
             </Sequence>
             <PrintNode message="{fortress_move_message}"/>
           </Fallback>
-          <PublishControllerName controller_name="{fortress_selected_controller}"/>
           <ReactiveSequence name="回堡垒并维持移动姿态">
             <MaintainSentryPosture mode="{fortress_move_posture}"/>
             <ReliableNavigateToPose

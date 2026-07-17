@@ -31,7 +31,6 @@ private:
     double goal_yaw{0.0};
     int move_posture{3};
     int wait_posture{1};
-    std::string controller{"FollowPath"};
     double reach_threshold{0.25};
     double wait_time_threshold{5.0};
   };

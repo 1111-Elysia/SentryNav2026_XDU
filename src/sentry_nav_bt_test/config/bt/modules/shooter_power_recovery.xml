@@ -25,7 +25,6 @@
                   index_key="{supply_goal_index_key}"
                   goal="{supply_goal}"
                   goal_name="{supply_selected_goal_name}"/>
-                <PublishControllerName controller_name="AdaptiveMppi"/>
                 <ReliableNavigateToPose
                   goal="{supply_goal}"
                   goal_name="{supply_selected_goal_name}"

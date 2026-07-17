@@ -8,15 +8,6 @@
       <PrintNode message="{highland_start_message}" throttle_ms="2000"/>
       <GoalSelector goal_name="{highland_goal_name}" goal="{highland_goal}"/>
 
-      <!-- 定点导航使用普通全局规划器和 AdaptiveMppi 控制器。 -->
-      <PublishControllerName
-        controller_name="GridBased"
-        topic_name="/planner_name"
-        selection_key="highland_grid_planner"/>
-      <PublishControllerName
-        controller_name="AdaptiveMppi"
-        topic_name="/controller_name"
-        selection_key="{highland_goal_name}"/>
       <ReactiveSequence name="前往梯形高地">
         <MaintainSentryPosture mode="{highland_move_posture}"/>
         <ReliableNavigateToPose

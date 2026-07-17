@@ -5,9 +5,6 @@
       <CheckCondition key_name="{game_progress_key}" comparison="eq" threshold="{prepare_progress}"/>
       <PrintNode message="{prestart_message}" throttle_ms="{log_throttle_ms}"/>
       <GoalSelector goal_name="{init_goal_name}" goal="{prestart_init_goal}"/>
-      <PublishControllerName
-        controller_name="{controller_name}"
-        log_throttle_ms="{log_throttle_ms}"/>
       <ReliableNavigateToPose
         goal="{prestart_init_goal}"
         goal_name="{init_goal_name}"
