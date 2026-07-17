@@ -130,8 +130,9 @@ private:
 
   double computeTargetYawDeg(const double base_x_map, const double base_y_map)
   {
-    // atan2 直接给出地图坐标系下的绝对朝向角，区间 [-π, π]
-    const double target_yaw_rad = std::atan2(target_y_ - base_y_map, target_x_ - base_x_map);
+    // 以目标为起点、车体为终点的向量 (车体 - 目标) 在 map 系下的方向角
+    // atan2 区间 (-π, π]，俯视逆时针为正
+    const double target_yaw_rad = std::atan2(base_y_map - target_y_, base_x_map - target_x_);
     return rad2deg(target_yaw_rad);
   }
 
