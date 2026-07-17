@@ -10,7 +10,7 @@
                         number_of_retries="1">
             <PipelineSequence>
               <PlannerSelector selected_planner="{selected_planner}"
-                               default_planner="GridBased"
+                               default_planner="ElasticTracker"
                                topic_name="planner_name"/>
               <GoalUpdater input_goal="{goal}"
                            output_goal="{updated_goal}">
