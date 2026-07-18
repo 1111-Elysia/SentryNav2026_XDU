@@ -27,7 +27,7 @@
                       number_of_retries="10">
           <PipelineSequence>
             <ControllerSelector selected_controller="{selected_controller}"
-                                default_controller="FollowPath"
+                                default_controller="AdaptiveMppi"
                                 topic_name="controller_name"/>
             <FollowPath path="{path}"
                         controller_id="{selected_controller}"/>

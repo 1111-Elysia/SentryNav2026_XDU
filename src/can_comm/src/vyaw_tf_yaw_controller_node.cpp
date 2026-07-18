@@ -35,7 +35,7 @@ public:
     this->declare_parameter<double>("publish_rate_hz", 30.0);
 
     // 下位机实时 yaw 订阅，用于零飘补偿
-    this->declare_parameter<std::string>("diankong_yaw_topic", "/diankong_yaw");
+    this->declare_parameter<std::string>("diankong_yaw_topic", "/diankong/yaw");
     this->declare_parameter<double>("diankong_yaw_timeout_s", 0.5);
 
     target_yaw_topic_ = this->get_parameter("target_yaw_topic").as_string();

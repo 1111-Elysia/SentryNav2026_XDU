@@ -87,7 +87,7 @@ controller_server:
     FollowPath:
       plugin: "goal_approach_controller::GoalApproachController"
       inner_plugin: "nav2_mppi_controller::MPPIController"
-      approach_distance: 0.2  #距目标时开始限速
+      approach_distance: 0.88  #距目标时开始限速
       approach_velocity: 0.2
       direct_approach_distance: 0.1  #进入直接驱动模式的距离，绕过MPPI防止画弧
       direct_approach_kp: 10.0  #直接驱动P控制增益
@@ -246,8 +246,8 @@ controller_server:
       normal.vx_std: 0.3
       normal.vy_std: 0.3
       normal.wz_std: 0.2
-      normal.vx_max: 2.0
-      normal.vy_max: 2.0
+      normal.vx_max: 1.5
+      normal.vy_max: 1.5
       normal.wz_max: 1.5
       normal.vx_min: -2.0
       normal.vy_min: -2.0
