@@ -54,6 +54,7 @@
           <CheckCondition key_name="uc_initialized" comparison="eq" threshold="1"/>
           <Sequence name="初始化状态">
             <PrintNode message="[UC] 比赛开始，初始化局内状态"/>
+            <PublishScanMode enabled="false"/>
             <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
             <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>

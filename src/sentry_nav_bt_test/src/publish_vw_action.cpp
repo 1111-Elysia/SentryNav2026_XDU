@@ -55,4 +55,29 @@ BT::NodeStatus PublishVw::tick()
     return BT::NodeStatus::SUCCESS;
 }
 
+PublishScanMode::PublishScanMode(const std::string &name, const BT::NodeConfig &config)
+    : BT::SyncActionNode(name, config)
+{
+    if (!config.blackboard || !config.blackboard->get("node", node_)) {
+        throw std::runtime_error("PublishScanMode: missing 'node' in blackboard");
+    }
+    control_publishers_ = std::make_shared<ControlTopicPublishers>(node_);
+}
+
+BT::PortsList PublishScanMode::providedPorts()
+{
+    return {BT::InputPort<bool>("enabled", false, "true 为定向 yaw，false 为旋转扫描")};
+}
+
+BT::NodeStatus PublishScanMode::tick()
+{
+    bool enabled = false;
+    getInput("enabled", enabled);
+    if (!control_publishers_->publishScanMode(enabled)) {
+        return BT::NodeStatus::FAILURE;
+    }
+    RCLCPP_INFO(node_->get_logger(), "[ScanMode] 发布 /scan_mod_type = %d", enabled ? 1 : 0);
+    return BT::NodeStatus::SUCCESS;
+}
+
 }  // namespace sentry_nav_bt_test

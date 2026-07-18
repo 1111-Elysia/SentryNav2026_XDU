@@ -321,6 +321,7 @@ void RegisterBehaviorTreePlugins(BT::BehaviorTreeFactory &factory,
     factory.registerNodeType<sentry_nav_bt_test::BuySentryProjectile>("BuySentryProjectile");
     factory.registerNodeType<sentry_nav_bt_test::EngageRune>("EngageRune");
     factory.registerNodeType<sentry_nav_bt_test::EngageOutpost>("EngageOutpost");
+    factory.registerNodeType<sentry_nav_bt_test::PublishScanMode>("PublishScanMode");
     factory.registerNodeType<sentry_nav_bt_test::PublishVw>("PublishVw");
     factory.registerBuilder<sentry_nav_bt_test::PrintBlackboardValue>("PrintBlackboardValue", print_blackboard_builder);
     // 条件检查
