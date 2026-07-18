@@ -156,7 +156,7 @@ class TeammateFrameConverter : public rclcpp::Node {
   rclcpp::Publisher<rm_referee_msgs::msg::GroundRobotPosition>::SharedPtr ground_pos_odom_pub_;
 
   // ---- 状态 ----
-  uint8_t robot_id_{0};
+  uint8_t robot_id_{7};
 
   // ---- 参数 ----
   std::string odom_frame_id_;
