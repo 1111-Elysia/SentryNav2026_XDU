@@ -37,7 +37,7 @@ class CanDebugGui(Node):
         self.create_subscription(Float32, "/target/yaw", self._on("yaw"), 10)
         self.create_subscription(Float32, "/target/pitch", self._on("pitch"), 10)
         self.create_subscription(Float32, "/target/distance", self._on("dist"), 10)
-        self.create_subscription(Float32, "/target/diankong_yaw", self._on("diankong_yaw"), 10)
+        self.create_subscription(Float32, "/diankong/yaw", self._on("diankong_yaw"), 10)
 
         self.tx_lock = Lock()
         self.tx_vx = 0.0
