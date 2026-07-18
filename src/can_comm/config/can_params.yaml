@@ -30,6 +30,7 @@ can_receive:
     yaw_topic: "/target/yaw"
     pitch_topic: "/target/pitch"
     distance_topic: "/target/distance"
+    diankong_yaw_topic: "/diankong/yaw"
     publish_rate_hz: 500.0
 
 target_frame:

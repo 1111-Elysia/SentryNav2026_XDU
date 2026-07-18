@@ -29,6 +29,7 @@ public:
         this->declare_parameter<std::string>("yaw_topic", "/target/yaw");
         this->declare_parameter<std::string>("pitch_topic", "/target/pitch");
         this->declare_parameter<std::string>("distance_topic", "/target/distance");
+        this->declare_parameter<std::string>("diankong_yaw_topic", "/diankong_yaw");
         this->declare_parameter<double>("publish_rate_hz", 50.0);
 
         // 读取参数
@@ -37,6 +38,7 @@ public:
         std::string yaw_topic = this->get_parameter("yaw_topic").as_string();
         std::string pitch_topic = this->get_parameter("pitch_topic").as_string();
         std::string distance_topic = this->get_parameter("distance_topic").as_string();
+        std::string diankong_yaw_topic = this->get_parameter("diankong_yaw_topic").as_string();
         double publish_rate_hz = this->get_parameter("publish_rate_hz").as_double();
         if (publish_rate_hz <= 1e-6) publish_rate_hz = 50.0;
 
@@ -44,6 +46,7 @@ public:
         yaw_pub_ = this->create_publisher<std_msgs::msg::Float32>(yaw_topic, 10);
         pitch_pub_ = this->create_publisher<std_msgs::msg::Float32>(pitch_topic, 10);
         distance_pub_ = this->create_publisher<std_msgs::msg::Float32>(distance_topic, 10);
+        diankong_yaw_pub_ = this->create_publisher<std_msgs::msg::Float32>(diankong_yaw_topic, 10);
 
         // 打开 SocketCAN
         socket_fd_ = ::socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -114,7 +117,7 @@ private:
     {
         if (socket_fd_ < 0) return;
 
-        float yaw = 0.0f, pitch = 0.0f, distance = 0.0f;
+        float yaw = 0.0f, pitch = 0.0f, distance = 0.0f, diankong_yaw = 0.0f;
         bool got_frame = false;
 
         // 循环读取所有待处理的 CAN 帧，只用最后一帧
@@ -131,7 +134,7 @@ private:
             if (frame.can_id & (CAN_ERR_FLAG | CAN_EFF_FLAG)) {
                 continue;
             }
-            if (frame.can_dlc < 6) {
+            if (frame.can_dlc < 8) {
                 continue;
             }
 
@@ -141,10 +144,13 @@ private:
                                                       static_cast<uint16_t>(frame.data[3]));
             int16_t distance_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[4]) << 8) |
                                                          static_cast<uint16_t>(frame.data[5]));
+            int16_t diankong_yaw_raw = static_cast<int16_t>((static_cast<uint16_t>(frame.data[6]) << 8) |
+                                                             static_cast<uint16_t>(frame.data[7]));
 
             yaw = static_cast<float>(yaw_raw) / 100.0f;
             pitch = static_cast<float>(pitch_raw) / 100.0f;
             distance = static_cast<float>(distance_raw) / 100.0f;
+            diankong_yaw = static_cast<float>(diankong_yaw_raw) / 100.0f;
             got_frame = true;
             frame_count_++;
         }
@@ -169,6 +175,11 @@ private:
             msg.data = distance;
             distance_pub_->publish(msg);
         }
+        {
+            std_msgs::msg::Float32 msg;
+            msg.data = diankong_yaw;
+            diankong_yaw_pub_->publish(msg);
+        }
 
         // 频率日志
         auto now = this->now();
@@ -176,8 +187,8 @@ private:
         if (dt >= 1.0) {
             double freq = frame_count_ / dt;
             RCLCPP_INFO(this->get_logger(),
-                        "CAN 接收频率: %.1f Hz | yaw=%.2f pitch=%.2f distance=%.2f",
-                        freq, yaw, pitch, distance);
+                        "CAN 接收频率: %.1f Hz | yaw=%.2f pitch=%.2f distance=%.2f diankong_yaw=%.2f",
+                        freq, yaw, pitch, distance, diankong_yaw);
             frame_count_ = 0;
             last_log_ = now;
         }
@@ -189,6 +200,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr yaw_pub_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pitch_pub_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr distance_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr diankong_yaw_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     size_t frame_count_{0};
