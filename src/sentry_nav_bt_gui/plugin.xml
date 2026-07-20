@@ -2,7 +2,7 @@
   <class name="SimpleNavControl"
          type="sentry_nav_bt_gui.rqt_plugin.SimpleNavControlPlugin"
          base_class_type="rqt_gui_py::Plugin">
-    <description>Runtime target, posture, controller, and timing controls for SimpleNav.</description>
+    <description>Runtime target, posture, and timing controls for SimpleNav.</description>
     <qtgui>
       <group>
         <label>Sentry Navigation</label>

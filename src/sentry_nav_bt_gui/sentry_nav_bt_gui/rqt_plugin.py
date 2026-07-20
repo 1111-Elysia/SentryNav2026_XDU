@@ -20,10 +20,8 @@ from rclpy.parameter import Parameter
 from rqt_gui_py.plugin import Plugin
 
 from sentry_nav_bt_gui.model import (
-    DEFAULT_CONTROLLERS,
     PARAMETER_NAMES,
     config_values,
-    load_controller_plugins,
     load_waypoints,
 )
 
@@ -45,7 +43,6 @@ class SimpleNavControlPlugin(Plugin):
         self._node = context.node
         self._target_node = "/sentry_nav_bt_test"
         self._waypoints = self._read_waypoints()
-        self._controllers = self._read_controller_plugins()
         self._loading_ui = False
         self._pending_get = None
         self._pending_set = None
@@ -80,18 +77,6 @@ class SimpleNavControlPlugin(Plugin):
         except Exception as error:
             self._node.get_logger().error(f"加载点位失败: {error}")
             return {"init": (0.0, 0.0, 0.0)}
-
-    def _read_controller_plugins(self):
-        params_path = os.path.join(
-            get_package_share_directory("bringup"),
-            "config",
-            "singlenav2_params.yaml",
-        )
-        try:
-            return load_controller_plugins(params_path)
-        except Exception as error:
-            self._node.get_logger().error(f"加载 Controller 列表失败: {error}")
-            return list(DEFAULT_CONTROLLERS)
 
     def _build_ui(self):
         root = QVBoxLayout(self._widget)
@@ -139,9 +124,6 @@ class SimpleNavControlPlugin(Plugin):
 
         navigation_group = QGroupBox("导航")
         navigation_form = QFormLayout(navigation_group)
-        self._controller = QComboBox()
-        self._controller.setEditable(True)
-        self._controller.addItems(self._controllers)
         self._reach_threshold = QDoubleSpinBox()
         self._reach_threshold.setRange(0.01, 10.0)
         self._reach_threshold.setDecimals(2)
@@ -153,7 +135,6 @@ class SimpleNavControlPlugin(Plugin):
         self._wait_threshold.setDecimals(1)
         self._wait_threshold.setSuffix(" s")
         self._wait_threshold.setValue(5.0)
-        navigation_form.addRow("Controller", self._controller)
         navigation_form.addRow("到点距离", self._reach_threshold)
         navigation_form.addRow("时间阈值", self._wait_threshold)
         root.addWidget(navigation_group)
@@ -266,7 +247,6 @@ class SimpleNavControlPlugin(Plugin):
         self._goal_yaw.setValue(values["runtime_goal_yaw"])
         self._move_posture.setCurrentIndex(int(values["runtime_move_posture"]) - 1)
         self._wait_posture.setCurrentIndex(int(values["runtime_wait_posture"]) - 1)
-        self._controller.setCurrentText(values["runtime_controller"])
         self._reach_threshold.setValue(values["runtime_reach_threshold"])
         self._wait_threshold.setValue(values["runtime_wait_time_threshold"])
         self._loading_ui = False
@@ -281,7 +261,6 @@ class SimpleNavControlPlugin(Plugin):
             self._goal_yaw.value(),
             self._move_posture.currentData(),
             self._wait_posture.currentData(),
-            self._controller.currentText(),
             self._reach_threshold.value(),
             self._wait_threshold.value(),
         )
