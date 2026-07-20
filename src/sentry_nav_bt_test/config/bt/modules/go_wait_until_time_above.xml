@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4">
   <BehaviorTree ID="GoWaitUntilTimeAbove">
-    <Sequence name="前往点位并等待时间窗口结束">
+    <ReactiveSequence name="前往点位并等待时间窗口结束">
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
-      <PrintNode message="{point_start_message}"/>
       <GoalSelector goal_name="{point_goal_name}" goal="{point_goal}"/>
-      <PublishControllerName controller_name="FollowPath"/>
-      <ReactiveSequence name="前往点位并维持移动姿态">
-        <MaintainSentryPosture mode="{point_move_posture}"/>
-        <ReliableNavigateToPose
-          goal="{point_goal}"
-          goal_name="{point_goal_name}"
-          reach_threshold="{point_reach_threshold}"
-          resend_interval="{nav_resend_interval}"
-          response_timeout="{nav_response_timeout}"
-          result_retry_delay="{nav_result_retry_delay}"/>
-      </ReactiveSequence>
-      <PrintNode message="{point_arrived_message}"/>
-      <ReactiveSequence name="等待阶段切换并维持姿态">
-        <MaintainSentryPosture mode="{point_wait_posture}"/>
-        <KeepRunningUntilFailure>
-          <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="{point_wait_time_threshold}"/>
-        </KeepRunningUntilFailure>
-      </ReactiveSequence>
-    </Sequence>
+      <ReactiveFallback name="动态导航或到点等待">
+        <ReactiveSequence name="已到点并等待阶段切换">
+          <CheckGoalReached goal="{point_goal}" threshold="{point_reach_threshold}"/>
+          <PrintNode message="{point_arrived_message}" throttle_ms="2000"/>
+          <MaintainSentryPosture mode="{point_wait_posture}"/>
+          <KeepRunningUntilFailure>
+            <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="{point_wait_time_threshold}"/>
+          </KeepRunningUntilFailure>
+        </ReactiveSequence>
+        <ReactiveSequence name="前往点位并维持移动姿态">
+          <PrintNode message="{point_start_message}" throttle_ms="2000"/>
+          <MaintainSentryPosture mode="{point_move_posture}"/>
+          <ReliableNavigateToPose
+            goal="{point_goal}"
+            goal_name="{point_goal_name}"
+            reach_threshold="{point_reach_threshold}"
+            resend_interval="{nav_resend_interval}"
+            response_timeout="{nav_response_timeout}"
+            result_retry_delay="{nav_result_retry_delay}"/>
+        </ReactiveSequence>
+      </ReactiveFallback>
+    </ReactiveSequence>
   </BehaviorTree>
 </root>

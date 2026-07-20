@@ -1,0 +1,13 @@
+<class_libraries>
+  <library path="line_crossing_layer">
+    <class name="line_crossing_layer::LineCrossingLayer"
+           type="line_crossing_layer::LineCrossingLayer"
+           base_class_type="nav2_costmap_2d::Layer">
+      <description>
+        Creates a cost band around predefined line segments to encourage
+        perpendicular path crossings. Reads line definitions in the same
+        format as pri_adaptive_mppi.
+      </description>
+    </class>
+  </library>
+</class_libraries>

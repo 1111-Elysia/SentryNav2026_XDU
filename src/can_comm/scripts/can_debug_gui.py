@@ -31,11 +31,13 @@ class CanDebugGui(Node):
         self.rx_yaw = 0.0
         self.rx_pitch = 0.0
         self.rx_dist = 0.0
+        self.rx_diankong_yaw = 0.0
         self.rx_lock = Lock()
 
         self.create_subscription(Float32, "/target/yaw", self._on("yaw"), 10)
         self.create_subscription(Float32, "/target/pitch", self._on("pitch"), 10)
         self.create_subscription(Float32, "/target/distance", self._on("dist"), 10)
+        self.create_subscription(Float32, "/diankong/yaw", self._on("diankong_yaw"), 10)
 
         self.tx_lock = Lock()
         self.tx_vx = 0.0
@@ -208,6 +210,7 @@ def build_gui(node: CanDebugGui):
     rx_labels = {}
     for i, (attr, label) in enumerate([
         ("rx_yaw", "target_yaw (°)"), ("rx_pitch", "target_pitch (°)"), ("rx_dist", "distance (m)"),
+        ("rx_diankong_yaw", "diankong_yaw (°)"),
     ]):
         ttk.Label(disp, text=f"{label}:").grid(
             row=row_rx + 2 + i, column=0, sticky="e", padx=(0, 5))

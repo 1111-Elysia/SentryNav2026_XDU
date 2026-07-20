@@ -69,84 +69,251 @@ controller_server:
       xy_goal_tolerance: 0.1
 
     FollowPath:
-      plugin: "nav2_mppi_controller::MPPIController"
-      time_steps: 80
-      model_dt: 0.04
-      batch_size: 1500
-      vx_std: 0.3
-      vy_std: 0.3
-      wz_std: 0.2
-      vx_max: 2.0
-      vy_max: 2.0
-      wz_max: 1.5
-      vx_min: -2.0
-      vy_min: -2.0
-      wz_min: -1.5
-      ax_max: 3.0
-      ay_max: 3.0
-      az_max: 3.0
-      ax_min: -3.0
-      ay_min: -3.0
-      az_min: -3.0
-      iteration_count: 1
-      prune_distance: 1.7
-      transform_tolerance: 0.1
-      temperature: 0.25
-      gamma: 0.015
-      motion_model: "Omni"
-      visualize: false
-      reset_period: 0.08
+      plugin: "pri_adaptive_mppi::PriAdaptiveMppi"
 
-      critics: ["ConstraintCritic", "CostCritic", "GoalCritic",
-                "PathFollowCritic", "PathAlignCritic", "ObstaclesCritic"]
+      # ═══════════════════════════════════════════════
+      #  PriAdaptiveMppi 专属参数
+      # ═══════════════════════════════════════════════
+      inner_plugin: "nav2_mppi_controller::MPPIController"
+      max_path_age: 2.0
 
-      ConstraintCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 4.0
+      # 直线列表 — 每条直线的名称列表，可自定义多条
+      # 每条直线需补充 <名称>.point_1, <名称>.point_2, <名称>.inflation_radius
+      # 以及 <名称>.uphill.* 和 <名称>.downhill.* 两套MPPI参数
+      lines: ["ramp_a"]
 
-      GoalCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 25.0
-        threshold_to_consider: 4.0
+      # ═══════════════════════════════════════════════
+      #  ramp_a 直线配置
+      # ═══════════════════════════════════════════════
+      ramp_a.point_1: [0.0, 0.0]
+      ramp_a.point_2: [5.0, 0.0]
+      ramp_a.inflation_radius_uphill: 1.0
+      ramp_a.inflation_radius_downhill: 1.0
 
-      ObstaclesCritic:
-        enabled: true
-        cost_power: 1
-        repulsion_weight: 1.5
-        critical_weight: 20.0
-        consider_footprint: false
-        collision_cost: 10000.0
-        collision_margin_distance: 0.25
-        near_goal_distance: 0.5
+      # ═══════════════════════════════════════════════
+      #  Normal 模式 MPPI 参数（默认）
+      # ═══════════════════════════════════════════════
+      normal.time_steps: 80
+      normal.model_dt: 0.04
+      normal.batch_size: 1500
+      normal.vx_std: 0.3
+      normal.vy_std: 0.3
+      normal.wz_std: 0.2
+      normal.vx_max: 2.0
+      normal.vy_max: 2.0
+      normal.wz_max: 1.5
+      normal.vx_min: -2.0
+      normal.vy_min: -2.0
+      normal.wz_min: -1.5
+      normal.ax_max: 3.0
+      normal.ay_max: 3.0
+      normal.az_max: 3.0
+      normal.ax_min: -3.0
+      normal.ay_min: -3.0
+      normal.az_min: -3.0
+      normal.iteration_count: 1
+      normal.prune_distance: 1.7
+      normal.transform_tolerance: 0.1
+      normal.temperature: 0.25
+      normal.gamma: 0.015
+      normal.motion_model: "Omni"
+      normal.visualize: false
+      normal.reset_period: 0.08
 
-      CostCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.8
-        critical_cost: 253.0
-        consider_footprint: false   # robot_radius is used, not polygon footprint
-        collision_cost: 1000000.0
-        near_goal_distance: 0.5
-        trajectory_point_step: 2
+      normal.critics: ["ConstraintCritic", "CostCritic", "GoalCritic",
+                        "PathFollowCritic", "PathAlignCritic", "ObstaclesCritic"]
 
-      PathFollowCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 15.0
-        offset_from_furthest: 5
-        threshold_to_consider: 1.0
+      normal.ConstraintCritic.enabled: true
+      normal.ConstraintCritic.cost_power: 1
+      normal.ConstraintCritic.cost_weight: 4.0
 
-      PathAlignCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 15.0
-        max_path_occupancy_ratio: 0.05
-        trajectory_point_step: 4
-        threshold_to_consider: 0.8
-        offset_from_furthest: 20
-        use_path_orientations: false
+      normal.GoalCritic.enabled: true
+      normal.GoalCritic.cost_power: 1
+      normal.GoalCritic.cost_weight: 25.0
+      normal.GoalCritic.threshold_to_consider: 4.0
+
+      normal.ObstaclesCritic.enabled: true
+      normal.ObstaclesCritic.cost_power: 1
+      normal.ObstaclesCritic.repulsion_weight: 1.5
+      normal.ObstaclesCritic.critical_weight: 20.0
+      normal.ObstaclesCritic.consider_footprint: false
+      normal.ObstaclesCritic.collision_cost: 10000.0
+      normal.ObstaclesCritic.collision_margin_distance: 0.25
+      normal.ObstaclesCritic.near_goal_distance: 0.5
+
+      normal.CostCritic.enabled: true
+      normal.CostCritic.cost_power: 1
+      normal.CostCritic.cost_weight: 3.8
+      normal.CostCritic.critical_cost: 253.0
+      normal.CostCritic.consider_footprint: false
+      normal.CostCritic.collision_cost: 1000000.0
+      normal.CostCritic.near_goal_distance: 0.5
+      normal.CostCritic.trajectory_point_step: 2
+
+      normal.PathFollowCritic.enabled: true
+      normal.PathFollowCritic.cost_power: 1
+      normal.PathFollowCritic.cost_weight: 15.0
+      normal.PathFollowCritic.offset_from_furthest: 5
+      normal.PathFollowCritic.threshold_to_consider: 1.0
+
+      normal.PathAlignCritic.enabled: true
+      normal.PathAlignCritic.cost_power: 1
+      normal.PathAlignCritic.cost_weight: 15.0
+      normal.PathAlignCritic.max_path_occupancy_ratio: 0.05
+      normal.PathAlignCritic.trajectory_point_step: 4
+      normal.PathAlignCritic.threshold_to_consider: 0.8
+      normal.PathAlignCritic.offset_from_furthest: 20
+      normal.PathAlignCritic.use_path_orientations: false
+
+      # ═══════════════════════════════════════════════
+      #  上坡模式 MPPI 参数（全局，所有直线共享）
+      #  上坡→下坡穿越时使用
+      uphill.time_steps: 80
+      uphill.model_dt: 0.04
+      uphill.batch_size: 1500
+      uphill.vx_std: 0.3
+      uphill.vy_std: 0.3
+      uphill.wz_std: 0.2
+      uphill.vx_max: 2.0
+      uphill.vy_max: 2.0
+      uphill.wz_max: 1.5
+      uphill.vx_min: -2.0
+      uphill.vy_min: -2.0
+      uphill.wz_min: -1.5
+      uphill.ax_max: 3.0
+      uphill.ay_max: 3.0
+      uphill.az_max: 3.0
+      uphill.ax_min: -3.0
+      uphill.ay_min: -3.0
+      uphill.az_min: -3.0
+      uphill.iteration_count: 1
+      uphill.prune_distance: 1.7
+      uphill.transform_tolerance: 0.1
+      uphill.temperature: 0.25
+      uphill.gamma: 0.015
+      uphill.motion_model: "Omni"
+      uphill.visualize: false
+      uphill.reset_period: 0.08
+
+      uphill.critics: ["ConstraintCritic", "CostCritic", "GoalCritic",
+                     "PathFollowCritic", "PathAlignCritic", "ObstaclesCritic"]
+
+      uphill.ConstraintCritic.enabled: true
+      uphill.ConstraintCritic.cost_power: 1
+      uphill.ConstraintCritic.cost_weight: 4.0
+
+      uphill.GoalCritic.enabled: true
+      uphill.GoalCritic.cost_power: 1
+      uphill.GoalCritic.cost_weight: 25.0
+      uphill.GoalCritic.threshold_to_consider: 4.0
+
+      uphill.ObstaclesCritic.enabled: true
+      uphill.ObstaclesCritic.cost_power: 1
+      uphill.ObstaclesCritic.repulsion_weight: 1.5
+      uphill.ObstaclesCritic.critical_weight: 20.0
+      uphill.ObstaclesCritic.consider_footprint: false
+      uphill.ObstaclesCritic.collision_cost: 10000.0
+      uphill.ObstaclesCritic.collision_margin_distance: 0.25
+      uphill.ObstaclesCritic.near_goal_distance: 0.5
+
+      uphill.CostCritic.enabled: true
+      uphill.CostCritic.cost_power: 1
+      uphill.CostCritic.cost_weight: 3.8
+      uphill.CostCritic.critical_cost: 253.0
+      uphill.CostCritic.consider_footprint: false
+      uphill.CostCritic.collision_cost: 1000000.0
+      uphill.CostCritic.near_goal_distance: 0.5
+      uphill.CostCritic.trajectory_point_step: 2
+
+      uphill.PathFollowCritic.enabled: true
+      uphill.PathFollowCritic.cost_power: 1
+      uphill.PathFollowCritic.cost_weight: 15.0
+      uphill.PathFollowCritic.offset_from_furthest: 5
+      uphill.PathFollowCritic.threshold_to_consider: 1.0
+
+      uphill.PathAlignCritic.enabled: true
+      uphill.PathAlignCritic.cost_power: 1
+      uphill.PathAlignCritic.cost_weight: 15.0
+      uphill.PathAlignCritic.max_path_occupancy_ratio: 0.05
+      uphill.PathAlignCritic.trajectory_point_step: 4
+      uphill.PathAlignCritic.threshold_to_consider: 0.8
+      uphill.PathAlignCritic.offset_from_furthest: 20
+      uphill.PathAlignCritic.use_path_orientations: false
+
+      # ═══════════════════════════════════════════════
+      #  下坡模式 MPPI 参数（全局，所有直线共享）
+      #  下坡→上坡穿越时使用
+      downhill.time_steps: 80
+      downhill.model_dt: 0.04
+      downhill.batch_size: 1500
+      downhill.vx_std: 0.3
+      downhill.vy_std: 0.3
+      downhill.wz_std: 0.2
+      downhill.vx_max: 2.0
+      downhill.vy_max: 2.0
+      downhill.wz_max: 1.5
+      downhill.vx_min: -2.0
+      downhill.vy_min: -2.0
+      downhill.wz_min: -1.5
+      downhill.ax_max: 3.0
+      downhill.ay_max: 3.0
+      downhill.az_max: 3.0
+      downhill.ax_min: -3.0
+      downhill.ay_min: -3.0
+      downhill.az_min: -3.0
+      downhill.iteration_count: 1
+      downhill.prune_distance: 1.7
+      downhill.transform_tolerance: 0.1
+      downhill.temperature: 0.25
+      downhill.gamma: 0.015
+      downhill.motion_model: "Omni"
+      downhill.visualize: false
+      downhill.reset_period: 0.08
+
+      downhill.critics: ["ConstraintCritic", "CostCritic", "GoalCritic",
+                     "PathFollowCritic", "PathAlignCritic", "ObstaclesCritic"]
+
+      downhill.ConstraintCritic.enabled: true
+      downhill.ConstraintCritic.cost_power: 1
+      downhill.ConstraintCritic.cost_weight: 4.0
+
+      downhill.GoalCritic.enabled: true
+      downhill.GoalCritic.cost_power: 1
+      downhill.GoalCritic.cost_weight: 25.0
+      downhill.GoalCritic.threshold_to_consider: 4.0
+
+      downhill.ObstaclesCritic.enabled: true
+      downhill.ObstaclesCritic.cost_power: 1
+      downhill.ObstaclesCritic.repulsion_weight: 1.5
+      downhill.ObstaclesCritic.critical_weight: 20.0
+      downhill.ObstaclesCritic.consider_footprint: false
+      downhill.ObstaclesCritic.collision_cost: 10000.0
+      downhill.ObstaclesCritic.collision_margin_distance: 0.25
+      downhill.ObstaclesCritic.near_goal_distance: 0.5
+
+      downhill.CostCritic.enabled: true
+      downhill.CostCritic.cost_power: 1
+      downhill.CostCritic.cost_weight: 3.8
+      downhill.CostCritic.critical_cost: 253.0
+      downhill.CostCritic.consider_footprint: false
+      downhill.CostCritic.collision_cost: 1000000.0
+      downhill.CostCritic.near_goal_distance: 0.5
+      downhill.CostCritic.trajectory_point_step: 2
+
+      downhill.PathFollowCritic.enabled: true
+      downhill.PathFollowCritic.cost_power: 1
+      downhill.PathFollowCritic.cost_weight: 15.0
+      downhill.PathFollowCritic.offset_from_furthest: 5
+      downhill.PathFollowCritic.threshold_to_consider: 1.0
+
+      downhill.PathAlignCritic.enabled: true
+      downhill.PathAlignCritic.cost_power: 1
+      downhill.PathAlignCritic.cost_weight: 15.0
+      downhill.PathAlignCritic.max_path_occupancy_ratio: 0.05
+      downhill.PathAlignCritic.trajectory_point_step: 4
+      downhill.PathAlignCritic.threshold_to_consider: 0.8
+      downhill.PathAlignCritic.offset_from_furthest: 20
+      downhill.PathAlignCritic.use_path_orientations: false
 
 # ──────────────────────────────────────────────
 #  Planner Server: ElasticTracker only

@@ -14,6 +14,7 @@ add_compile_options(-Ofast -O3)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_util REQUIRED)
@@ -49,12 +50,14 @@ add_library(sentry_nav_bt_test_nodes SHARED
   src/referee/control_topic_publishers.cpp
   src/blackboard/defaults.cpp
   src/navigation/waypoint_loader.cpp
+  src/runtime_config.cpp
 )
 
 # 库的依赖
 ament_target_dependencies(sentry_nav_bt_test_nodes
   rclcpp
   rclcpp_action
+  rcl_interfaces
   behaviortree_cpp
   nav2_msgs
   nav2_util
@@ -90,6 +93,7 @@ target_link_libraries(navigate_bt_node
 ament_target_dependencies(navigate_bt_node
   rclcpp
   rclcpp_action
+  rcl_interfaces
   behaviortree_cpp
   nav2_msgs
   nav2_util
@@ -120,6 +124,7 @@ install(DIRECTORY
   config
   launch
   DESTINATION share/${PROJECT_NAME}
+  PATTERN "__pycache__" EXCLUDE
 )
 
 ament_export_include_directories(include)

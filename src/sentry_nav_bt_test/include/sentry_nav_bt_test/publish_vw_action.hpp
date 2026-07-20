@@ -29,6 +29,20 @@ private:
     bool has_published_{false};
 };
 
+// 复用控制话题发布器，向扫描模式话题发布一次指定状态。
+class PublishScanMode : public BT::SyncActionNode
+{
+public:
+    PublishScanMode(const std::string &name, const BT::NodeConfig &config);
+
+    static BT::PortsList providedPorts();
+    BT::NodeStatus tick() override;
+
+private:
+    rclcpp::Node::SharedPtr node_;
+    std::shared_ptr<ControlTopicPublishers> control_publishers_;
+};
+
 }  // namespace sentry_nav_bt_test
 
 #endif  // SENTRY_NAV_BT_TEST_PUBLISH_VW_ACTION_HPP_

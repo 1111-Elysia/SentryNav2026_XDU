@@ -265,6 +265,16 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /tracking_zone
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: AdaptiveLine
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /FollowPath/adaptive_line_visualization
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

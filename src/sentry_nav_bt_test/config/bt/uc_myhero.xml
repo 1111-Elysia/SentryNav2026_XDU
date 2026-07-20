@@ -39,7 +39,6 @@
               init_goal_name="init"
               prestart_message="[UC] 准备时间，持续发送 init(0,0) 导航目标"
               log_throttle_ms="2000"
-              controller_name="FollowPath"
               reach_threshold="0.10"
               nav_resend_interval="0.30"
               nav_response_timeout="0.80"
@@ -55,6 +54,7 @@
           <CheckCondition key_name="uc_initialized" comparison="eq" threshold="1"/>
           <Sequence name="初始化状态">
             <PrintNode message="[UC] 比赛开始，初始化局内状态"/>
+            <PublishScanMode enabled="false"/>
             <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
             <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
@@ -562,10 +562,6 @@
       <input_port name="success_condition_key"/>
       <input_port name="success_condition_comparison"/>
       <input_port name="success_condition_threshold"/>
-    </Action>
-    <Action ID="PublishControllerName" editable="true">
-      <input_port name="controller_name"/>
-      <input_port name="topic_name"/>
     </Action>
     <Condition ID="CheckGoalReached" editable="true">
       <input_port name="goal"/>

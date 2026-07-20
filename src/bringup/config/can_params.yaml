@@ -23,24 +23,6 @@ can_send:
     cmd_vel_timeout_s: 0.1
     vw_timeout_s: 0.1
 
-hurt_spin_vw_node:
-  ros__parameters:
-    # 输出给 can_send 的 vw 话题
-    vw_out_topic: "/vw"
-
-    # 裁判系统受击信息
-    hurt_data_topic: "/rm_referee/hurt_data"
-
-    # 触发条件：HurtData.hp_deduction_reason == hurt_reason_value
-    hurt_reason_value: 0
-
-    # 触发后持续输出 spin_vw，持续 spin_duration_s 秒
-    spin_vw: 0.7
-    spin_duration_s: 5.0
-
-    # 定时发布频率 (Hz)
-    publish_rate_hz: 50.0
-
 can_receive:
   ros__parameters:
     port: "can0"
@@ -48,6 +30,7 @@ can_receive:
     yaw_topic: "/target/yaw"
     pitch_topic: "/target/pitch"
     distance_topic: "/target/distance"
+    diankong_yaw_topic: "/diankong/yaw"
     publish_rate_hz: 50.0
 
 target_frame:

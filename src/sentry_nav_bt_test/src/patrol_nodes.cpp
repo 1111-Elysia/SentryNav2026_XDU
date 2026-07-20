@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <mutex>
 #include <sstream>
 
 namespace sentry_nav_bt_test
@@ -9,6 +11,29 @@ namespace sentry_nav_bt_test
 
 namespace
 {
+
+using ControllerPublisher = rclcpp::Publisher<std_msgs::msg::String>;
+
+ControllerPublisher::SharedPtr getSharedControllerPublisher(
+  const rclcpp::Node::SharedPtr &node, const std::string &topic_name)
+{
+  static std::mutex mutex;
+  static std::map<
+    const rclcpp::Node *,
+    std::map<std::string, std::weak_ptr<ControllerPublisher>>,
+    std::less<const rclcpp::Node *>> publishers;
+
+  std::lock_guard<std::mutex> lock(mutex);
+  auto &publisher_slot = publishers[node.get()][topic_name];
+  if (auto publisher = publisher_slot.lock()) {
+    return publisher;
+  }
+
+  const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  auto publisher = node->create_publisher<std_msgs::msg::String>(topic_name, qos);
+  publisher_slot = publisher;
+  return publisher;
+}
 
 std::string trim(const std::string &value)
 {
@@ -199,73 +224,76 @@ BT::NodeStatus CheckGoalReached::tick()
   return BT::NodeStatus::FAILURE;
 }
 
-PublishControllerName::PublishControllerName(
+UseTrackingPlanner::UseTrackingPlanner(
   const std::string &name, const BT::NodeConfig &config)
-: BT::SyncActionNode(name, config),
-  logger_(rclcpp::get_logger("PublishControllerName"))
+: BT::StatefulActionNode(name, config),
+  logger_(rclcpp::get_logger("UseTrackingPlanner"))
 {
   if (!config.blackboard || !config.blackboard->get("node", node_)) {
-    throw BT::RuntimeError("PublishControllerName: missing 'node' in blackboard");
+    throw BT::RuntimeError("UseTrackingPlanner: missing 'node' in blackboard");
   }
 }
 
-BT::PortsList PublishControllerName::providedPorts()
+BT::PortsList UseTrackingPlanner::providedPorts()
 {
   return {
-    BT::InputPort<std::string>("controller_name", "Nav2 controller plugin id"),
-    BT::InputPort<std::string>("topic_name", "/controller_name", "ControllerSelector topic"),
-    BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流")
+    BT::InputPort<std::string>(
+      "tracking_planner", "ElasticTracker", "追击使用的 Nav2 planner plugin id"),
+    BT::InputPort<std::string>(
+      "fallback_planner", "GridBased", "退出追击后恢复的 Nav2 planner plugin id"),
+    BT::InputPort<std::string>(
+      "topic_name", "/planner_name", "Nav2 PlannerSelector 话题")
   };
 }
 
-void PublishControllerName::ensurePublisher(const std::string &topic_name)
+bool UseTrackingPlanner::publishPlanner(const std::string &planner_name)
 {
-  if (publisher_ && publisher_topic_ == topic_name) {
-    return;
-  }
-
-  const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
-  publisher_ = node_->create_publisher<std_msgs::msg::String>(topic_name, qos);
-  publisher_topic_ = topic_name;
-}
-
-BT::NodeStatus PublishControllerName::tick()
-{
-  std::string controller_name;
-  if (!getInput("controller_name", controller_name) || trim(controller_name).empty()) {
-    RCLCPP_ERROR(logger_, "缺少必要参数 'controller_name'");
-    return BT::NodeStatus::FAILURE;
-  }
-  controller_name = trim(controller_name);
-
-  std::string topic_name = "/controller_name";
-  getInput("topic_name", topic_name);
-  if (trim(topic_name).empty()) {
-    topic_name = "/controller_name";
-  } else {
+  if (!publisher_) {
+    std::string topic_name = "/planner_name";
+    getInput("topic_name", topic_name);
     topic_name = trim(topic_name);
+    if (topic_name.empty()) {
+      topic_name = "/planner_name";
+    }
+    publisher_ = getSharedControllerPublisher(node_, topic_name);
   }
 
-  ensurePublisher(topic_name);
+  const std::string selected = trim(planner_name);
+  if (selected.empty()) {
+    RCLCPP_ERROR(logger_, "planner id 不能为空");
+    return false;
+  }
 
   std_msgs::msg::String msg;
-  msg.data = controller_name;
+  msg.data = selected;
   publisher_->publish(msg);
+  RCLCPP_INFO(logger_, "切换 Nav2 planner -> %s", selected.c_str());
+  return true;
+}
 
-  if (config().blackboard) {
-    config().blackboard->set("last_nav_controller_name", controller_name);
+BT::NodeStatus UseTrackingPlanner::onStart()
+{
+  if (!getInput("tracking_planner", tracking_planner_)) {
+    tracking_planner_ = "ElasticTracker";
+  }
+  if (!getInput("fallback_planner", fallback_planner_)) {
+    fallback_planner_ = "GridBased";
   }
 
-  int log_throttle_ms = 0;
-  getInput("log_throttle_ms", log_throttle_ms);
-  RCLCPP_INFO_THROTTLE(
-    logger_,
-    *node_->get_clock(),
-    log_throttle_ms,
-    "已发布 controller_name=%s -> %s",
-    controller_name.c_str(),
-    topic_name.c_str());
-  return BT::NodeStatus::SUCCESS;
+  return publishPlanner(tracking_planner_)
+    ? BT::NodeStatus::RUNNING
+    : BT::NodeStatus::FAILURE;
+}
+
+BT::NodeStatus UseTrackingPlanner::onRunning()
+{
+  return BT::NodeStatus::RUNNING;
+}
+
+void UseTrackingPlanner::onHalted()
+{
+  // target_frame_node 监听该切换，并在离开 ElasticTracker 时取消追击 goal。
+  publishPlanner(fallback_planner_);
 }
 
 }  // namespace sentry_nav_bt_test

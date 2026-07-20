@@ -46,22 +46,26 @@ private:
   bool last_pose_invalid_reported_{false};
 };
 
-class PublishControllerName : public BT::SyncActionNode
+// 运行期间启用追击规划器；被上级行为树抢占时恢复普通规划器。
+class UseTrackingPlanner : public BT::StatefulActionNode
 {
 public:
-  PublishControllerName(const std::string &name, const BT::NodeConfig &config);
+  UseTrackingPlanner(const std::string &name, const BT::NodeConfig &config);
 
   static BT::PortsList providedPorts();
 
-  BT::NodeStatus tick() override;
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
 
 private:
-  void ensurePublisher(const std::string &topic_name);
+  bool publishPlanner(const std::string &planner_name);
 
   rclcpp::Node::SharedPtr node_;
   rclcpp::Logger logger_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
-  std::string publisher_topic_;
+  std::string tracking_planner_;
+  std::string fallback_planner_;
 };
 
 }  // namespace sentry_nav_bt_test

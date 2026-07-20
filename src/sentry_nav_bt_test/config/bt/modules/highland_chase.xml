@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="HighlandChase">
+    <Sequence name="前往梯形高地后追击">
+      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="{chase_active_key}" value="0" type="int"/>
+      <PrintNode message="{highland_start_message}" throttle_ms="2000"/>
+      <GoalSelector goal_name="{highland_goal_name}" goal="{highland_goal}"/>
+
+      <ReactiveSequence name="前往梯形高地">
+        <MaintainSentryPosture mode="{highland_move_posture}"/>
+        <ReliableNavigateToPose
+          goal="{highland_goal}"
+          goal_name="{highland_goal_name}"
+          reach_threshold="{highland_reach_threshold}"
+          resend_interval="{nav_resend_interval}"
+          response_timeout="{nav_response_timeout}"
+          result_retry_delay="{nav_result_retry_delay}"/>
+      </ReactiveSequence>
+
+      <PrintNode message="{highland_arrived_message}"/>
+      <SetBlackboardValue key="{chase_active_key}" value="1" type="int"/>
+      <SubTree
+        ID="Chase"
+        chase_active_key="{chase_active_key}"
+        chase_message="{chase_message}"
+        chase_log_throttle_ms="2000"
+        chase_posture="{chase_posture}"
+        chase_planner="ElasticTracker"
+        chase_fallback_planner="GridBased"
+        chase_planner_topic="/planner_name"
+        _autoremap="true"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

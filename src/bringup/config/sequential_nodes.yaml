@@ -4,15 +4,15 @@ sequential_nodes:
     cmd: ["ros2", "launch", "livox_ros_driver2", "msg_MID360_launch.py"]
     wait_after: 0
 
-  - label: D435-Driver
-    type: execute
-    cmd: ["ros2", "run", "realsense2_camera", "realsense2_camera_node"]
-    wait_after: 0
+  # - label: D435-Driver
+  #   type: execute
+  #   cmd: ["ros2", "run", "realsense2_camera", "realsense2_camera_node"]
+  #   wait_after: 0
 
-  - label: D435-Pointcloud
-    type: execute
-    cmd: ["ros2", "launch", "d435_process_pcl", "depth_to_pcl.launch.py"]
-    wait_after: 0
+  # - label: D435-Pointcloud
+  #   type: execute
+  #   cmd: ["ros2", "launch", "d435_process_pcl", "depth_to_pcl.launch.py"]
+  #   wait_after: 0
 
   # - label: Odin-Driver
   #   type: execute
@@ -144,6 +144,14 @@ sequential_nodes:
       "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py"
     ]
     wait_after: 0
+
+  # - label: Sentry-Simple-Nav-GUI
+  #   type: execute
+  #   cmd: [
+  #     "ros2", "launch", "sentry_nav_bt_gui", "simple_nav_with_gui.launch.py"
+  #   ]
+  #   wait_after: 0
+
 
   # - label: Rosbag-Record
   #   type: execute

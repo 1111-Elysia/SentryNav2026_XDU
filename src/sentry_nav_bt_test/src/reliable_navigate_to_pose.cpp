@@ -30,6 +30,7 @@ BT::PortsList ReliableNavigateToPose::providedPorts()
     BT::InputPort<double>("resend_interval", 0.50, "重发最小间隔"),
     BT::InputPort<double>("response_timeout", 1.00, "等待 Nav2 接收超时"),
     BT::InputPort<double>("result_retry_delay", 0.50, "结果失败后的重试延迟"),
+    BT::InputPort<double>("cancel_confirm_timeout", 0.50, "等待取消确认的超时时间"),
     BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流"),
     BT::InputPort<std::string>("success_condition_key", "", "判定导航成功时需要满足的黑板键"),
     BT::InputPort<std::string>("success_condition_comparison", "eq", "成功条件比较符"),
@@ -89,7 +90,11 @@ void ReliableNavigateToPose::resetRuntimeState_()
   active_goal_id_ = ++seq_;
   active_send_id_ = 0;
   pending_cancel_reason_.clear();
+  awaiting_cancel_confirm_ = false;
+  success_pending_after_cancel_ = false;
+  wait_cancel_goal_id_ = 0;
   const auto clock_type = node_->get_clock()->get_clock_type();
+  cancel_wait_start_ = rclcpp::Time(0, 0, clock_type);
   last_send_time_ = rclcpp::Time(0, 0, clock_type);
   last_log_time_ = rclcpp::Time(0, 0, clock_type);
   last_pose_invalid_logged_ = false;
@@ -105,6 +110,7 @@ BT::NodeStatus ReliableNavigateToPose::onStart()
   getInput("resend_interval", resend_interval_);
   getInput("response_timeout", response_timeout_);
   getInput("result_retry_delay", result_retry_delay_);
+  getInput("cancel_confirm_timeout", cancel_confirm_timeout_);
   getInput("log_throttle_ms", log_throttle_ms_);
   getInput("success_condition_key", success_condition_key_);
   getInput("success_condition_comparison", success_condition_comparison_);
@@ -250,6 +256,11 @@ void ReliableNavigateToPose::sendGoal_()
   options.goal_response_callback =
     [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
     {
+      // 被等待确认的目标未被 Nav2 接收 → 服务器端无活跃目标，无需再等
+      if (!handle && awaiting_cancel_confirm_ && goal_id == wait_cancel_goal_id_) {
+        awaiting_cancel_confirm_ = false;
+      }
+
       if (goal_id != active_goal_id_) {
         if (handle) {
           tryCancelGoal_(handle, "stale_goal_response");
@@ -324,6 +335,13 @@ void ReliableNavigateToPose::sendGoal_()
   options.result_callback =
     [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
     {
+      // 被等待确认的目标到达任意终态（SUCCEEDED/ABORTED/CANCELED）即视为
+      // Nav2 端已终止，解除取消确认门控。必须放在过期守卫之前：
+      // 目标切换路径会先 resetRuntimeState_() 更新 active_goal_id_
+      if (awaiting_cancel_confirm_ && goal_id == wait_cancel_goal_id_) {
+        awaiting_cancel_confirm_ = false;
+      }
+
       if (goal_id != active_goal_id_) {
         RCLCPP_DEBUG(
           node_->get_logger(),
@@ -503,8 +521,40 @@ void ReliableNavigateToPose::cancelGoal_(const char *reason)
   state_ = InternalState::IDLE;
 }
 
+void ReliableNavigateToPose::beginCancelWait_(uint64_t goal_id, bool success_after)
+{
+  awaiting_cancel_confirm_ = true;
+  success_pending_after_cancel_ = success_after;
+  wait_cancel_goal_id_ = goal_id;
+  cancel_wait_start_ = node_->now();
+}
+
 BT::NodeStatus ReliableNavigateToPose::onRunning()
 {
+  // ── 取消确认门控：上一目标的取消尚未被 Nav2 确认前不做任何事 ──
+  // 若此时就放行（返回 SUCCESS / 重发新目标），下一目标会在 bt_navigator
+  // 处成为 pending goal，而 SimpleActionServer 在存在 pending goal 时
+  // 会屏蔽当前目标的取消请求 → 行为树不重启、旧路径终点被判定到达 → 跳点
+  if (awaiting_cancel_confirm_) {
+    const auto wait_now = node_->now();
+    if ((wait_now - cancel_wait_start_).seconds() < cancel_confirm_timeout_) {
+      return BT::NodeStatus::RUNNING;
+    }
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "[ReliableNavigate] 等待取消确认超时(%.2fs)%s%s%s, 不再等待",
+      cancel_confirm_timeout_,
+      goal_name_.empty() ? "" : "[",
+      goal_name_.empty() ? "" : goal_name_.c_str(),
+      goal_name_.empty() ? "" : "]");
+    awaiting_cancel_confirm_ = false;
+  }
+
+  if (success_pending_after_cancel_) {
+    success_pending_after_cancel_ = false;
+    return BT::NodeStatus::SUCCESS;
+  }
+
   geometry_msgs::msg::PoseStamped previous_goal = current_goal_;
   const std::string previous_goal_name = goal_name_;
   bool goal_changed = false;
@@ -523,15 +573,29 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
       goal_name_.empty() ? "<unnamed>" : goal_name_.c_str(),
       current_goal_.pose.position.x,
       current_goal_.pose.position.y);
+    const bool inflight = goal_handle_ || state_ == InternalState::SENDING;
     cancelGoal_("goal_updated");
+    const uint64_t canceled_id = canceled_goal_id_;
     resetRuntimeState_();
+    if (inflight) {
+      // 等旧目标在 Nav2 端确认终止后，再由 IDLE 分支发送新目标
+      beginCancelWait_(canceled_id, false);
+      return BT::NodeStatus::RUNNING;
+    }
   }
 
   const auto now = node_->now();
   const GoalStatus goal_status = evaluateGoalStatus_();
   if (goal_status == GoalStatus::REACHED) {
+    const bool inflight = goal_handle_ || state_ == InternalState::SENDING;
     if (goal_handle_ || state_ != InternalState::IDLE || last_send_time_.nanoseconds() != 0) {
       cancelGoal_("goal_reached_locally");
+    }
+    if (inflight) {
+      // 取消已发出但未确认：等 Nav2 端终止后再返回 SUCCESS，
+      // 否则父序列会立刻发下一目标，与本次取消交叠触发跳点
+      beginCancelWait_(canceled_goal_id_, true);
+      return BT::NodeStatus::RUNNING;
     }
     return BT::NodeStatus::SUCCESS;
   }

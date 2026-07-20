@@ -30,6 +30,7 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("ul_center_ready", 0);
     bb->set("uc_supply_active", 0);
     bb->set("uc_outpost_active", 0);
+    bb->set("uc_chase_active", 0);
     bb->set("uc_normal_posture", 3);
     bb->set("power_management_shooter_output", true);
     bb->set("power_heat_data_received", false);
@@ -63,6 +64,14 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("hurt_armor", 0);
     bb->set("is_under_attack", 0);
     bb->set("in_rune_phase", 0);
+    bb->set("simple_nav_initialized", 0);
+    bb->set("simple_nav_completed", 0);
+    bb->set("runtime_effective_goal_name", std::string("init"));
+    bb->set("runtime_move_posture", 3);
+    bb->set("runtime_wait_posture", 1);
+    bb->set("runtime_reach_threshold", 0.25);
+    bb->set("runtime_wait_time_threshold", 5.0);
+    bb->set("runtime_use_custom_pose", false);
 }
 
 }  // namespace sentry_nav_bt_test::blackboard

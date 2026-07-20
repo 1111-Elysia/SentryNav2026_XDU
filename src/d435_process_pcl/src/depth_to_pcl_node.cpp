@@ -33,6 +33,7 @@ public:
         this->declare_parameter<std::string>("camera_info_topic", "/camera/camera/depth/camera_info");
         this->declare_parameter<std::string>("frame_id", "d435_frame");
         this->declare_parameter<int>("step", 2);
+        this->declare_parameter<int>("top_margin", 30);
         this->declare_parameter<float>("min_distance", 0.2f);
         this->declare_parameter<float>("max_distance", 3.0f);
 
@@ -47,6 +48,7 @@ public:
         this->get_parameter("camera_info_topic", camera_info_topic_);
         this->get_parameter("frame_id", frame_id_);
         this->get_parameter("step", step_);
+        this->get_parameter("top_margin", top_margin_);
         this->get_parameter("min_distance", min_distance_);
         this->get_parameter("max_distance", max_distance_);
         this->get_parameter("median_kernel_size", median_kernel_size_);
@@ -129,7 +131,11 @@ private:
         // ===== 1. Spatial Filter (空间滤波，去散粒噪点) =====
         cv::Mat depth_filtered;
         if (depth.type() == CV_16U || depth.type() == CV_8U) {
+            // 记录中值滤波前的无效像素 (值为0)
+            // 防止 medianBlur 将有效深度扩散到无效区域产生虚假点云
+            cv::Mat invalid_mask = (depth == 0);
             cv::medianBlur(depth, depth_filtered, median_kernel_size_);
+            depth_filtered.setTo(0, invalid_mask);  // 恢复无效像素为0
         } else {
             depth_filtered = depth;
         }
@@ -191,9 +197,14 @@ private:
 
         cloud->points.reserve(rows * cols / (step_ * step_));
 
-        // ===== 2. projection =====
-        for (int v = 0; v < rows; v += step_) {
-            for (int u = 0; u < cols; u += step_) {
+        // ===== 2. projection (跳过顶部边缘，避免D435上视场角IR内反射伪影) =====
+        int v_start = std::max(0, top_margin_);
+        int v_end = rows;
+        int u_start = 0;
+        int u_end = cols;
+
+        for (int v = v_start; v < v_end; v += step_) {
+            for (int u = u_start; u < u_end; u += step_) {
 
                 float d = current_float.at<float>(v, u);
 
@@ -249,6 +260,7 @@ private:
     std::string camera_info_topic_;
     std::string frame_id_;
     int step_;
+    int top_margin_;
     float min_distance_;
     float max_distance_;
     int median_kernel_size_;

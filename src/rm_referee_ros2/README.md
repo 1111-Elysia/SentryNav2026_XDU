@@ -69,13 +69,23 @@ git clone --recursive https://github.com/XDU-IRobot/rm_referee_ros2.git
 
 `referee_replay_node` 可以按录制时间间隔读取 `record_raw_data` 生成的文件，复用串口节点的解包和话题发布逻辑。回放节点不会打开串口，也不会创建 `/rm_referee/tx` 服务。
 
+| 参数名                | 说明                                                                  | 默认值 |
+| --------------------- | --------------------------------------------------------------------- | ------ |
+| `normal_data_file`    | 常规链路原始数据文件；留空时不回放该链路                              | `""` |
+| `vt_data_file`        | 图传链路原始数据文件；留空时不回放该链路                              | `""` |
+| `replay_rate`         | 回放倍速；`1.0` 为原速，`2.0` 为两倍速，`0.0` 表示不等待录制时间间隔 | `1.0`  |
+| `start_game_progress` | 从指定 `game_status.game_progress` 首次出现的位置开始回放             | `-1`   |
+
+`start_game_progress` 设置为 `-1` 时不进行阶段定位，从文件开头回放；设置为 `0` 到 `5` 时，节点会先扫描常规链路文件，并从目标阶段首次出现的位置开始回放。如果文件中不存在指定阶段，节点会输出错误信息并停止该文件的回放。
+
+例如，从比赛进行阶段（`game_progress=4`）开始回放：
+
 ```bash
 ros2 launch rm_referee referee_replay.launch.py \
   normal_data_file:=/tmp/rm_referee_data/normal_raw_data_YYYYMMDD_HHMMSS.bin \
-  replay_rate:=1.0
+  replay_rate:=1.0 \
+  start_game_progress:=4
 ```
-
-`normal_data_file` 和 `vt_data_file` 分别指定常规链路和图传链路的录制文件。`replay_rate` 为 `1.0` 时按原速回放，为 `2.0` 时两倍速回放，为 `0.0` 时不等待录制时间间隔。
 
 ### 话题列表
 

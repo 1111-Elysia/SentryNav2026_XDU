@@ -34,7 +34,13 @@ public:
 
     this->declare_parameter<double>("publish_rate_hz", 30.0);
 
+    // 下位机实时 yaw 订阅，用于零飘补偿
+    this->declare_parameter<std::string>("diankong_yaw_topic", "/diankong/yaw");
+    this->declare_parameter<double>("diankong_yaw_timeout_s", 0.5);
+
     target_yaw_topic_ = this->get_parameter("target_yaw_topic").as_string();
+    std::string diankong_yaw_topic = this->get_parameter("diankong_yaw_topic").as_string();
+    diankong_yaw_timeout_s_ = this->get_parameter("diankong_yaw_timeout_s").as_double();
     map_frame_ = this->get_parameter("map_frame").as_string();
     base_frame_ = this->get_parameter("base_frame").as_string();
 
@@ -53,6 +59,14 @@ public:
       "/yaw_controller",
       10,
       std::bind(&VyawTfYawControllerNode::onYawEnable, this, std::placeholders::_1));
+
+    diankong_yaw_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+      diankong_yaw_topic, 10,
+      [this](const std_msgs::msg::Float32::SharedPtr m) {
+        diankong_yaw_deg_ = m->data;
+        last_diankong_yaw_time_ = this->now();
+        diankong_yaw_received_ = true;
+      });
 
     const double freq = std::max(publish_rate_hz, 1.0);
     const auto period = std::chrono::duration<double>(1.0 / freq);
@@ -78,6 +92,10 @@ public:
     RCLCPP_INFO(
       this->get_logger(),
       "Waiting for /yaw_controller msg (0=NLJG, 1=outpost) to start.");
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Subscribing diankong_yaw on %s for zero-drift compensation",
+      diankong_yaw_topic.c_str());
   }
 
   ~VyawTfYawControllerNode() override
@@ -91,6 +109,14 @@ private:
   static double rad2deg(const double rad)
   {
     return rad * 180.0 / M_PI;
+  }
+
+  // 归一化到 (-180, 180]
+  static double normalizeDeg(const double deg)
+  {
+    double d = std::fmod(deg + 180.0, 360.0);
+    if (d <= 0.0) d += 360.0;
+    return d - 180.0;
   }
 
   void publishTargetYaw(const double target_yaw_deg)
@@ -130,8 +156,9 @@ private:
 
   double computeTargetYawDeg(const double base_x_map, const double base_y_map)
   {
-    // atan2 直接给出地图坐标系下的绝对朝向角，区间 [-π, π]
-    const double target_yaw_rad = std::atan2(target_y_ - base_y_map, target_x_ - base_x_map);
+    // 以目标为起点、车体为终点的向量 (车体 - 目标) 在 map 系下的方向角
+    // atan2 区间 (-π, π]，俯视逆时针为正
+    const double target_yaw_rad = std::atan2(base_y_map - target_y_, base_x_map - target_x_);
     return rad2deg(target_yaw_rad);
   }
 
@@ -175,8 +202,31 @@ private:
         target_yaw_deg_);
     }
 
-    // 持续发送锁定的目标角度，直到下次 /yaw_controller 触发
-    publishTargetYaw(target_yaw_deg_);
+    // ── 零飘补偿：下位机 yaw − 导航 TF yaw ，每个周期重算 ──
+    double yaw_offset_deg = 0.0;
+    const auto now = this->now();
+    const bool diankong_fresh =
+      diankong_yaw_received_ &&
+      (now - last_diankong_yaw_time_).seconds() <= diankong_yaw_timeout_s_;
+
+    if (diankong_fresh) {
+      yaw_offset_deg = normalizeDeg(diankong_yaw_deg_ - rad2deg(current_yaw_rad));
+    } else if (diankong_yaw_received_) {
+      // 下位机 yaw 超时，保持最后已知偏移
+      yaw_offset_deg = normalizeDeg(diankong_yaw_deg_ - rad2deg(current_yaw_rad));
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 2000,
+        "diankong_yaw 超时(%.2fs)，保持最后偏移",
+        diankong_yaw_timeout_s_);
+    } else {
+      RCLCPP_INFO_THROTTLE(
+        this->get_logger(), *this->get_clock(), 5000,
+        "尚未收到 diankong_yaw，暂不补偿零飘");
+    }
+
+    // 持续发送补偿后的目标角度，直到下次 /yaw_controller 触发
+    const double compensated_yaw = normalizeDeg(target_yaw_deg_ + yaw_offset_deg);
+    publishTargetYaw(compensated_yaw);
   }
 
 private:
@@ -202,7 +252,13 @@ private:
 
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr target_yaw_pub_;
   rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr yaw_enable_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr diankong_yaw_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
+
+  float diankong_yaw_deg_ = 0.0f;
+  bool diankong_yaw_received_ = false;
+  rclcpp::Time last_diankong_yaw_time_{0, 0, RCL_ROS_TIME};
+  double diankong_yaw_timeout_s_ = 0.5;
 };
 
 int main(int argc, char ** argv)

@@ -17,4 +17,11 @@ def generate_launch_description():
             output='screen',
             parameters=[config_file],
         ),
+        Node(
+            package='ground_pos_relay',
+            executable='teammate_frame_converter_node',
+            name='teammate_frame_converter_node',
+            output='screen',
+            parameters=[config_file],
+        ),
     ])
