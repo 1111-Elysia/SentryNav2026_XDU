@@ -1,0 +1,14 @@
+<class_libraries>
+  <library path="teammate_cost_layer">
+    <class name="teammate_cost_layer::TeammateCostLayer"
+           type="teammate_cost_layer::TeammateCostLayer"
+           base_class_type="nav2_costmap_2d::Layer">
+      <description>
+        Adds circular gradient cost regions around teammate robot positions
+        to prevent collision with friendly units. Subscribes to teammate
+        positions (GroundRobotPosition) and draws core lethal zone + decay
+        ring for MPPI gradient-aware avoidance.
+      </description>
+    </class>
+  </library>
+</class_libraries>

@@ -479,7 +479,7 @@ local_costmap:
       resolution: 0.05
       robot_radius: 0.1
       footprint: "[ [0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1] ]"
-      plugins: ["static_layer","stvl_voxel_layer","line_crossing_layer","inflation_layer"]
+      plugins: ["static_layer","stvl_voxel_layer","line_crossing_layer","teammate_cost_layer","inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -573,6 +573,20 @@ local_costmap:
         h4.point_2: [3.327, 0.566]
         h5.point_1: [3.327, 0.566]
         h5.point_2: [3.653, 0.000]
+      teammate_cost_layer:
+        plugin: "teammate_cost_layer::TeammateCostLayer"
+        enabled: true
+        teammate_topic: "/ground_pos_relay/teammate_pos_odom"
+        enable_hero: true
+        enable_engineer: true
+        enable_standard_3: false
+        enable_standard_4: false
+        enable_sentry: true
+        core_radius: 0.5
+        decay_radius: 0.5
+        core_cost_value: 254
+        gradient_power: 1.5
+        teammate_timeout: 2.0
       always_send_full_costmap: False
 
 
@@ -591,7 +605,7 @@ global_costmap:
       footprint: "[ [0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1] ]"
       resolution: 0.04
       track_unknown_space: true
-      plugins: ["static_layer","stvl_voxel_layer","line_crossing_layer","inflation_layer"]
+      plugins: ["static_layer","stvl_voxel_layer","line_crossing_layer","teammate_cost_layer","inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -686,6 +700,20 @@ global_costmap:
         h4.point_2: [3.327, 0.566]
         h5.point_1: [3.327, 0.566]
         h5.point_2: [3.653, 0.000]
+      teammate_cost_layer:
+        plugin: "teammate_cost_layer::TeammateCostLayer"
+        enabled: true
+        teammate_topic: "/ground_pos_relay/teammate_pos_odom"
+        enable_hero: true
+        enable_engineer: true
+        enable_standard_3: false
+        enable_standard_4: false
+        enable_sentry: true
+        core_radius: 0.5
+        decay_radius: 0.5
+        core_cost_value: 254
+        gradient_power: 1.5
+        teammate_timeout: 2.0
       always_send_full_costmap: False
 
 map_server:

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"
+  schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>teammate_cost_layer</name>
+  <version>0.1.0</version>
+  <description>
+    Nav2 costmap layer that adds obstacle costs around teammate robot
+    positions, preventing the robot from colliding with friendly units.
+    Subscribes to teammate positions in odom frame and draws circular
+    gradient cost regions.
+  </description>
+  <license>MIT</license>
+  <maintainer email="qza36@outlook.com">ZhiangQi</maintainer>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>nav2_costmap_2d</depend>
+  <depend>nav2_util</depend>
+  <depend>pluginlib</depend>
+  <depend>rm_referee_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
