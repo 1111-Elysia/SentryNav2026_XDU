@@ -14,7 +14,7 @@
             goal="{random_goal}"
             goal_name="{random_goal_name}"/>
           <ReactiveSequence name="随机巡逻_移动到点">
-            <MaintainSentryPosture mode="3"/>
+            <MaintainSentryPosture mode="{random_patrol_posture}"/>
             <ReliableNavigateToPose
               goal="{random_goal}"
               goal_name="{random_goal_name}"
@@ -24,7 +24,7 @@
               result_retry_delay="{nav_result_retry_delay}"/>
           </ReactiveSequence>
           <ReactiveSequence name="随机巡逻_到点停留">
-            <MaintainSentryPosture mode="3"/>
+            <MaintainSentryPosture mode="{random_patrol_posture}"/>
             <Wait wait_duration="{random_patrol_wait_duration}"/>
           </ReactiveSequence>
         </Sequence>

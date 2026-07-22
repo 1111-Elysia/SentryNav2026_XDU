@@ -32,6 +32,7 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("uc_outpost_active", 0);
     bb->set("uc_chase_active", 0);
     bb->set("uc_normal_posture", 3);
+    bb->set("random_patrol_posture", 3);
     bb->set("power_management_shooter_output", true);
     bb->set("power_heat_data_received", false);
     bb->set("shooter_17mm_barrel_heat", 0);
