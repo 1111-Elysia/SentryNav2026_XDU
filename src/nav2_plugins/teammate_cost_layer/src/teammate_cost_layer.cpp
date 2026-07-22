@@ -52,14 +52,22 @@ void TeammateCostLayer::onInitialize()
     node, name_ + ".enable_sentry", rclcpp::ParameterValue(true));
   enable_sentry_ = node->get_parameter(name_ + ".enable_sentry").as_bool();
 
-  // 代价区域参数
+  // 代价区域参数（带合法性校验）
   nav2_util::declare_parameter_if_not_declared(
     node, name_ + ".core_radius", rclcpp::ParameterValue(0.5));
   core_radius_ = node->get_parameter(name_ + ".core_radius").as_double();
+  if (core_radius_ < 0.0) {
+    RCLCPP_WARN(logger_, "core_radius=%.2f < 0, clamping to 0.0", core_radius_);
+    core_radius_ = 0.0;
+  }
 
   nav2_util::declare_parameter_if_not_declared(
     node, name_ + ".decay_radius", rclcpp::ParameterValue(0.5));
   decay_radius_ = node->get_parameter(name_ + ".decay_radius").as_double();
+  if (decay_radius_ <= 0.0) {
+    RCLCPP_WARN(logger_, "decay_radius=%.2f <= 0, clamping to 0.01 (avoids div-by-zero)", decay_radius_);
+    decay_radius_ = 0.01;
+  }
 
   nav2_util::declare_parameter_if_not_declared(
     node, name_ + ".core_cost_value", rclcpp::ParameterValue(254));
@@ -98,7 +106,19 @@ void TeammateCostLayer::onInitialize()
 void TeammateCostLayer::teammateCallback(
   const rm_referee_msgs::msg::GroundRobotPosition::SharedPtr msg)
 {
+  // 防御：检查关键字段是否为 NaN（上游数据异常时保护代价地图）
+  if (std::isnan(msg->hero_x) || std::isnan(msg->hero_y) ||
+      std::isnan(msg->engineer_x) || std::isnan(msg->engineer_y)) {
+    RCLCPP_WARN_ONCE(logger_, "Received NaN in teammate position, ignoring message");
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(positions_mutex_);
+
+  auto node = node_.lock();
+  if (!node) {
+    return;  // 节点已销毁，放弃本次数据
+  }
 
   positions_.hero_x       = msg->hero_x;
   positions_.hero_y       = msg->hero_y;
@@ -110,13 +130,13 @@ void TeammateCostLayer::teammateCallback(
   positions_.standard_4_y = msg->standard_4_y;
   positions_.sentry_x     = msg->reserved;
   positions_.sentry_y     = msg->reserved_2;
-  positions_.stamp        = node_.lock()->now();
+  positions_.stamp        = node->now();
   positions_.valid        = true;
 }
 
 bool TeammateCostLayer::isDataValid() const
 {
-  std::lock_guard<std::mutex> lock(positions_mutex_);
+  // 注意：调用者必须持有 positions_mutex_
   if (!positions_.valid) {
     return false;
   }
@@ -137,10 +157,9 @@ void TeammateCostLayer::updateBounds(
   }
 
   std::lock_guard<std::mutex> lock(positions_mutex_);
-  if (!isDataValid()) {
-    return;
-  }
 
+  // 即使数据超时也扩展边界 —— 否则滚动窗口不会覆盖旧的代价区域，
+  // 导致残留代价无法被后续图层更新自然清除
   const double total_radius = core_radius_ + decay_radius_;
 
   // 扩展每个启用队友的包围盒

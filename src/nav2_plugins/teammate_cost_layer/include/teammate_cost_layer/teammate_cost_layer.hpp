@@ -80,6 +80,7 @@ private:
     double tx, double ty);
 
   /// 判断队友数据是否有效（未超时）
+  /// @pre 调用者必须持有 positions_mutex_
   bool isDataValid() const;
 
   // ── 队友位置缓存 ──
