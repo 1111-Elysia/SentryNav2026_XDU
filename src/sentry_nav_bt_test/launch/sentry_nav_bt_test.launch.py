@@ -14,8 +14,8 @@ def generate_launch_description():
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_fortress.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_myhero.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_patrol.xml')  
-    bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_chase.xml')
-    # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'train_rune.xml')
+    # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_chase.xml')
+    bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'train.xml')
     bt_subtree_dir = os.path.join(pkg_dir, 'config', 'bt', 'modules')
 
     # 路径点 JSON

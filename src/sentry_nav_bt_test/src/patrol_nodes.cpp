@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -222,6 +223,83 @@ BT::NodeStatus CheckGoalReached::tick()
 
   last_reported_reached_ = false;
   return BT::NodeStatus::FAILURE;
+}
+
+TargetDetected::TargetDetected(
+  const std::string &name, const BT::NodeConfig &config)
+: BT::ConditionNode(name, config),
+  logger_(rclcpp::get_logger("TargetDetected"))
+{
+  if (!config.blackboard || !config.blackboard->get("node", node_)) {
+    throw BT::RuntimeError("TargetDetected: missing 'node' in blackboard");
+  }
+}
+
+BT::PortsList TargetDetected::providedPorts()
+{
+  return {
+    BT::InputPort<std::string>(
+      "topic_name", "/target/distance", "目标距离话题"),
+    BT::InputPort<double>(
+      "lost_timeout", 1.0, "最后一次有效目标观测后的保持时间（秒）")
+  };
+}
+
+void TargetDetected::ensureSubscription()
+{
+  if (subscription_) {
+    return;
+  }
+
+  std::string topic_name = "/target/distance";
+  getInput("topic_name", topic_name);
+  topic_name = trim(topic_name);
+  if (topic_name.empty()) {
+    topic_name = "/target/distance";
+  }
+
+  subscription_ = node_->create_subscription<std_msgs::msg::Float32>(
+    topic_name,
+    10,
+    std::bind(&TargetDetected::distanceCallback, this, std::placeholders::_1));
+}
+
+void TargetDetected::distanceCallback(const std_msgs::msg::Float32::SharedPtr msg)
+{
+  // 与 target_frame_node 保持一致：距离 <= 0 表示无有效目标。
+  if (!std::isfinite(msg->data) || msg->data <= 0.0F) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  last_valid_time_ = node_->now();
+  has_valid_observation_ = true;
+}
+
+BT::NodeStatus TargetDetected::tick()
+{
+  ensureSubscription();
+
+  double lost_timeout = 1.0;
+  getInput("lost_timeout", lost_timeout);
+  lost_timeout = std::max(0.0, lost_timeout);
+
+  bool detected = false;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    detected = has_valid_observation_ &&
+      (node_->now() - last_valid_time_).seconds() <= lost_timeout;
+  }
+
+  if (detected != last_reported_detected_) {
+    RCLCPP_INFO(
+      logger_, "%s目标，%s追击模式",
+      detected ? "检测到" : "持续未检测到",
+      detected ? "允许进入/保持" : "退出");
+    last_reported_detected_ = detected;
+  }
+
+  return detected ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
 }
 
 UseTrackingPlanner::UseTrackingPlanner(
