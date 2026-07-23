@@ -38,7 +38,7 @@
         <ReliableNavigateToPose
           goal="{rune_goal}"
           goal_name="{rune_goal_name}"
-          reach_threshold="0.35"
+          reach_threshold="0.15"
           resend_interval="0.30"
           response_timeout="0.80"
           result_retry_delay="0.30"/>

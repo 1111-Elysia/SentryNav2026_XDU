@@ -16,8 +16,8 @@
                 <SubTree
                   ID="PointHold"
                   point_hold_goal_name="myhero"
-                  point_hold_arrive_threshold="0.35"
-                  point_hold_exit_threshold="0.40"
+                  point_hold_arrive_threshold="0.25"
+                  point_hold_exit_threshold="0.30"
                   point_hold_move_posture="1"
                   point_hold_posture="1"
                   point_hold_wait_duration="0.5"

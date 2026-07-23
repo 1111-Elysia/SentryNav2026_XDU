@@ -14,13 +14,13 @@
       <PrintNode
         message="{chase_message}"
         throttle_ms="{chase_log_throttle_ms}"/>
-      <Parallel name="维持追击" success_count="-1" failure_count="1">
+      <ReactiveSequence name="维持追击">
         <MaintainSentryPosture mode="{chase_posture}"/>
         <UseTrackingPlanner
           tracking_planner="{chase_planner}"
           fallback_planner="{chase_fallback_planner}"
           topic_name="{chase_planner_topic}"/>
-      </Parallel>
+      </ReactiveSequence>
     </ReactiveSequence>
   </BehaviorTree>
 </root>

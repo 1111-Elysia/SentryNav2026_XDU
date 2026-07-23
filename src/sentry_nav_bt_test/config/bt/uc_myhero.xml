@@ -125,22 +125,18 @@
             nav_result_retry_delay="0.30"
             _autoremap="1"/>
 
-          <Sequence name="作战模式">
+          <ReactiveSequence name="作战模式">
             <CheckCondition key_name="uc_supply_active" comparison="eq" threshold="0"/>
             <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
-            <Parallel success_count="-1" failure_count="1">
-              <Sequence name="普通姿态目标更新">
-                <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
-                <Fallback name="普通姿态目标选择">
-                  <Sequence name="17mm热量维持_切进攻姿态">
-                    <CheckCondition key_name="shooter_17mm_heat_firing" comparison="eq" threshold="1"/>
-                    <SetBlackboardValue key="uc_normal_posture" value="1" type="int"/>
-                  </Sequence>
-                  <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
-                </Fallback>
+            <Fallback name="普通姿态目标选择">
+              <Sequence name="17mm热量维持_切进攻姿态">
+                <CheckCondition key_name="shooter_17mm_heat_firing" comparison="eq" threshold="1"/>
+                <SetBlackboardValue key="uc_normal_posture" value="1" type="int"/>
               </Sequence>
+              <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
+            </Fallback>
 
-              <ReactiveFallback name="全场策略机">
+            <ReactiveFallback name="全场策略机">
                 <Sequence name="前期_小符_Phase1">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="390"/>
                   <SubTree
@@ -221,7 +217,7 @@
                     point_hold_goal_name="myhero"
                     point_hold_arrive_threshold="0.25"
                     point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
+                    point_hold_move_posture="3"
                     point_hold_posture="1"
                     point_hold_wait_duration="0.5"
                     point_hold_log_throttle_ms="10000"
@@ -267,7 +263,7 @@
                     point_hold_goal_name="myhero"
                     point_hold_arrive_threshold="0.25"
                     point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
+                    point_hold_move_posture="3"
                     point_hold_posture="1"
                     point_hold_wait_duration="0.5"
                     point_hold_log_throttle_ms="10000"
@@ -313,7 +309,7 @@
                     point_hold_goal_name="myhero"
                     point_hold_arrive_threshold="0.25"
                     point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
+                    point_hold_move_posture="3"
                     point_hold_posture="1"
                     point_hold_wait_duration="0.5"
                     point_hold_log_throttle_ms="10000"
@@ -358,7 +354,7 @@
                     point_hold_goal_name="myhero"
                     point_hold_arrive_threshold="0.25"
                     point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
+                    point_hold_move_posture="3"
                     point_hold_posture="1"
                     point_hold_wait_duration="0.5"
                     point_hold_log_throttle_ms="10000"
@@ -370,18 +366,8 @@
                     nav_result_retry_delay="0.30"
                     _autoremap="1"/>
                 </ReactiveSequence>
-              </ReactiveFallback>
-
-              <ForceSuccess>
-                <Sequence name="普通姿态维持">
-                  <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
-                  <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
-                  <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
-                  <MaintainSentryPosture mode="{uc_normal_posture}"/>
-                </Sequence>
-              </ForceSuccess>
-            </Parallel>
-          </Sequence>
+            </ReactiveFallback>
+          </ReactiveSequence>
         </ReactiveFallback>
       </ReactiveSequence>
     </Fallback>
