@@ -14,6 +14,7 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("server_timeout", std::chrono::milliseconds(1000));
     bb->set("initial_pose_received", false);
     bb->set("game_status_received", false);
+    bb->set("robot_id", uint8_t{0});
     bb->set("game_status_connected_logged", 0);
     bb->set("last_referee_tx_ok", false);
     bb->set("last_posture_request_target", -1);
@@ -31,6 +32,9 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("uc_supply_active", 0);
     bb->set("uc_outpost_active", 0);
     bb->set("uc_chase_active", 0);
+    bb->set("train_chase_active", 0);
+    bb->set("train_chase_started", 0);
+    bb->set("train_vw_active", 0);
     bb->set("uc_normal_posture", 3);
     bb->set("random_patrol_posture", 3);
     bb->set("power_management_shooter_output", true);
@@ -52,6 +56,12 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("outpost_gain_point_occupancy_status", 0);
     bb->set("base_gain_point_occupied", 0);
     bb->set("map_command_received", false);
+    bb->set("ground_robot_position_received", false);
+    bb->set("hero_x", 0.0);
+    bb->set("hero_y", 0.0);
+    bb->set("hero_position_fresh", 0);
+    bb->set("hero_highland_inside", 0);
+    bb->set("hero_highland_elapsed_ms", 0);
     bb->set("sentry_info_received", false);
     bb->set("ul_pose_stale_timeout_s", 0.50);
     bb->set("waypoint_now_valid", false);
