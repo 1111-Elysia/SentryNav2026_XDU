@@ -13,6 +13,8 @@ class MatchControlTiming:
         self.big_rune_chances = 0
         self.last_remain_seconds = -1
         self.rune_window_timers = {"small": 0, "big": 0}
+        self._set_rune_status("small", 0)
+        self._set_rune_status("big", 0)
         self.supply_projectile_claimed = 0
         self.gold_income_claimed = set()
         self.sentry_posture.reset()

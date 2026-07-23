@@ -1,8 +1,9 @@
 #include "sentry_nav_bt_test/reliable_navigate_to_pose.hpp"
 
 #include <cmath>
-#include <exception>
+#include <limits>
 
+#include "navigation_transition_gate.hpp"
 #include "sentry_nav_bt_test/blackboard_utils.hpp"
 
 namespace sentry_nav_bt_test
@@ -28,9 +29,9 @@ BT::PortsList ReliableNavigateToPose::providedPorts()
     BT::InputPort<std::string>("goal_name", "", "目标点名称，用于日志"),
     BT::InputPort<double>("reach_threshold", 0.30, "到点距离阈值"),
     BT::InputPort<double>("resend_interval", 0.50, "重发最小间隔"),
-    BT::InputPort<double>("response_timeout", 1.00, "等待 Nav2 接收超时"),
+    BT::InputPort<double>("response_timeout", 1.00, "等待 Nav2 接收的告警阈值；超出后继续等待且不重发"),
     BT::InputPort<double>("result_retry_delay", 0.50, "结果失败后的重试延迟"),
-    BT::InputPort<double>("cancel_confirm_timeout", 0.50, "等待取消确认的超时时间"),
+    BT::InputPort<double>("cancel_confirm_timeout", 1.50, "等待取消确认的超时时间"),
     BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流"),
     BT::InputPort<std::string>("success_condition_key", "", "判定导航成功时需要满足的黑板键"),
     BT::InputPort<std::string>("success_condition_comparison", "eq", "成功条件比较符"),
@@ -83,12 +84,14 @@ void ReliableNavigateToPose::resetRuntimeState_()
   result_ready_ = false;
   result_success_ = false;
   cancel_requested_ = false;
+  response_timeout_reported_ = false;
   goal_handle_.reset();
   send_attempts_ = 0;
   retry_count_ = 0;
   canceled_goal_id_ = 0;
   active_goal_id_ = ++seq_;
   active_send_id_ = 0;
+  active_navigation_token_ = 0;
   pending_cancel_reason_.clear();
   awaiting_cancel_confirm_ = false;
   success_pending_after_cancel_ = false;
@@ -167,8 +170,12 @@ bool ReliableNavigateToPose::isSuccessConditionSatisfied_(double *current_value)
     "ReliableNavigateToPose");
 }
 
-ReliableNavigateToPose::GoalStatus ReliableNavigateToPose::evaluateGoalStatus_()
+ReliableNavigateToPose::GoalStatus ReliableNavigateToPose::evaluateGoalStatus_(double *distance_out)
 {
+  if (distance_out) {
+    *distance_out = std::numeric_limits<double>::infinity();
+  }
+
   auto blackboard = config().blackboard;
   if (!blackboard) {
     return GoalStatus::NOT_REACHED;
@@ -193,6 +200,9 @@ ReliableNavigateToPose::GoalStatus ReliableNavigateToPose::evaluateGoalStatus_()
   const double dx = current_goal_.pose.position.x - current_pose.pose.position.x;
   const double dy = current_goal_.pose.position.y - current_pose.pose.position.y;
   const double distance = std::hypot(dx, dy);
+  if (distance_out) {
+    *distance_out = distance;
+  }
 
   if (distance <= reach_threshold_) {
     double success_condition_value = 0.0;
@@ -240,297 +250,29 @@ ReliableNavigateToPose::GoalStatus ReliableNavigateToPose::evaluateGoalStatus_()
   return GoalStatus::NOT_REACHED;
 }
 
-void ReliableNavigateToPose::sendGoal_()
-{
-  const auto now = node_->now();
-  current_goal_.header.stamp = now;
-  const uint64_t goal_id = active_goal_id_;
-  const uint64_t send_id = ++send_seq_;
-  active_send_id_ = send_id;
-  ++send_attempts_;
-
-  NavigateToPose::Goal goal_msg;
-  goal_msg.pose = current_goal_;
-
-  auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
-  options.goal_response_callback =
-    [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle)
-    {
-      // 被等待确认的目标未被 Nav2 接收 → 服务器端无活跃目标，无需再等
-      if (!handle && awaiting_cancel_confirm_ && goal_id == wait_cancel_goal_id_) {
-        awaiting_cancel_confirm_ = false;
-      }
-
-      if (goal_id != active_goal_id_) {
-        if (handle) {
-          tryCancelGoal_(handle, "stale_goal_response");
-        }
-        RCLCPP_DEBUG(
-          node_->get_logger(),
-          "[ReliableNavigate] 忽略过期 goal_response, goal_id=%lu current=%lu",
-          goal_id,
-          active_goal_id_);
-        return;
-      }
-
-      if (send_id != active_send_id_) {
-        if (handle) {
-          tryCancelGoal_(handle, "stale_send_response");
-          RCLCPP_DEBUG(
-            node_->get_logger(),
-            "[ReliableNavigate] 取消过期已接收目标%s%s%s, send_id=%lu current=%lu",
-            goal_name_.empty() ? "" : "[",
-            goal_name_.empty() ? "" : goal_name_.c_str(),
-            goal_name_.empty() ? "" : "]",
-            send_id,
-            active_send_id_);
-        }
-        return;
-      }
-
-      if (!handle) {
-        state_ = InternalState::IDLE;
-        ++retry_count_;
-        RCLCPP_WARN(
-          node_->get_logger(),
-          "[ReliableNavigate] Nav2 未接收目标%s%s%s, retry_count=%d",
-          goal_name_.empty() ? "" : "[",
-          goal_name_.empty() ? "" : goal_name_.c_str(),
-          goal_name_.empty() ? "" : "]",
-          retry_count_);
-        return;
-      }
-
-      if (cancel_requested_) {
-        canceled_goal_id_ = goal_id;
-        if (!tryCancelGoal_(
-            handle,
-            pending_cancel_reason_.empty() ? "cancel_requested" : pending_cancel_reason_.c_str()))
-        {
-          cancel_requested_ = false;
-        }
-        RCLCPP_INFO(
-          node_->get_logger(),
-          "[ReliableNavigate] 目标已接收但当前请求已取消%s%s%s, reason=%s",
-          goal_name_.empty() ? "" : "[",
-          goal_name_.empty() ? "" : goal_name_.c_str(),
-          goal_name_.empty() ? "" : "]",
-          pending_cancel_reason_.empty() ? "cancel_requested" : pending_cancel_reason_.c_str());
-        return;
-      }
-
-      goal_handle_ = handle;
-      state_ = InternalState::ACCEPTED;
-      RCLCPP_INFO_THROTTLE(
-        node_->get_logger(),
-        *node_->get_clock(),
-        log_throttle_ms_,
-        "[ReliableNavigate] Nav2 已接收目标%s%s%s, send_attempt=%d",
-        goal_name_.empty() ? "" : "[",
-        goal_name_.empty() ? "" : goal_name_.c_str(),
-        goal_name_.empty() ? "" : "]",
-        send_attempts_);
-    };
-
-  options.result_callback =
-    [this, goal_id, send_id](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult &result)
-    {
-      // 被等待确认的目标到达任意终态（SUCCEEDED/ABORTED/CANCELED）即视为
-      // Nav2 端已终止，解除取消确认门控。必须放在过期守卫之前：
-      // 目标切换路径会先 resetRuntimeState_() 更新 active_goal_id_
-      if (awaiting_cancel_confirm_ && goal_id == wait_cancel_goal_id_) {
-        awaiting_cancel_confirm_ = false;
-      }
-
-      if (goal_id != active_goal_id_) {
-        RCLCPP_DEBUG(
-          node_->get_logger(),
-          "[ReliableNavigate] 忽略过期 result, goal_id=%lu current=%lu",
-          goal_id,
-          active_goal_id_);
-        return;
-      }
-
-      if (send_id != active_send_id_) {
-        RCLCPP_DEBUG(
-          node_->get_logger(),
-          "[ReliableNavigate] 忽略过期 result callback%s%s%s, send_id=%lu current=%lu",
-          goal_name_.empty() ? "" : "[",
-          goal_name_.empty() ? "" : goal_name_.c_str(),
-          goal_name_.empty() ? "" : "]",
-          send_id,
-          active_send_id_);
-        return;
-      }
-
-      switch (result.code) {
-        case rclcpp_action::ResultCode::SUCCEEDED:
-          result_success_ = true;
-          result_ready_ = true;
-          RCLCPP_INFO_THROTTLE(
-            node_->get_logger(),
-            *node_->get_clock(),
-            log_throttle_ms_,
-            "[ReliableNavigate] Nav2 返回成功%s%s%s",
-            goal_name_.empty() ? "" : "[",
-            goal_name_.empty() ? "" : goal_name_.c_str(),
-            goal_name_.empty() ? "" : "]");
-          break;
-
-        case rclcpp_action::ResultCode::ABORTED:
-          ++retry_count_;
-          state_ = InternalState::IDLE;
-          goal_handle_.reset();
-          result_ready_ = false;
-          result_success_ = false;
-          RCLCPP_WARN(
-            node_->get_logger(),
-            "[ReliableNavigate] Nav2 aborted%s%s%s, retry_count=%d",
-            goal_name_.empty() ? "" : "[",
-            goal_name_.empty() ? "" : goal_name_.c_str(),
-            goal_name_.empty() ? "" : "]",
-            retry_count_);
-          break;
-
-        case rclcpp_action::ResultCode::CANCELED:
-          if (goal_id == canceled_goal_id_) {
-            cancel_requested_ = false;
-            goal_handle_.reset();
-            state_ = InternalState::IDLE;
-            result_ready_ = true;
-            result_success_ = false;
-            RCLCPP_INFO(
-              node_->get_logger(),
-              "[ReliableNavigate] 目标被本节点取消%s%s%s, reason=%s",
-              goal_name_.empty() ? "" : "[",
-              goal_name_.empty() ? "" : goal_name_.c_str(),
-              goal_name_.empty() ? "" : "]",
-              pending_cancel_reason_.empty() ? "cancel_requested" : pending_cancel_reason_.c_str());
-          } else {
-            ++retry_count_;
-            state_ = InternalState::IDLE;
-            goal_handle_.reset();
-            result_ready_ = false;
-            result_success_ = false;
-            RCLCPP_WARN(
-              node_->get_logger(),
-              "[ReliableNavigate] 目标被外部取消%s%s%s, retry_count=%d",
-              goal_name_.empty() ? "" : "[",
-              goal_name_.empty() ? "" : goal_name_.c_str(),
-              goal_name_.empty() ? "" : "]",
-              retry_count_);
-          }
-          break;
-
-        default:
-          ++retry_count_;
-          state_ = InternalState::IDLE;
-          goal_handle_.reset();
-          result_ready_ = false;
-          result_success_ = false;
-          RCLCPP_WARN(
-            node_->get_logger(),
-            "[ReliableNavigate] 未知结果码%s%s%s, retry_count=%d",
-            goal_name_.empty() ? "" : "[",
-            goal_name_.empty() ? "" : goal_name_.c_str(),
-            goal_name_.empty() ? "" : "]",
-            retry_count_);
-          break;
-      }
-    };
-
-  client_->async_send_goal(goal_msg, options);
-  state_ = InternalState::SENDING;
-  last_send_time_ = now;
-
-  RCLCPP_INFO_THROTTLE(
-    node_->get_logger(),
-    *node_->get_clock(),
-    log_throttle_ms_,
-    "[ReliableNavigate] 发送目标%s%s%s -> (%.2f, %.2f), attempt=%d, goal_id=%lu",
-    goal_name_.empty() ? "" : "[",
-    goal_name_.empty() ? "" : goal_name_.c_str(),
-    goal_name_.empty() ? "" : "]",
-    current_goal_.pose.position.x,
-    current_goal_.pose.position.y,
-    send_attempts_,
-    goal_id);
-}
-
-bool ReliableNavigateToPose::tryCancelGoal_(
-  const rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr &handle,
-  const char *reason)
-{
-  if (!client_ || !handle) {
-    return false;
-  }
-
-  try {
-    client_->async_cancel_goal(handle);
-    return true;
-  } catch (const rclcpp_action::exceptions::UnknownGoalHandleError &ex) {
-    RCLCPP_WARN(
-      node_->get_logger(),
-      "[ReliableNavigate] 取消目标时 goal handle 已失效%s%s%s, reason=%s, detail=%s",
-      goal_name_.empty() ? "" : "[",
-      goal_name_.empty() ? "" : goal_name_.c_str(),
-      goal_name_.empty() ? "" : "]",
-      reason ? reason : "",
-      ex.what());
-  } catch (const std::exception &ex) {
-    RCLCPP_ERROR(
-      node_->get_logger(),
-      "[ReliableNavigate] 取消目标失败%s%s%s, reason=%s, detail=%s",
-      goal_name_.empty() ? "" : "[",
-      goal_name_.empty() ? "" : goal_name_.c_str(),
-      goal_name_.empty() ? "" : "]",
-      reason ? reason : "",
-      ex.what());
-  }
-
-  return false;
-}
-
-void ReliableNavigateToPose::cancelGoal_(const char *reason)
-{
-  canceled_goal_id_ = active_goal_id_;
-  cancel_requested_ = true;
-  pending_cancel_reason_ = reason ? reason : "";
-
-  if (client_ && goal_handle_) {
-    if (!tryCancelGoal_(goal_handle_, reason)) {
-      cancel_requested_ = false;
-    }
-    RCLCPP_WARN(
-      node_->get_logger(),
-      "[ReliableNavigate] 取消当前目标%s%s%s, reason=%s",
-      goal_name_.empty() ? "" : "[",
-      goal_name_.empty() ? "" : goal_name_.c_str(),
-      goal_name_.empty() ? "" : "]",
-      reason);
-  } else if (reason && *reason != '\0') {
-    RCLCPP_INFO(
-      node_->get_logger(),
-      "[ReliableNavigate] 标记当前目标取消%s%s%s, 等待后续回调处理, reason=%s",
-      goal_name_.empty() ? "" : "[",
-      goal_name_.empty() ? "" : goal_name_.c_str(),
-      goal_name_.empty() ? "" : "]",
-      reason);
-  }
-  goal_handle_.reset();
-  state_ = InternalState::IDLE;
-}
-
-void ReliableNavigateToPose::beginCancelWait_(uint64_t goal_id, bool success_after)
-{
-  awaiting_cancel_confirm_ = true;
-  success_pending_after_cancel_ = success_after;
-  wait_cancel_goal_id_ = goal_id;
-  cancel_wait_start_ = node_->now();
-}
-
 BT::NodeStatus ReliableNavigateToPose::onRunning()
 {
+  // 跨实例门控：旧子树 onHalted() 后，必须等对应 Nav2 goal 到达终态，
+  // 才允许新子树发送目标。超时只作为 action 回调永久丢失时的保险。
+  bool global_gate_timed_out = false;
+  uint64_t pending_navigation_token = 0;
+  double global_gate_elapsed_s = 0.0;
+  if (navigation_transition::cancelPending(
+      cancel_confirm_timeout_,
+      &global_gate_timed_out,
+      &pending_navigation_token,
+      &global_gate_elapsed_s))
+  {
+    return BT::NodeStatus::RUNNING;
+  }
+  if (global_gate_timed_out) {
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "[ReliableNavigate] 跨实例等待旧导航取消确认超时(%.2fs, token=%lu)，解除门控",
+      global_gate_elapsed_s,
+      pending_navigation_token);
+  }
+
   // ── 取消确认门控：上一目标的取消尚未被 Nav2 确认前不做任何事 ──
   // 若此时就放行（返回 SUCCESS / 重发新目标），下一目标会在 bt_navigator
   // 处成为 pending goal，而 SimpleActionServer 在存在 pending goal 时
@@ -585,13 +327,12 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
   }
 
   const auto now = node_->now();
-  const GoalStatus goal_status = evaluateGoalStatus_();
+  double current_distance = std::numeric_limits<double>::infinity();
+  const GoalStatus goal_status = evaluateGoalStatus_(&current_distance);
   if (goal_status == GoalStatus::REACHED) {
     const bool inflight = goal_handle_ || state_ == InternalState::SENDING;
-    if (goal_handle_ || state_ != InternalState::IDLE || last_send_time_.nanoseconds() != 0) {
-      cancelGoal_("goal_reached_locally");
-    }
     if (inflight) {
+      cancelGoal_("goal_reached_locally");
       // 取消已发出但未确认：等 Nav2 端终止后再返回 SUCCESS，
       // 否则父序列会立刻发下一目标，与本次取消交叠触发跳点
       beginCancelWait_(canceled_goal_id_, true);
@@ -601,6 +342,7 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
   }
 
   if (goal_status == GoalStatus::REACHED_GUARD_UNSATISFIED &&
+    !result_ready_ &&
     !cancel_requested_ &&
     (goal_handle_ || state_ != InternalState::IDLE))
   {
@@ -617,29 +359,36 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
 
   if (result_ready_) {
     if (result_success_) {
-      double success_condition_value = 0.0;
-      if (isSuccessConditionSatisfied_(&success_condition_value)) {
-        return BT::NodeStatus::SUCCESS;
-      }
-
+      // Nav2 的 SUCCEEDED 可能来自抢占切换前的旧路径。只有本节点基于
+      // waypoint_now 验证距离和业务成功条件均通过，才允许向父树返回 SUCCESS。
       result_ready_ = false;
       result_success_ = false;
       state_ = InternalState::IDLE;
       goal_handle_.reset();
       ++retry_count_;
-      RCLCPP_WARN_THROTTLE(
-        node_->get_logger(),
-        *node_->get_clock(),
-        1000,
-        "[ReliableNavigate] Nav2 返回成功%s%s%s，但成功条件 '%s' 未满足 (当前=%.3f, 期望 %s %.3f)，准备重发, retry_count=%d",
-        goal_name_.empty() ? "" : "[",
-        goal_name_.empty() ? "" : goal_name_.c_str(),
-        goal_name_.empty() ? "" : "]",
-        success_condition_key_.c_str(),
-        success_condition_value,
-        success_condition_comparison_.c_str(),
-        success_condition_threshold_,
-        retry_count_);
+      if (std::isfinite(current_distance)) {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(),
+          *node_->get_clock(),
+          1000,
+          "[ReliableNavigate] Nav2 返回成功%s%s%s，但本地距离 %.3f m > %.3f m，拒绝假成功并准备重发, retry_count=%d",
+          goal_name_.empty() ? "" : "[",
+          goal_name_.empty() ? "" : goal_name_.c_str(),
+          goal_name_.empty() ? "" : "]",
+          current_distance,
+          reach_threshold_,
+          retry_count_);
+      } else {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(),
+          *node_->get_clock(),
+          1000,
+          "[ReliableNavigate] Nav2 返回成功%s%s%s，但当前位姿无效，拒绝假成功并准备重发, retry_count=%d",
+          goal_name_.empty() ? "" : "[",
+          goal_name_.empty() ? "" : goal_name_.c_str(),
+          goal_name_.empty() ? "" : "]",
+          retry_count_);
+      }
       if ((now - last_send_time_).seconds() < result_retry_delay_) {
         return BT::NodeStatus::RUNNING;
       }
@@ -662,16 +411,17 @@ BT::NodeStatus ReliableNavigateToPose::onRunning()
       break;
 
     case InternalState::SENDING:
-      if ((now - last_send_time_).seconds() >= response_timeout_) {
-        ++retry_count_;
-        state_ = InternalState::IDLE;
+      if (!response_timeout_reported_ &&
+        (now - last_send_time_).seconds() >= response_timeout_)
+      {
+        response_timeout_reported_ = true;
         RCLCPP_WARN(
           node_->get_logger(),
-          "[ReliableNavigate] 等待 Nav2 接收超时，准备重发%s%s%s, retry_count=%d",
+          "[ReliableNavigate] 等待 Nav2 接收超过 %.2fs%s%s%s；为避免产生 preemption，保持等待且不重发",
+          response_timeout_,
           goal_name_.empty() ? "" : "[",
           goal_name_.empty() ? "" : goal_name_.c_str(),
-          goal_name_.empty() ? "" : "]",
-          retry_count_);
+          goal_name_.empty() ? "" : "]");
       }
       break;
 

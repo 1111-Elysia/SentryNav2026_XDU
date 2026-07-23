@@ -5,15 +5,8 @@
       <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
       <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
       <GoalSelector goal_name="{point_hold_goal_name}" goal="{point_hold_goal}"/>
-      <Fallback name="点位驻守维持">
-        <ReactiveSequence name="已在驻守半径内">
-          <CheckGoalReached goal="{point_hold_goal}" threshold="{point_hold_exit_threshold}"/>
-          <ResolveSentryPosture
-            requested_mode="{point_hold_posture}"
-            resolved_mode="{point_hold_effective_posture}"/>
-          <MaintainSentryPosture mode="{point_hold_effective_posture}"/>
-          <Wait wait_duration="{point_hold_wait_duration}"/>
-        </ReactiveSequence>
+      <Fallback name="确保进入驻守半径">
+        <CheckGoalReached goal="{point_hold_goal}" threshold="{point_hold_exit_threshold}"/>
         <Sequence name="回驻守点位">
           <PrintNode message="{point_hold_message}" throttle_ms="{point_hold_log_throttle_ms}"/>
           <RetryUntilSuccessful num_attempts="100">
@@ -33,6 +26,14 @@
           </RetryUntilSuccessful>
         </Sequence>
       </Fallback>
+      <ReactiveSequence name="到点后维持姿态并等待">
+        <CheckGoalReached goal="{point_hold_goal}" threshold="{point_hold_exit_threshold}"/>
+        <ResolveSentryPosture
+          requested_mode="{point_hold_posture}"
+          resolved_mode="{point_hold_effective_posture}"/>
+        <MaintainSentryPosture mode="{point_hold_effective_posture}"/>
+        <Wait wait_duration="{point_hold_wait_duration}"/>
+      </ReactiveSequence>
     </Sequence>
   </BehaviorTree>
 </root>

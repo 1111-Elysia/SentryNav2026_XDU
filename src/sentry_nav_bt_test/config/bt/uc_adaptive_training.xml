@@ -15,7 +15,7 @@
           <CheckCondition key_name="game_status_connected_logged" comparison="eq" threshold="1"/>
           <Sequence name="首次裁判系统连接成功">
             <CheckCondition key_name="game_status_received" comparison="eq" threshold="1"/>
-            <PrintNode message="[UC] 裁判系统已连接，等待比赛开始"/>
+            <PrintNode message="[UC适应性训练] 裁判系统已连接，等待比赛开始"/>
             <SetBlackboardValue key="game_status_connected_logged" value="1" type="int"/>
           </Sequence>
         </Fallback>
@@ -27,7 +27,7 @@
           <Fallback name="标记局内状态待初始化">
             <CheckCondition key_name="uc_initialized" comparison="eq" threshold="0"/>
             <Sequence name="清除局内初始化标记">
-              <PrintNode message="[UC] 比赛未开始，标记局内状态待初始化"/>
+              <PrintNode message="[UC适应性训练] 比赛未开始，标记局内状态待初始化"/>
               <SetBlackboardValue key="uc_initialized" value="0" type="int"/>
             </Sequence>
           </Fallback>
@@ -37,7 +37,7 @@
               game_progress_key="game_progress"
               prepare_progress="1"
               init_goal_name="init"
-              prestart_message="[UC] 准备时间，持续发送 init(0,0) 导航目标"
+              prestart_message="[UC适应性训练] 准备时间，持续发送 init(0,0) 导航目标"
               log_throttle_ms="2000"
               reach_threshold="0.10"
               nav_resend_interval="0.30"
@@ -53,14 +53,15 @@
         <Fallback name="初始化">
           <CheckCondition key_name="uc_initialized" comparison="eq" threshold="1"/>
           <Sequence name="初始化状态">
-            <PrintNode message="[UC] 比赛开始，初始化局内状态"/>
+            <PrintNode message="[UC适应性训练] 比赛开始，初始化局内状态"/>
             <PublishScanMode enabled="false"/>
             <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
             <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
-            <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
-            <SetBlackboardValue key="uc_fortress_goal_name" value="myhero" type="string"/>
+            <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
+            <!-- 高地和堡垒各自的停留时间（秒）；往返子树从主树读取此值。 -->
+            <SetBlackboardValue key="uc_adaptive_stay_duration" value="5.0" type="double"/>
             <SetBlackboardValue key="uc_initialized" value="1" type="int"/>
           </Sequence>
         </Fallback>
@@ -100,7 +101,7 @@
             recovery_posture="1"
             recovery_start_message="[回补] 发射机构电源输出关闭，攻击姿态回补给点等待恢复"
             recovery_wait_message="[回补] 发射机构电源输出关闭，已在补给区保持攻击姿态"
-            recovery_done_message="[回补] 发射机构电源输出恢复，继续执行全场策略"
+            recovery_done_message="[回补] 发射机构电源输出恢复，继续适应性训练"
             nav_resend_interval="0.30"
             nav_response_timeout="0.80"
             nav_result_retry_delay="0.30"
@@ -115,7 +116,7 @@
             supply_ready_ammo_threshold="100"
             supply_reach_threshold="0.25"
             supply_start_message="[回补] 低血或没弹，回补给区休整"
-            supply_done_message="[回补] 血量已满且允许发弹量不低于100，退出回补状态"
+            supply_done_message="[回补] 血量已满且允许发弹量不低于100，继续适应性训练"
             supply_active_key="uc_supply_active"
             supply_rfid_detected_key="rfid_supply_zone_detected"
             rune_phase_key="in_rune_phase"
@@ -132,11 +133,11 @@
               <Sequence name="普通姿态目标更新">
                 <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
                 <Fallback name="普通姿态目标选择">
-                  <Sequence name="17mm热量维持_切进攻姿态">
-                    <CheckCondition key_name="shooter_17mm_heat_firing" comparison="eq" threshold="1"/>
+                  <Sequence name="普通受击目标进攻">
+                    <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
                     <SetBlackboardValue key="uc_normal_posture" value="1" type="int"/>
                   </Sequence>
-                  <SetBlackboardValue key="uc_normal_posture" value="2" type="int"/>
+                  <SetBlackboardValue key="uc_normal_posture" value="3" type="int"/>
                 </Fallback>
               </Sequence>
 
@@ -214,18 +215,18 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_myhero驻守_Phase4">
+                <ReactiveSequence name="中期_往返训练_Phase4">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                  <SubTree
-                    ID="PointHold"
-                    point_hold_goal_name="myhero"
-                    point_hold_arrive_threshold="0.25"
-                    point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
-                    point_hold_posture="1"
-                    point_hold_wait_duration="0.5"
-                    point_hold_log_throttle_ms="10000"
-                    point_hold_message="[Phase 4 | 5:00-4:00] 不需要打符，前往 myhero 点位持续驻守"
+                  <SubTree ID="AdaptiveTrainingShuttle"
+                    shuttle_highland_goal_name="trapezoid_highland"
+                    shuttle_fortress_goal_name="fortress"
+                    shuttle_reach_threshold="0.25"
+                    shuttle_exit_threshold="0.30"
+                    shuttle_move_posture="3"
+                    shuttle_hold_posture="1"
+                    shuttle_stay_duration="{uc_adaptive_stay_duration}"
+                    shuttle_highland_message="[Phase 4] 前往梯形高地并停留"
+                    shuttle_fortress_message="[Phase 4] 前往堡垒并停留"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     nav_resend_interval="0.30"
@@ -260,18 +261,18 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_myhero驻守_Phase6">
+                <ReactiveSequence name="中期_往返训练_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
-                  <SubTree
-                    ID="PointHold"
-                    point_hold_goal_name="myhero"
-                    point_hold_arrive_threshold="0.25"
-                    point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
-                    point_hold_posture="1"
-                    point_hold_wait_duration="0.5"
-                    point_hold_log_throttle_ms="10000"
-                    point_hold_message="[Phase 6 | 3:30-2:45] 前往 myhero 点位并进入驻守"
+                  <SubTree ID="AdaptiveTrainingShuttle"
+                    shuttle_highland_goal_name="trapezoid_highland"
+                    shuttle_fortress_goal_name="fortress"
+                    shuttle_reach_threshold="0.25"
+                    shuttle_exit_threshold="0.30"
+                    shuttle_move_posture="3"
+                    shuttle_hold_posture="1"
+                    shuttle_stay_duration="{uc_adaptive_stay_duration}"
+                    shuttle_highland_message="[Phase 6] 前往梯形高地并停留"
+                    shuttle_fortress_message="[Phase 6] 前往堡垒并停留"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     nav_resend_interval="0.30"
@@ -306,18 +307,18 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="后期_myhero驻守_Phase8">
+                <ReactiveSequence name="后期_往返训练_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
-                  <SubTree
-                    ID="PointHold"
-                    point_hold_goal_name="myhero"
-                    point_hold_arrive_threshold="0.25"
-                    point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
-                    point_hold_posture="1"
-                    point_hold_wait_duration="0.5"
-                    point_hold_log_throttle_ms="10000"
-                    point_hold_message="[Phase 8 | 2:15-1:30] 后期回到 myhero 点位持续驻守"
+                  <SubTree ID="AdaptiveTrainingShuttle"
+                    shuttle_highland_goal_name="trapezoid_highland"
+                    shuttle_fortress_goal_name="fortress"
+                    shuttle_reach_threshold="0.25"
+                    shuttle_exit_threshold="0.30"
+                    shuttle_move_posture="3"
+                    shuttle_hold_posture="1"
+                    shuttle_stay_duration="{uc_adaptive_stay_duration}"
+                    shuttle_highland_message="[Phase 8] 前往梯形高地并停留"
+                    shuttle_fortress_message="[Phase 8] 前往堡垒并停留"
                     rune_phase_key="in_rune_phase"
                     fortress_active_key="uc_fortress_hold_active"
                     nav_resend_interval="0.30"
@@ -352,24 +353,22 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="全局_myhero驻守">
-                  <SubTree
-                    ID="PointHold"
-                    point_hold_goal_name="myhero"
-                    point_hold_arrive_threshold="0.25"
-                    point_hold_exit_threshold="0.30"
-                    point_hold_move_posture="1"
-                    point_hold_posture="1"
-                    point_hold_wait_duration="0.5"
-                    point_hold_log_throttle_ms="10000"
-                    point_hold_message="[Fallback] 不需要打符，回 myhero 点位持续驻守"
-                    rune_phase_key="in_rune_phase"
-                    fortress_active_key="uc_fortress_hold_active"
-                    nav_resend_interval="0.30"
-                    nav_response_timeout="0.80"
-                    nav_result_retry_delay="0.30"
-                    _autoremap="1"/>
-                </ReactiveSequence>
+                <SubTree ID="AdaptiveTrainingShuttle"
+                  shuttle_highland_goal_name="trapezoid_highland"
+                  shuttle_fortress_goal_name="fortress"
+                  shuttle_reach_threshold="0.25"
+                  shuttle_exit_threshold="0.30"
+                  shuttle_move_posture="3"
+                  shuttle_hold_posture="1"
+                  shuttle_stay_duration="{uc_adaptive_stay_duration}"
+                  shuttle_highland_message="[Fallback] 前往梯形高地并停留"
+                  shuttle_fortress_message="[Fallback] 前往堡垒并停留"
+                  rune_phase_key="in_rune_phase"
+                  fortress_active_key="uc_fortress_hold_active"
+                  nav_resend_interval="0.30"
+                  nav_response_timeout="0.80"
+                  nav_result_retry_delay="0.30"
+                  _autoremap="1"/>
               </ReactiveFallback>
 
               <ForceSuccess>
@@ -386,119 +385,4 @@
       </ReactiveSequence>
     </Fallback>
   </BehaviorTree>
-
-  <TreeNodesModel>
-    <Action ID="SetSentryPosture" editable="true">
-      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove</input_port>
-      <input_port name="timeout_ms" type="int">姿态切换等待超时</input_port>
-      <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
-    </Action>
-    <Action ID="MaintainSentryPosture" editable="true">
-      <input_port name="mode" type="int">1:Attack, 2:Defend, 3:Move, 4:EnhancedAttack, 5:EnhancedDefend, 6:EnhancedMove</input_port>
-      <input_port name="cooldown_ms" type="int">姿态切换冷却时间</input_port>
-      <input_port name="force" type="bool">忽略姿态切换冷却</input_port>
-    </Action>
-    <Action ID="ResolveSentryPosture" editable="true">
-      <input_port name="requested_mode" type="int">请求姿态</input_port>
-      <output_port name="resolved_mode" type="int">强化窗口耗尽后的实际目标姿态</output_port>
-    </Action>
-    <Action ID="RequestActivateRune" editable="true">
-      <input_port name="posture" type="int">请求时保持的姿态</input_port>
-      <input_port name="protocol_ver" type="string">old or new</input_port>
-    </Action>
-    <Action ID="ConfirmResurrection" editable="true">
-      <input_port name="posture"/>
-      <input_port name="burst_count"/>
-      <input_port name="burst_interval_ms"/>
-      <input_port name="min_interval_ms"/>
-    </Action>
-    <Action ID="BuySentryProjectile" editable="true">
-      <input_port name="target_allowance"/>
-      <input_port name="max_exchange_projectile"/>
-      <input_port name="reserve_gold"/>
-      <input_port name="buy_step"/>
-      <input_port name="min_interval_ms"/>
-      <input_port name="posture"/>
-      <input_port name="response_timeout_ms"/>
-    </Action>
-    <Action ID="EngageRune" editable="true">
-      <input_port name="rune_type"/>
-      <input_port name="posture"/>
-      <input_port name="timeout_ms"/>
-      <input_port name="request_interval_ms"/>
-    </Action>
-    <Action ID="EngageOutpost" editable="true">
-      <input_port name="timeout_ms"/>
-    </Action>
-    <Condition ID="CheckCondition" editable="true">
-      <input_port name="key_name"/>
-      <input_port name="comparison"/>
-      <input_port name="threshold"/>
-    </Condition>
-    <Condition ID="CompareValues" editable="true">
-      <input_port name="first_key"/>
-      <input_port name="second_key"/>
-      <input_port name="comparison"/>
-    </Condition>
-    <Action ID="GoalSelector" editable="true">
-      <input_port name="goal_name"/>
-      <output_port name="goal"/>
-    </Action>
-    <Action ID="NavigateToPose" editable="true">
-      <input_port name="goal"/>
-    </Action>
-    <Action ID="RandomSelector" editable="true">
-      <input_port name="goal_names"/>
-      <input_port name="avoid_repeat"/>
-      <output_port name="goal"/>
-      <output_port name="goal_name"/>
-    </Action>
-    <Action ID="PatrolGoalSelector" editable="true">
-      <input_port name="goal_names"/>
-      <input_port name="index_key"/>
-      <output_port name="goal"/>
-      <output_port name="goal_name"/>
-    </Action>
-    <Action ID="ReliableNavigateToPose" editable="true">
-      <input_port name="goal"/>
-      <input_port name="goal_name"/>
-      <input_port name="reach_threshold"/>
-      <input_port name="resend_interval"/>
-      <input_port name="response_timeout"/>
-      <input_port name="result_retry_delay"/>
-      <input_port name="success_condition_key"/>
-      <input_port name="success_condition_comparison"/>
-      <input_port name="success_condition_threshold"/>
-    </Action>
-    <Condition ID="CheckGoalReached" editable="true">
-      <input_port name="goal"/>
-      <input_port name="threshold"/>
-    </Condition>
-    <Action ID="PrintNode" editable="true">
-      <input_port name="message"/>
-      <input_port name="throttle_ms"/>
-    </Action>
-    <Action ID="SetBlackboardValue" editable="true">
-      <input_port name="key"/>
-      <input_port name="value"/>
-      <input_port name="type"/>
-    </Action>
-    <Action ID="Wait" editable="true">
-      <input_port name="wait_duration"/>
-    </Action>
-    <Decorator ID="RetryUntilSuccessful">
-      <input_port name="num_attempts"/>
-    </Decorator>
-    <Decorator ID="KeepRunningUntilFailure"/>
-    <Decorator ID="ForceFailure"/>
-    <Decorator ID="Inverter"/>
-    <Control ID="Sequence"/>
-    <Control ID="Fallback"/>
-    <Control ID="Parallel">
-      <input_port name="success_count"/>
-      <input_port name="failure_count"/>
-    </Control>
-    <Control ID="ReactiveSequence"/>
-    <Control ID="ReactiveFallback"/>
-  </TreeNodesModel>
 </root>

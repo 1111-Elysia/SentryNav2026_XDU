@@ -220,7 +220,6 @@ void EngageRune::cleanupOutputs()
 
     yaw_controller_triggered_ = false;
     yaw_controller_trigger_time_ = std::chrono::steady_clock::time_point{};
-    active_rune_status_key_.clear();
 }
 
 void EngageRune::setRuneOutcome(bool success, const std::string &result) const
@@ -297,7 +296,6 @@ BT::NodeStatus EngageRune::onStart()
     start_time_ = std::chrono::steady_clock::now();
     last_request_time_ = std::chrono::steady_clock::time_point{};
     yaw_controller_trigger_time_ = std::chrono::steady_clock::time_point{};
-    active_rune_status_key_.clear();
     saw_activating_state_ = false;
     scan_mode_yaw_control_enabled_ = false;
     yaw_controller_triggered_ = false;
@@ -345,66 +343,40 @@ BT::NodeStatus EngageRune::onRunning()
 
     int can_activate_rune = 0;
     const bool have_can_activate = tryGetCanActivateRune(can_activate_rune);
-    const bool any_unactivated = small_rune_status == 0 || large_rune_status == 0;
 
     const int requested_rune_status =
         rune_type_ == RuneType::SMALL ? small_rune_status : large_rune_status;
 
-    int observed_status = requested_rune_status;
-    const char *observed_rune_name = runeTypeName();
-    if (!active_rune_status_key_.empty()) {
-        if (!getBlackboardIntLike(config().blackboard, active_rune_status_key_, observed_status)) {
-            RCLCPP_WARN_THROTTLE(
-                node_->get_logger(),
-                *node_->get_clock(),
-                1000,
-                "EngageRune: 尚未获取已锁定的能量机关状态键 %s",
-                active_rune_status_key_.c_str());
-            return BT::NodeStatus::RUNNING;
-        }
-        observed_rune_name =
-            active_rune_status_key_ == "small_rune_status" ? "小能量机关" : "大能量机关";
-    } else if (small_rune_status == 2) {
-        active_rune_status_key_ = "small_rune_status";
-        observed_status = small_rune_status;
-        observed_rune_name = "小能量机关";
-    } else if (large_rune_status == 2) {
-        active_rune_status_key_ = "large_rune_status";
-        observed_status = large_rune_status;
-        observed_rune_name = "大能量机关";
-    }
-
-    if (observed_status == 2) {
+    if (requested_rune_status == 2) {
         if (!saw_activating_state_) {
             saw_activating_state_ = true;
-            RCLCPP_INFO(node_->get_logger(), "EngageRune: %s进入正在激活状态", observed_rune_name);
+            RCLCPP_INFO(node_->get_logger(), "EngageRune: %s进入正在激活状态", runeTypeName());
         }
         ensureEngageOutputs();
         return BT::NodeStatus::RUNNING;
     }
 
-    if (saw_activating_state_ && observed_status == 1) {
+    if (saw_activating_state_ && requested_rune_status == 1) {
         RCLCPP_INFO(
             node_->get_logger(),
             "EngageRune: %s已确认激活成功，恢复 scan mode 并关闭 autoshoot",
-            observed_rune_name);
+            runeTypeName());
         setRuneOutcome(true, "activated");
         cleanupOutputs();
         return BT::NodeStatus::SUCCESS;
     }
 
-    if (saw_activating_state_ && observed_status == 0) {
+    if (saw_activating_state_ && requested_rune_status == 0) {
         RCLCPP_WARN(
             node_->get_logger(),
             "EngageRune: %s激活窗口结束但未激活成功，恢复 scan mode 并关闭 autoshoot",
-            observed_rune_name);
+            runeTypeName());
         setRuneOutcome(false, "window_expired");
         cleanupOutputs();
         return BT::NodeStatus::FAILURE;
     }
 
-    if (requested_rune_status == 1 &&
-        !(have_can_activate && can_activate_rune == 1 && any_unactivated)) {
+    if (requested_rune_status == 1) {
         RCLCPP_INFO(
             node_->get_logger(),
             "EngageRune: %s已处于已激活状态，无需继续请求激活",

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4">
   <BehaviorTree ID="PrestartInitReturn">
-    <Sequence name="准备时间回初始点">
+    <ReactiveSequence name="准备时间回初始点">
       <CheckCondition key_name="{game_progress_key}" comparison="eq" threshold="{prepare_progress}"/>
       <PrintNode message="{prestart_message}" throttle_ms="{log_throttle_ms}"/>
       <GoalSelector goal_name="{init_goal_name}" goal="{prestart_init_goal}"/>
@@ -13,6 +13,6 @@
         response_timeout="{nav_response_timeout}"
         result_retry_delay="{nav_result_retry_delay}"
         log_throttle_ms="{log_throttle_ms}"/>
-    </Sequence>
+    </ReactiveSequence>
   </BehaviorTree>
 </root>

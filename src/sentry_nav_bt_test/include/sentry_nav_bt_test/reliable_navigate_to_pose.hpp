@@ -47,7 +47,7 @@ private:
   void resetRuntimeState_();
   bool refreshGoalInput_(bool *goal_changed = nullptr);
   bool isSuccessConditionSatisfied_(double *current_value = nullptr) const;
-  GoalStatus evaluateGoalStatus_();
+  GoalStatus evaluateGoalStatus_(double *distance = nullptr);
   void sendGoal_();
   void cancelGoal_(const char *reason);
   void beginCancelWait_(uint64_t goal_id, bool success_after);
@@ -64,7 +64,7 @@ private:
   double resend_interval_{0.50};
   double response_timeout_{1.00};
   double result_retry_delay_{0.50};
-  double cancel_confirm_timeout_{0.50};
+  double cancel_confirm_timeout_{1.50};
   int log_throttle_ms_{0};
   std::string success_condition_key_;
   std::string success_condition_comparison_{"eq"};
@@ -76,6 +76,7 @@ private:
   bool result_ready_{false};
   bool result_success_{false};
   bool cancel_requested_{false};
+  bool response_timeout_reported_{false};
   // 取消确认等待：取消旧目标后阻塞节点直到 Nav2 端确认终止，
   // 防止下一目标与取消请求在 bt_navigator 处交叠（pending goal 会屏蔽取消 → 跳点）
   bool awaiting_cancel_confirm_{false};
@@ -84,6 +85,7 @@ private:
   rclcpp::Time cancel_wait_start_{0, 0, RCL_ROS_TIME};
   uint64_t active_goal_id_{0};
   uint64_t active_send_id_{0};
+  uint64_t active_navigation_token_{0};
   uint64_t canceled_goal_id_{0};
   uint64_t seq_{0};
   uint64_t send_seq_{0};

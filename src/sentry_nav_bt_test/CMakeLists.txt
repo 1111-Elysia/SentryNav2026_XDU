@@ -1,14 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(sentry_nav_bt_test)
 
-SET(CMAKE_CXX_STANDARD 17)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-if(NOT CMAKE_BUILD_TYPE)
-  SET(CMAKE_BUILD_TYPE "Release")
-endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 编译选项
-add_compile_options(-Ofast -O3)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -43,7 +41,9 @@ add_library(sentry_nav_bt_test_nodes SHARED
   src/random_selector_node.cpp
   src/goal_selector_node.cpp
   src/patrol_nodes.cpp
+  src/navigation_transition_gate.cpp
   src/reliable_navigate_to_pose.cpp
+  src/reliable_navigate_to_pose_action.cpp
   src/publish_vw_action.cpp
   src/referee_actions_common.cpp
   src/referee_engage_actions.cpp
