@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="MyHeroHold">
+    <SubTree
+      ID="PointHold"
+      point_hold_goal_name="myhero"
+      point_hold_arrive_threshold="0.25"
+      point_hold_exit_threshold="0.30"
+      point_hold_move_posture="3"
+      point_hold_posture="1"
+      point_hold_wait_duration="0.5"
+      point_hold_log_throttle_ms="10000"
+      point_hold_message="{point_hold_message}"
+      rune_phase_key="in_rune_phase"
+      fortress_active_key="uc_fortress_hold_active"
+      _autoremap="true"/>
+  </BehaviorTree>
+</root>

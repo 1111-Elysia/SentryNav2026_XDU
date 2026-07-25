@@ -2,8 +2,10 @@
 <root BTCPP_format="4" project_name="sentry_nav_bt_test">
     <include path="5.3tree.xml"/>
     <include path="modules/adaptive_training_shuttle.xml"/>
+    <include path="modules/conditional_trapezoid_highland_hold.xml"/>
     <include path="modules/fortress_hold.xml"/>
     <include path="modules/go_wait_until_time_above.xml"/>
+    <include path="modules/hero_highland_trigger.xml"/>
     <include path="modules/outpost_task.xml"/>
     <include path="modules/point_hold.xml"/>
     <include path="modules/prestart_init_return.xml"/>
@@ -16,7 +18,6 @@
     <include path="uc_fortress.xml"/>
     <include path="uc_patrol.xml"/>
     <include path="uc_myhero.xml"/>
-    <include path="train_rune.xml"/>
     <include path="uc_adaptive_training.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>

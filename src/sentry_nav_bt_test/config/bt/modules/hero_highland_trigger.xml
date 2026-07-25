@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="HeroHighlandTrigger">
+    <Fallback name="英雄高地或云台手指令触发">
+      <CheckCondition key_name="map_command_received" comparison="eq" threshold="1"/>
+      <Sequence name="英雄连续停留梯形高地">
+        <CheckCondition key_name="ground_robot_position_received" comparison="eq" threshold="1"/>
+        <CheckCondition key_name="hero_position_fresh" comparison="eq" threshold="1"/>
+        <CheckCondition key_name="hero_highland_inside" comparison="eq" threshold="1"/>
+        <CheckCondition
+          key_name="hero_highland_elapsed_ms"
+          comparison="gte"
+          threshold="5000"/>
+      </Sequence>
+    </Fallback>
+  </BehaviorTree>
+</root>

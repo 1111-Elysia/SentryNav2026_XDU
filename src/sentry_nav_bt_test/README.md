@@ -93,11 +93,15 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py
   - 路径点 JSON
   - 默认值：安装目录下的 `config/waypoints.json`
 - `bt_message_log_file`
-  - `PrintNode` 额外落盘的日志目录/基准文件路径
-  - 默认值：`/tmp/sentry_nav_bt_messages.log`
-  - 固定路径会持续追加所有运行记录，例如：`/tmp/sentry_nav_bt_messages.log`
-  - 同时也会按每次启动生成唯一文件，例如：`/tmp/sentry_nav_bt_messages_2026-03-27_21-05-33_pid12345.log`
-  - 传空字符串可关闭该文件输出
+  - 兼容用的 `PrintNode` 专用日志路径
+  - 默认值为空，即默认关闭，避免与完整终端日志重复
+- `save_terminal_log`
+  - 是否实时保存 `navigate_bt_node` 的完整 stdout/stderr
+  - 默认值：`true`
+- `terminal_log_dir`
+  - 完整终端日志根目录
+  - 默认值：源码包下的 `logs/`
+  - 每次启动生成独立目录和 `launch.log`
 注意：
 
 - 当前 launch 文件里把 `navigate_bt_node` 的 `use_sim_time` 写死成了 `False`
@@ -413,9 +417,9 @@ ros2 launch sentry_nav_bt_test sentry_nav_bt_test.launch.py
 - 中心驻守激活时会持续发布 `/vw = 1`
 - 退出中心驻守后会停止继续发布 `/vw`
 - 打前哨站期间会持续发布 `/vw = 1`，退出、超时或被打断时会补发一次 `/vw = 0`
-- `PrintNode` 消息默认会同时写入累计历史日志 `/tmp/sentry_nav_bt_messages.log`
-- `PrintNode` 消息也会额外写入按启动时间命名的独立日志文件，例如 `/tmp/sentry_nav_bt_messages_2026-03-27_21-05-33_pid12345.log`
-- 每次启动都会保留自己的独立日志，同时固定路径也能看到完整运行历史
+- 默认实时保存 `navigate_bt_node` 的完整终端输出到源码包 `logs/` 下的本次运行目录
+- `save_terminal_log:=false` 可关闭本次完整终端日志
+- 旧的 `bt_message_log_file` 仍可显式启用，但默认关闭
 - 默认中心到点阈值 `ul_center_arrive_distance_threshold = 0.10 m`
 - 默认中心驻守半径 `ul_center_hold_distance_threshold = 0.50 m`
 - 默认堡垒回点阈值 `uc_fortress_hold_distance_threshold = 0.25 m`

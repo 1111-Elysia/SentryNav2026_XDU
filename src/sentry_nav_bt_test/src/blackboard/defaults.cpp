@@ -24,6 +24,8 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("last_posture_request_pending", false);
     bb->set("last_posture_request_result", std::string("idle"));
     bb->set("last_posture_request_time_s", -1.0);
+    bb->set("last_observed_effective_posture", -1);
+    bb->set("last_posture_change_time_s", -1.0);
     bb->set("posture_switch_cooldown_ms", 5000);
     bb->set("ul_initialized", 0);
     bb->set("uc_initialized", 0);
@@ -56,12 +58,15 @@ void initializeDefaults(const BT::Blackboard::Ptr &bb)
     bb->set("outpost_gain_point_occupancy_status", 0);
     bb->set("base_gain_point_occupied", 0);
     bb->set("map_command_received", false);
+    bb->set("map_command_window_id", -1);
+    bb->set("map_command_last_event_time_s", -1.0);
     bb->set("ground_robot_position_received", false);
     bb->set("hero_x", 0.0);
     bb->set("hero_y", 0.0);
     bb->set("hero_position_fresh", 0);
     bb->set("hero_highland_inside", 0);
     bb->set("hero_highland_elapsed_ms", 0);
+    bb->set("uc_highland_hold_active", 0);
     bb->set("sentry_info_received", false);
     bb->set("ul_pose_stale_timeout_s", 0.50);
     bb->set("waypoint_now_valid", false);

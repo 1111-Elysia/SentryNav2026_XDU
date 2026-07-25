@@ -17,7 +17,10 @@ constexpr const char *kLastPostureRequestConfirmedKey = "last_posture_request_co
 constexpr const char *kLastPostureRequestPendingKey = "last_posture_request_pending";
 constexpr const char *kLastPostureRequestResultKey = "last_posture_request_result";
 constexpr const char *kLastPostureRequestTimeKey = "last_posture_request_time_s";
+constexpr const char *kLastObservedEffectivePostureKey = "last_observed_effective_posture";
+constexpr const char *kLastPostureChangeTimeKey = "last_posture_change_time_s";
 constexpr const char *kPostureSwitchCooldownKey = "posture_switch_cooldown_ms";
+constexpr int kPostureRequestRetryIntervalMs = 1000;
 
 struct SentryDecisionFeedback
 {
@@ -292,6 +295,42 @@ BT::NodeStatus MaintainSentryPosture::tick()
     if (!getBlackboardIntLike(config().blackboard, "current_effective_posture", current_real_posture)) {
         getBlackboardIntLike(config().blackboard, "current_posture", current_real_posture);
     }
+    double last_posture_change_time_s = -1.0;
+    if (config().blackboard &&
+        current_real_posture >= 1 &&
+        current_real_posture <= 6) {
+        int last_observed_posture = -1;
+        getBlackboardIntLike(
+            config().blackboard,
+            kLastObservedEffectivePostureKey,
+            last_observed_posture);
+        getBlackboardDoubleLike(
+            config().blackboard,
+            kLastPostureChangeTimeKey,
+            last_posture_change_time_s);
+
+        if (last_observed_posture < 1 || last_observed_posture > 6) {
+            // 首次回显只建立基线。开局默认移动姿态不应产生额外 5 秒冷却。
+            config().blackboard->set(
+                kLastObservedEffectivePostureKey,
+                current_real_posture);
+        } else if (last_observed_posture != current_real_posture) {
+            last_posture_change_time_s = now_s;
+            config().blackboard->set(
+                kLastObservedEffectivePostureKey,
+                current_real_posture);
+            config().blackboard->set(
+                kLastPostureChangeTimeKey,
+                last_posture_change_time_s);
+            RCLCPP_INFO(
+                node_->get_logger(),
+                "MaintainSentryPosture: 已确认实际姿态从 %d 切换到 %d，开始 %dms 冷却",
+                last_observed_posture,
+                current_real_posture,
+                cooldown_ms);
+        }
+    }
+
     if (current_real_posture == target_mode_int) {
         double last_request_time_s = -1.0;
         getBlackboardDoubleLike(
@@ -348,31 +387,37 @@ BT::NodeStatus MaintainSentryPosture::tick()
     }
 
     const bool cooldown_active =
-        last_request_time_s > 0.0 &&
-        (now_s - last_request_time_s) * 1000.0 < static_cast<double>(cooldown_ms);
+        last_posture_change_time_s > 0.0 &&
+        (now_s - last_posture_change_time_s) * 1000.0 < static_cast<double>(cooldown_ms);
     const bool force_bypasses_cooldown = force && last_target_mode != target_mode_int;
     if (cooldown_active && !force_bypasses_cooldown) {
-        if (last_target_mode == target_mode_int) {
-            updatePostureRequestStatus(
-                config().blackboard,
-                target_mode_int,
-                false,
-                last_tx_ok,
-                false,
-                true,
-                last_tx_ok ? "pending_same_target_cooldown" : "retry_backoff_same_target",
-                last_request_time_s);
-        } else {
-            updatePostureRequestStatus(
-                config().blackboard,
-                target_mode_int,
-                false,
-                last_tx_ok,
-                false,
-                false,
-                "cooldown_blocked_by_previous_target",
-                last_request_time_s);
-        }
+        updatePostureRequestStatus(
+            config().blackboard,
+            target_mode_int,
+            false,
+            last_tx_ok,
+            false,
+            last_target_mode == target_mode_int && last_pending,
+            "cooldown_after_confirmed_posture_change",
+            last_request_time_s);
+        return BT::NodeStatus::SUCCESS;
+    }
+
+    const bool request_retry_backoff_active =
+        last_target_mode == target_mode_int &&
+        last_request_time_s > 0.0 &&
+        (now_s - last_request_time_s) * 1000.0 <
+            static_cast<double>(kPostureRequestRetryIntervalMs);
+    if (request_retry_backoff_active) {
+        updatePostureRequestStatus(
+            config().blackboard,
+            target_mode_int,
+            false,
+            last_tx_ok,
+            false,
+            last_pending,
+            last_tx_ok ? "pending_request_retry_backoff" : "tx_failed_retry_backoff",
+            last_request_time_s);
         return BT::NodeStatus::SUCCESS;
     }
 

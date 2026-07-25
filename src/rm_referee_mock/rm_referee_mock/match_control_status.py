@@ -58,7 +58,7 @@ class MatchControlStatus:
                 "enemy_base": self.spinBox_enemy_base_hp.value(),
             },
             "robot_status": {
-                "id": self.spinBox_robot_id.value(),
+                "id": int(self.comboBox_robot_id.currentData()),
                 "current_hp": self.spinBox_hp_7.value(),
                 "max_hp": self.spinBox_hp_7.maximum(),
                 "ammo": self.spinBox_ammo.value(),

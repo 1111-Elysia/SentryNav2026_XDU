@@ -368,7 +368,7 @@ int main(int argc, char **argv)
     bool validate_bt_only = false;
 
     node->declare_parameter("waypoints_file", "");
-    node->declare_parameter("bt_message_log_file", "/tmp/sentry_nav_bt_messages.log");
+    node->declare_parameter("bt_message_log_file", "");
     node->declare_parameter("bt_subtree_dir", "");
     node->declare_parameter("validate_bt_only", false);
 

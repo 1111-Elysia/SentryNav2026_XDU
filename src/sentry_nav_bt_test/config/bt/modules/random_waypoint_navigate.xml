@@ -9,8 +9,8 @@
           threshold="{random_wait_time_threshold}"/>
         <Sequence name="随机点导航循环">
           <RandomSelector
-            goal_names="{random_goal_names}"
-            avoid_repeat="{random_avoid_repeat}"
+            goal_names="point1,point2,point3"
+            avoid_repeat="true"
             goal="{random_goal}"
             goal_name="{random_goal_name}"/>
           <ReactiveSequence name="随机巡逻_移动到点">
@@ -18,14 +18,11 @@
             <ReliableNavigateToPose
               goal="{random_goal}"
               goal_name="{random_goal_name}"
-              reach_threshold="{random_reach_threshold}"
-              resend_interval="{nav_resend_interval}"
-              response_timeout="{nav_response_timeout}"
-              result_retry_delay="{nav_result_retry_delay}"/>
+              reach_threshold="0.25"/>
           </ReactiveSequence>
           <ReactiveSequence name="随机巡逻_到点停留">
             <MaintainSentryPosture mode="{random_patrol_posture}"/>
-            <Wait wait_duration="{random_patrol_wait_duration}"/>
+            <Wait wait_duration="10.0"/>
           </ReactiveSequence>
         </Sequence>
       </ReactiveSequence>

@@ -2,17 +2,14 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="PrestartInitReturn">
     <ReactiveSequence name="准备时间回初始点">
-      <CheckCondition key_name="{game_progress_key}" comparison="eq" threshold="{prepare_progress}"/>
-      <PrintNode message="{prestart_message}" throttle_ms="{log_throttle_ms}"/>
-      <GoalSelector goal_name="{init_goal_name}" goal="{prestart_init_goal}"/>
+      <CheckCondition key_name="game_progress" comparison="eq" threshold="1"/>
+      <PrintNode message="{prestart_message}" throttle_ms="2000"/>
+      <GoalSelector goal_name="init" goal="{prestart_init_goal}"/>
       <ReliableNavigateToPose
         goal="{prestart_init_goal}"
-        goal_name="{init_goal_name}"
-        reach_threshold="{reach_threshold}"
-        resend_interval="{nav_resend_interval}"
-        response_timeout="{nav_response_timeout}"
-        result_retry_delay="{nav_result_retry_delay}"
-        log_throttle_ms="{log_throttle_ms}"/>
+        goal_name="init"
+        reach_threshold="0.10"
+        log_throttle_ms="2000"/>
     </ReactiveSequence>
   </BehaviorTree>
 </root>

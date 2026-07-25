@@ -2,23 +2,13 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="RuneTaskViaPoint">
     <Sequence name="经由减速点的能量机关任务">
-      <Switch2 variable="{rune_type}" case_1="small" case_2="large">
-        <Fallback name="小符任务允许">
-          <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
-          <Sequence>
-            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
-            <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
-          </Sequence>
-        </Fallback>
-        <Fallback name="大符任务允许">
-          <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
-          <Sequence>
-            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
-            <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
-          </Sequence>
-        </Fallback>
-        <AlwaysFailure/>
-      </Switch2>
+      <Fallback name="小符任务允许">
+        <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+        <Sequence>
+          <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+          <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+        </Sequence>
+      </Fallback>
       <Fallback name="打符前弹量足够或触发回补">
         <CheckCondition key_name="projectile_allowance_17mm" comparison="gte" threshold="100"/>
         <ForceFailure>
@@ -34,39 +24,33 @@
       <PrintNode message="[Phase 1 | 7:00-6:30] 先经由 myhero 减速点，再前往小符点位"/>
       <GoalSelector goal_name="myhero" goal="{rune_via_goal}"/>
       <ReactiveSequence name="前往减速点并维持对应姿态">
-        <MaintainSentryPosture mode="{rune_move_posture}"/>
+        <MaintainSentryPosture mode="{uc_normal_posture}"/>
         <ReliableNavigateToPose
           goal="{rune_via_goal}"
           goal_name="myhero"
-          reach_threshold="0.25"
-          resend_interval="0.30"
-          response_timeout="0.80"
-          result_retry_delay="0.30"/>
+          reach_threshold="0.25"/>
       </ReactiveSequence>
-      <PrintNode message="{rune_start_message}"/>
-      <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
+      <PrintNode message="[Phase 1 | 7:00-6:30] 前往小符点位，准备激活小能量机关"/>
+      <GoalSelector goal_name="small_rune_point" goal="{rune_goal}"/>
       <ReactiveSequence name="前往符点并维持对应姿态">
-        <MaintainSentryPosture mode="{rune_move_posture}"/>
+        <MaintainSentryPosture mode="{uc_normal_posture}"/>
         <ReliableNavigateToPose
           goal="{rune_goal}"
-          goal_name="{rune_goal_name}"
-          reach_threshold="0.15"
-          resend_interval="0.30"
-          response_timeout="0.80"
-          result_retry_delay="0.30"/>
+          goal_name="small_rune_point"
+          reach_threshold="0.35"/>
       </ReactiveSequence>
-      <PrintNode message="{rune_arrived_message}"/>
+      <PrintNode message="[Phase 1 | 7:00-6:30] 到达小符点位，准备请求小能量机关"/>
       <ReactiveSequence name="打符并维持打符标志">
         <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
         <SetBlackboardValue key="in_rune_phase" value="1" type="int"/>
         <EngageRune
-          rune_type="{rune_type}"
+          rune_type="small"
           posture="1"
           timeout_ms="30000"
           request_interval_ms="1000"/>
       </ReactiveSequence>
       <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
-      <PrintNode message="{rune_done_message}"/>
+      <PrintNode message="[Phase 1 | 7:00-6:30] 小能量机关流程结束"/>
     </Sequence>
   </BehaviorTree>
 </root>

@@ -114,6 +114,13 @@ void RefereeReplayNode::ReplayFile(const std::string& file_path, bool normal_lin
       RCLCPP_ERROR(get_logger(), "Invalid %s replay record size: %u bytes", link_name, data_size);
       return;
     }
+    // Some field recordings are zero-padded after the last valid record.
+    // Treat the first empty zero-timestamp record as EOF instead of reporting
+    // a non-monotonic timestamp error.
+    if (record_count > 0 && timestamp_us == 0 && data_size == 0) {
+      RCLCPP_INFO(get_logger(), "Reached trailing zero padding in %s replay file", link_name);
+      break;
+    }
 
     std::string data(data_size, '\0');
     file.read(data.data(), static_cast<std::streamsize>(data.size()));

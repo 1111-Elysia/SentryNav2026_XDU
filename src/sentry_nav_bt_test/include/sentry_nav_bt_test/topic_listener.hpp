@@ -2,6 +2,7 @@
 #define SENTRY_NAV_BT_TEST_TOPIC_LISTENER_HPP_
 
 #include <string>
+#include <chrono>
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -29,12 +30,14 @@
 #include "rm_referee_msgs/msg/hurt_data.hpp"
 #include "rm_referee_msgs/msg/event_data.hpp"
 #include "rm_referee_msgs/msg/map_command.hpp"
+#include "rm_referee_msgs/msg/ground_robot_position.hpp"
 
 #include <geometry_msgs/msg/twist.hpp>
 #include "sentry_nav_bt_test/center_hold_vw_controller.hpp"
 #include "sentry_nav_bt_test/blackboard/defaults.hpp"
 #include "sentry_nav_bt_test/blackboard_utils.hpp"
 #include "sentry_nav_bt_test/navigation/waypoint_loader.hpp"
+#include "sentry_nav_bt_test/trapezoid_highland.hpp"
 
 namespace sentry_nav_bt_test
 {
@@ -162,6 +165,60 @@ namespace sentry_nav_bt_test
                     blackboard_->set("hurt_armor", 0);
                 });
 
+            hero_position_stale_timer_ = node_->create_wall_timer(
+                std::chrono::milliseconds(250),
+                [this]()
+                {
+                    std::lock_guard<std::mutex> lock(hero_position_mutex_);
+                    if (!hero_position_received_) {
+                        return;
+                    }
+
+                    const double now_s = steadyNowSeconds();
+                    if (now_s - hero_position_last_update_s_ <= kHeroPositionStaleTimeoutSeconds) {
+                        return;
+                    }
+
+                    hero_highland_inside_ = false;
+                    hero_highland_elapsed_s_ = 0.0;
+                    blackboard_->set("hero_position_fresh", 0);
+                    blackboard_->set("hero_highland_inside", 0);
+                    blackboard_->set("hero_highland_elapsed_ms", 0);
+                });
+
+            map_command_window_timer_ = node_->create_wall_timer(
+                std::chrono::milliseconds(100),
+                [this]()
+                {
+                    std::lock_guard<std::mutex> lock(map_command_mutex_);
+                    const int current_window_id =
+                        competitionTimeWindowId(getBlackboardDouble("stage_remain_time", 0.0));
+
+                    if (map_command_observed_window_id_ < 0) {
+                        map_command_observed_window_id_ = current_window_id;
+                        return;
+                    }
+                    if (current_window_id == map_command_observed_window_id_) {
+                        return;
+                    }
+
+                    bool had_map_command = false;
+                    if (!blackboard_->get("map_command_received", had_map_command)) {
+                        had_map_command = false;
+                    }
+                    map_command_observed_window_id_ = current_window_id;
+                    blackboard_->set("map_command_received", false);
+                    blackboard_->set("map_command_window_id", -1);
+                    blackboard_->set("uc_highland_hold_active", 0);
+
+                    if (had_map_command) {
+                        RCLCPP_INFO(
+                            node_->get_logger(),
+                            "比赛时间窗切换至 Phase %d，清除上一时间窗的0x0303触发状态",
+                            current_window_id);
+                    }
+                });
+
             // 订阅己方机器人血量数据
             this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::GameRobotHP>(
                 "/rm_referee/game_robot_hp",
@@ -240,20 +297,94 @@ namespace sentry_nav_bt_test
                         "/rm_referee/robot_pos");
                 });
 
-            // 订阅选手端小地图交互数据（0x0303）。收到任意一帧即认为有小地图标记。
+            // 订阅己方地面机器人位置（0x020B），持续计算英雄在梯形高地内的停留时间。
+            this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::GroundRobotPosition>(
+                "/rm_referee/ground_robot_position",
+                [this](const rm_referee_msgs::msg::GroundRobotPosition::SharedPtr msg, BT::Blackboard::Ptr bb)
+                {
+                    std::lock_guard<std::mutex> lock(hero_position_mutex_);
+                    const double now_s = steadyNowSeconds();
+
+                    if (hero_position_received_ &&
+                        now_s - hero_position_last_update_s_ > kHeroPositionStaleTimeoutSeconds)
+                    {
+                        hero_highland_inside_ = false;
+                        hero_highland_elapsed_s_ = 0.0;
+                    }
+
+                    double robot_id_value = 0.0;
+                    blackboard_utils::getValue(bb, "robot_id", robot_id_value, "BlackboardManager");
+                    const int robot_id = static_cast<int>(robot_id_value);
+                    const bool inside = trapezoid_highland::contains(
+                        static_cast<double>(msg->hero_x),
+                        static_cast<double>(msg->hero_y),
+                        robot_id);
+
+                    if (inside) {
+                        if (!hero_highland_inside_) {
+                            hero_highland_enter_time_s_ = now_s;
+                        }
+                        hero_highland_elapsed_s_ = now_s - hero_highland_enter_time_s_;
+                    } else {
+                        hero_highland_elapsed_s_ = 0.0;
+                    }
+
+                    hero_position_received_ = true;
+                    hero_position_last_update_s_ = now_s;
+                    hero_highland_inside_ = inside;
+
+                    bb->set("ground_robot_position_received", true);
+                    bb->set("hero_x", static_cast<double>(msg->hero_x));
+                    bb->set("hero_y", static_cast<double>(msg->hero_y));
+                    bb->set("hero_position_fresh", 1);
+                    bb->set("hero_highland_inside", inside ? 1 : 0);
+                    bb->set(
+                        "hero_highland_elapsed_ms",
+                        static_cast<int>(hero_highland_elapsed_s_ * 1000.0));
+
+                    RCLCPP_DEBUG(
+                        node_->get_logger(),
+                        "0x020B 英雄位置: (%.2f, %.2f), robot_id=%d, 梯形高地内=%d, 连续停留=%.1fs",
+                        msg->hero_x,
+                        msg->hero_y,
+                        robot_id,
+                        inside ? 1 : 0,
+                        hero_highland_elapsed_s_);
+                });
+
+            // 订阅选手端小地图交互数据（0x0303）。
+            // 官方协议会在一次触发后连发5帧，并继续以1Hz重发最近一包；这里只把新触发记为事件。
             this->subscribeWithProcessorBestEffort<rm_referee_msgs::msg::MapCommand>(
                 "/rm_referee/map_command",
                 [this](const rm_referee_msgs::msg::MapCommand::SharedPtr msg, BT::Blackboard::Ptr bb)
                 {
-                    const rclcpp::Time now_ros = node_->now();
+                    std::lock_guard<std::mutex> lock(map_command_mutex_);
+                    const double now_s = steadyNowSeconds();
 
                     bb->set("map_command", *msg);
-                    bb->set("map_command_received", true);
+                    if (!isNewMapCommandEvent(*msg, now_s)) {
+                        RCLCPP_DEBUG(
+                            node_->get_logger(),
+                            "忽略0x0303协议重复帧: x=%.2f, y=%.2f, key=%u, target_robot_id=%u, cmd_source=%u",
+                            msg->target_position_x,
+                            msg->target_position_y,
+                            static_cast<unsigned>(msg->cmd_keyboard),
+                            static_cast<unsigned>(msg->target_robot_id),
+                            static_cast<unsigned>(msg->cmd_source));
+                        return;
+                    }
 
-                    RCLCPP_INFO_ONCE(
+                    const int window_id =
+                        competitionTimeWindowId(getBlackboardDouble("stage_remain_time", 0.0));
+                    map_command_observed_window_id_ = window_id;
+                    bb->set("map_command_received", true);
+                    bb->set("map_command_window_id", window_id);
+                    bb->set("map_command_last_event_time_s", now_s);
+
+                    RCLCPP_INFO(
                         node_->get_logger(),
-                        "收到 0x0303 小地图交互包: stamp=%.3f, x=%.2f, y=%.2f, key=%u, target_robot_id=%u, cmd_source=%u",
-                        now_ros.seconds(),
+                        "收到新的0x0303小地图指令: Phase=%d, x=%.2f, y=%.2f, key=%u, target_robot_id=%u, cmd_source=%u",
+                        window_id,
                         msg->target_position_x,
                         msg->target_position_y,
                         static_cast<unsigned>(msg->cmd_keyboard),
@@ -312,6 +443,28 @@ namespace sentry_nav_bt_test
                     bb->set("current_posture", static_cast<int>(current_posture));
                     bb->set("current_posture_enhanced", current_posture_enhanced);
                     bb->set("current_effective_posture", current_effective_posture);
+                    if (current_effective_posture >= 1 && current_effective_posture <= 6) {
+                        int last_observed_posture = -1;
+                        if (!bb->get(
+                                "last_observed_effective_posture",
+                                last_observed_posture) ||
+                            last_observed_posture < 1 ||
+                            last_observed_posture > 6) {
+                            // 首次回显只建立基线，开局默认移动姿态可立即切换。
+                            bb->set(
+                                "last_observed_effective_posture",
+                                current_effective_posture);
+                        } else if (last_observed_posture != current_effective_posture) {
+                            const double now_s =
+                                std::chrono::duration<double>(
+                                    std::chrono::steady_clock::now().time_since_epoch())
+                                    .count();
+                            bb->set(
+                                "last_observed_effective_posture",
+                                current_effective_posture);
+                            bb->set("last_posture_change_time_s", now_s);
+                        }
+                    }
                     bb->set("can_activate_rune", can_activate_rune);
                     bb->set("sentry_info_3", raw_info_3);
                     bb->set("attack_posture_remaining_s", static_cast<int>(attack_posture_remaining_s));
@@ -558,6 +711,22 @@ namespace sentry_nav_bt_test
 
         rclcpp::TimerBase::SharedPtr hurt_reset_timer_;
         std::mutex hurt_mutex_;
+        rclcpp::TimerBase::SharedPtr hero_position_stale_timer_;
+        std::mutex hero_position_mutex_;
+        bool hero_position_received_{false};
+        bool hero_highland_inside_{false};
+        double hero_position_last_update_s_{0.0};
+        double hero_highland_enter_time_s_{0.0};
+        double hero_highland_elapsed_s_{0.0};
+        static constexpr double kHeroPositionStaleTimeoutSeconds = 2.5;
+        rclcpp::TimerBase::SharedPtr map_command_window_timer_;
+        std::mutex map_command_mutex_;
+        bool map_command_payload_seen_{false};
+        rm_referee_msgs::msg::MapCommand last_map_command_payload_{};
+        double map_command_last_packet_time_s_{0.0};
+        bool map_command_cluster_triggered_{false};
+        int map_command_observed_window_id_{-1};
+        static constexpr double kMapCommandBurstGapSeconds = 0.35;
 
         std::shared_ptr<CenterHoldVwController> center_hold_vw_controller_;
         bool has_previous_shooter_17mm_heat_{false};
@@ -575,10 +744,96 @@ namespace sentry_nav_bt_test
         bool waypoint_now_received_ = false;
         bool last_waypoint_now_valid_ = false;
 
+        static double steadyNowSeconds()
+        {
+            return std::chrono::duration<double>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
+
+        static int competitionTimeWindowId(double stage_remain_time)
+        {
+            if (stage_remain_time > 390.0) {
+                return 1;
+            }
+            if (stage_remain_time > 330.0) {
+                return 2;
+            }
+            if (stage_remain_time > 300.0) {
+                return 3;
+            }
+            if (stage_remain_time > 240.0) {
+                return 4;
+            }
+            if (stage_remain_time > 210.0) {
+                return 5;
+            }
+            if (stage_remain_time > 165.0) {
+                return 6;
+            }
+            if (stage_remain_time > 135.0) {
+                return 7;
+            }
+            if (stage_remain_time > 90.0) {
+                return 8;
+            }
+            if (stage_remain_time > 60.0) {
+                return 9;
+            }
+            return 10;
+        }
+
+        static bool sameMapCommandPayload(
+            const rm_referee_msgs::msg::MapCommand &lhs,
+            const rm_referee_msgs::msg::MapCommand &rhs)
+        {
+            return lhs.target_position_x == rhs.target_position_x &&
+                   lhs.target_position_y == rhs.target_position_y &&
+                   lhs.cmd_keyboard == rhs.cmd_keyboard &&
+                   lhs.target_robot_id == rhs.target_robot_id &&
+                   lhs.cmd_source == rhs.cmd_source;
+        }
+
+        bool isNewMapCommandEvent(
+            const rm_referee_msgs::msg::MapCommand &msg,
+            double now_s)
+        {
+            if (!map_command_payload_seen_) {
+                map_command_payload_seen_ = true;
+                last_map_command_payload_ = msg;
+                map_command_last_packet_time_s_ = now_s;
+                // 启动后首帧可能只是服务器对历史指令的1Hz重发，先建立基线而不触发。
+                map_command_cluster_triggered_ = false;
+                return false;
+            }
+
+            if (!sameMapCommandPayload(msg, last_map_command_payload_)) {
+                last_map_command_payload_ = msg;
+                map_command_last_packet_time_s_ = now_s;
+                map_command_cluster_triggered_ = true;
+                return true;
+            }
+
+            const double packet_gap_s = now_s - map_command_last_packet_time_s_;
+            map_command_last_packet_time_s_ = now_s;
+
+            if (packet_gap_s > kMapCommandBurstGapSeconds) {
+                // 同内容的单个1Hz包先视为协议重发；若随后出现100ms连发，再确认是一次新触发。
+                map_command_cluster_triggered_ = false;
+                return false;
+            }
+
+            if (!map_command_cluster_triggered_) {
+                map_command_cluster_triggered_ = true;
+                return true;
+            }
+            return false;
+        }
+
         double getBlackboardDouble(const std::string &key, double default_value) const
         {
             double value = default_value;
-            if (!blackboard_->get(key, value)) {
+            if (!blackboard_utils::getValue(
+                    blackboard_, key, value, "BlackboardManager")) {
                 return default_value;
             }
             return value;
@@ -590,7 +845,10 @@ namespace sentry_nav_bt_test
                 return false;
             }
 
-            const double stale_timeout = getBlackboardDouble("ul_pose_stale_timeout_s", 0.50);
+            double stale_timeout = 0.50;
+            if (!blackboard_->get("ul_pose_stale_timeout_s", stale_timeout)) {
+                stale_timeout = 0.50;
+            }
             return (node_->now() - last_waypoint_update_time_).seconds() <= stale_timeout;
         }
 

@@ -2,44 +2,41 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="ShooterPowerRecovery">
     <ReactiveSequence name="发射机构断电回补">
-      <CheckCondition key_name="{shooter_output_key}" comparison="eq" threshold="0"/>
-      <PrintNode message="{recovery_start_message}" throttle_ms="2000"/>
+      <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="0"/>
+      <PrintNode message="[回补] 发射机构电源输出关闭，攻击姿态回补给点等待恢复" throttle_ms="2000"/>
       <Inverter>
         <KeepRunningUntilFailure>
           <Sequence name="断电期间持续回补">
-            <CheckCondition key_name="{shooter_output_key}" comparison="eq" threshold="0"/>
-            <SetBlackboardValue key="{supply_active_key}" value="1" type="int"/>
-            <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
-            <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
-            <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
-            <MaintainSentryPosture mode="{recovery_posture}" force="true"/>
+            <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="0"/>
+            <SetBlackboardValue key="uc_supply_active" value="1" type="int"/>
+            <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+            <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+            <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
+            <MaintainSentryPosture mode="1" force="true"/>
             <ReactiveFallback name="断电回补_RFID保持或重发补给点">
               <Sequence name="断电回补_已在补给区">
-                <CheckCondition key_name="{supply_rfid_detected_key}" comparison="eq" threshold="1"/>
-                <PrintNode message="{recovery_wait_message}" throttle_ms="2000"/>
+                <CheckCondition key_name="rfid_supply_zone_detected" comparison="eq" threshold="1"/>
+                <PrintNode message="[回补] 发射机构电源输出关闭，已在补给区保持攻击姿态" throttle_ms="2000"/>
                 <Wait wait_duration="0.20"/>
               </Sequence>
               <Sequence name="断电回补_攻击姿态回补给点">
                 <PatrolGoalSelector
-                  goal_names="{supply_goal_names}"
-                  index_key="{supply_goal_index_key}"
+                  goal_names="supply_point,supply_point_2"
+                  index_key="uc_shooter_power_recovery_goal_index"
                   goal="{supply_goal}"
                   goal_name="{supply_selected_goal_name}"/>
                 <ReliableNavigateToPose
                   goal="{supply_goal}"
                   goal_name="{supply_selected_goal_name}"
-                  reach_threshold="{supply_reach_threshold}"
-                  resend_interval="{nav_resend_interval}"
-                  response_timeout="{nav_response_timeout}"
-                  result_retry_delay="{nav_result_retry_delay}"/>
+                  reach_threshold="0.25"/>
               </Sequence>
             </ReactiveFallback>
           </Sequence>
         </KeepRunningUntilFailure>
       </Inverter>
       <PrintNode message="{recovery_done_message}"/>
-      <SetBlackboardValue key="{supply_goal_index_key}" value="0" type="int"/>
-      <SetBlackboardValue key="{supply_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="uc_shooter_power_recovery_goal_index" value="0" type="int"/>
+      <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
     </ReactiveSequence>
   </BehaviorTree>
 </root>

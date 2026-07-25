@@ -5,12 +5,12 @@
       <CheckCondition key_name="is_under_attack" comparison="eq" threshold="1"/>
       <Fallback name="按血量选择小陀螺速度">
         <Sequence name="高血量受击速度">
-          <CheckCondition key_name="current_hp" comparison="gte" threshold="{high_hp_threshold}"/>
-          <PublishVw value="{high_hp_vw}" republish_interval_ms="{republish_interval_ms}"/>
+          <CheckCondition key_name="current_hp" comparison="gte" threshold="150"/>
+          <PublishVw value="1.0" republish_interval_ms="50"/>
         </Sequence>
         <Sequence name="低血量受击速度">
-          <CheckCondition key_name="current_hp" comparison="lt" threshold="{low_hp_threshold}"/>
-          <PublishVw value="{low_hp_vw}" republish_interval_ms="{republish_interval_ms}"/>
+          <CheckCondition key_name="current_hp" comparison="lt" threshold="150"/>
+          <PublishVw value="0.3" republish_interval_ms="50"/>
         </Sequence>
       </Fallback>
     </Sequence>

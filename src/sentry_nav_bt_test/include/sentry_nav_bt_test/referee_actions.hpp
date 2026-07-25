@@ -155,6 +155,7 @@ namespace sentry_nav_bt_test
         bool yaw_controller_triggered_{false};
         bool auto_shoot_enabled_{false};
         bool saw_activating_state_{false};
+        bool activation_request_sent_{false};
     };
 
     // 动作 5：打前哨站

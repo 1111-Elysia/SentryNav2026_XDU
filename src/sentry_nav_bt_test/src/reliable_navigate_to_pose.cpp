@@ -29,7 +29,7 @@ BT::PortsList ReliableNavigateToPose::providedPorts()
     BT::InputPort<std::string>("goal_name", "", "目标点名称，用于日志"),
     BT::InputPort<double>("reach_threshold", 0.30, "到点距离阈值"),
     BT::InputPort<double>("resend_interval", 0.50, "重发最小间隔"),
-    BT::InputPort<double>("response_timeout", 1.00, "等待 Nav2 接收的告警阈值；超出后继续等待且不重发"),
+    BT::InputPort<double>("response_timeout", 1.50, "等待 Nav2 接收的告警阈值；超出后继续等待且不重发"),
     BT::InputPort<double>("result_retry_delay", 0.50, "结果失败后的重试延迟"),
     BT::InputPort<double>("cancel_confirm_timeout", 1.50, "等待取消确认的超时时间"),
     BT::InputPort<int>("log_throttle_ms", 0, "高频 INFO 日志节流时间；0 表示不节流"),

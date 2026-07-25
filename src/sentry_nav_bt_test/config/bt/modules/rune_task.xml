@@ -3,20 +3,26 @@
   <BehaviorTree ID="RuneTask">
     <Sequence name="能量机关任务">
       <Switch2 variable="{rune_type}" case_1="small" case_2="large">
-        <Fallback name="小符任务允许">
-          <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
-          <Sequence>
-            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
-            <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
-          </Sequence>
-        </Fallback>
-        <Fallback name="大符任务允许">
-          <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
-          <Sequence>
-            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
-            <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
-          </Sequence>
-        </Fallback>
+        <Sequence name="小符任务允许并选择目标">
+          <Fallback name="小符任务允许">
+            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+            <Sequence>
+              <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+              <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+            </Sequence>
+          </Fallback>
+          <SetBlackboardValue key="rune_selected_goal_name" value="small_rune_point" type="string"/>
+        </Sequence>
+        <Sequence name="大符任务允许并选择目标">
+          <Fallback name="大符任务允许">
+            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
+            <Sequence>
+              <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
+              <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+            </Sequence>
+          </Fallback>
+          <SetBlackboardValue key="rune_selected_goal_name" value="large_rune_point" type="string"/>
+        </Sequence>
         <AlwaysFailure/>
       </Switch2>
       <Fallback name="打符前弹量足够或触发回补">
@@ -32,18 +38,49 @@
       <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
       <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
       <PrintNode message="{rune_start_message}"/>
-      <GoalSelector goal_name="{rune_goal_name}" goal="{rune_goal}"/>
+      <GoalSelector goal_name="{rune_selected_goal_name}" goal="{rune_goal}"/>
       <ReactiveSequence name="前往符点并维持移动姿态">
-        <MaintainSentryPosture mode="{rune_move_posture}"/>
+        <Switch2 variable="{rune_type}" case_1="small" case_2="large">
+          <Fallback name="导航期间小符机会仍有效">
+            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+            <Sequence>
+              <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+              <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+            </Sequence>
+          </Fallback>
+          <Fallback name="导航期间大符机会仍有效">
+            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
+            <Sequence>
+              <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
+              <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+            </Sequence>
+          </Fallback>
+          <AlwaysFailure/>
+        </Switch2>
+        <MaintainSentryPosture mode="{uc_normal_posture}"/>
         <ReliableNavigateToPose
           goal="{rune_goal}"
-          goal_name="{rune_goal_name}"
-          reach_threshold="0.15"
-          resend_interval="0.30"
-          response_timeout="0.80"
-          result_retry_delay="0.30"/>
+          goal_name="{rune_selected_goal_name}"
+          reach_threshold="0.35"/>
       </ReactiveSequence>
       <PrintNode message="{rune_arrived_message}"/>
+      <Switch2 variable="{rune_type}" case_1="small" case_2="large">
+        <Fallback name="到点后小符机会仍有效">
+          <CheckCondition key_name="small_rune_status" comparison="eq" threshold="2"/>
+          <Sequence>
+            <CheckCondition key_name="small_rune_status" comparison="eq" threshold="0"/>
+            <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+          </Sequence>
+        </Fallback>
+        <Fallback name="到点后大符机会仍有效">
+          <CheckCondition key_name="large_rune_status" comparison="eq" threshold="2"/>
+          <Sequence>
+            <CheckCondition key_name="large_rune_status" comparison="eq" threshold="0"/>
+            <CheckCondition key_name="can_activate_rune" comparison="eq" threshold="1"/>
+          </Sequence>
+        </Fallback>
+        <AlwaysFailure/>
+      </Switch2>
       <ReactiveSequence name="打符并维持打符标志">
         <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
         <SetBlackboardValue key="in_rune_phase" value="1" type="int"/>

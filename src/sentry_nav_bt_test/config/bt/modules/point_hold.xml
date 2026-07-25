@@ -16,10 +16,7 @@
                 <ReliableNavigateToPose
                   goal="{point_hold_goal}"
                   goal_name="{point_hold_goal_name}"
-                  reach_threshold="{point_hold_arrive_threshold}"
-                  resend_interval="{nav_resend_interval}"
-                  response_timeout="{nav_response_timeout}"
-                  result_retry_delay="{nav_result_retry_delay}"/>
+                  reach_threshold="{point_hold_arrive_threshold}"/>
                 <CheckGoalReached goal="{point_hold_goal}" threshold="{point_hold_exit_threshold}"/>
               </Sequence>
             </ReactiveSequence>

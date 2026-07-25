@@ -3,55 +3,49 @@
   <BehaviorTree ID="OutpostTask">
     <Fallback name="前哨站任务及状态清理">
       <Sequence name="执行前哨站任务">
-        <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
-        <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
-        <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
+        <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+        <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+        <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
         <Parallel name="打前哨站并驻守直到阶段切换" success_count="1" failure_count="1">
           <!-- 作战分支始终保持 RUNNING，只有下方的阶段计时分支能结束 Parallel。 -->
           <KeepRunningUntilFailure>
             <ReactiveFallback name="前哨站存活状态选择">
               <Sequence name="前哨站被击毁后转移至myhero">
                 <CheckCondition key_name="enemy_outpost_hp" comparison="lte" threshold="0"/>
-                <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
+                <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
                 <SubTree
                   ID="PointHold"
                   point_hold_goal_name="myhero"
-                  point_hold_arrive_threshold="0.25"
-                  point_hold_exit_threshold="0.30"
-                  point_hold_move_posture="1"
+                  point_hold_arrive_threshold="0.35"
+                  point_hold_exit_threshold="0.40"
+                  point_hold_move_posture="3"
                   point_hold_posture="1"
                   point_hold_wait_duration="0.5"
                   point_hold_log_throttle_ms="10000"
                   point_hold_message="前哨站已被击毁，转移至 myhero 点位驻守"
-                  rune_phase_key="{rune_phase_key}"
-                  fortress_active_key="{fortress_active_key}"
-                  nav_resend_interval="{nav_resend_interval}"
-                  nav_response_timeout="{nav_response_timeout}"
-                  nav_result_retry_delay="{nav_result_retry_delay}"
+                  rune_phase_key="in_rune_phase"
+                  fortress_active_key="uc_fortress_hold_active"
                   _autoremap="true"/>
               </Sequence>
               <ReactiveSequence name="驻守前哨站点并打击">
                 <SubTree
                   ID="PointHold"
-                  point_hold_goal_name="{outpost_goal_name}"
-                  point_hold_arrive_threshold="{outpost_reach_threshold}"
-                  point_hold_exit_threshold="{outpost_reach_threshold}"
-                  point_hold_move_posture="{outpost_move_posture}"
+                  point_hold_goal_name="outpost_point"
+                  point_hold_arrive_threshold="0.25"
+                  point_hold_exit_threshold="0.30"
+                  point_hold_move_posture="{uc_normal_posture}"
                   point_hold_posture="4"
                   point_hold_wait_duration="0"
                   point_hold_log_throttle_ms="10000"
-                  point_hold_message="{outpost_start_message}"
-                  rune_phase_key="{rune_phase_key}"
-                  fortress_active_key="{fortress_active_key}"
-                  nav_resend_interval="{nav_resend_interval}"
-                  nav_response_timeout="{nav_response_timeout}"
-                  nav_result_retry_delay="{nav_result_retry_delay}"
+                  point_hold_message="[Phase 2 | 6:30-5:30] 开局小符结束，前往前哨站点位"
+                  rune_phase_key="in_rune_phase"
+                  fortress_active_key="uc_fortress_hold_active"
                   _autoremap="true"/>
                 <ReactiveSequence name="打前哨站并维持激活标志">
                   <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="1"/>
-                  <SetBlackboardValue key="{outpost_active_key}" value="1" type="int"/>
-                  <PrintNode message="{outpost_arrived_message}" throttle_ms="10000"/>
-                  <EngageOutpost timeout_ms="{outpost_timeout_ms}"/>
+                  <SetBlackboardValue key="uc_outpost_active" value="1" type="int"/>
+                  <PrintNode message="[Phase 2 | 6:30-5:30] 已到达前哨站点位，开始打前哨站" throttle_ms="10000"/>
+                  <EngageOutpost timeout_ms="70000"/>
                 </ReactiveSequence>
               </ReactiveSequence>
             </ReactiveFallback>
@@ -61,15 +55,15 @@
               <CheckCondition
                 key_name="stage_remain_time"
                 comparison="gt"
-                threshold="{outpost_wait_time_threshold}"/>
+                threshold="330"/>
             </KeepRunningUntilFailure>
           </ForceSuccess>
         </Parallel>
-        <PrintNode message="{outpost_done_message}"/>
-        <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
+        <PrintNode message="[Phase 2 | 6:30-5:30] 前哨站流程结束，等待阶段切换完成"/>
+        <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
       </Sequence>
       <ForceFailure>
-        <SetBlackboardValue key="{outpost_active_key}" value="0" type="int"/>
+        <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
       </ForceFailure>
     </Fallback>
   </BehaviorTree>

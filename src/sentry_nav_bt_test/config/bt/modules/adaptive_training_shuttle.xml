@@ -2,41 +2,35 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="AdaptiveTrainingShuttle">
     <Sequence name="高地堡垒往返训练">
-      <SetBlackboardValue key="{rune_phase_key}" value="0" type="int"/>
-      <SetBlackboardValue key="{fortress_active_key}" value="0" type="int"/>
+      <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+      <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
 
       <SubTree
         ID="PointHold"
-        point_hold_goal_name="{shuttle_highland_goal_name}"
-        point_hold_arrive_threshold="{shuttle_reach_threshold}"
-        point_hold_exit_threshold="{shuttle_exit_threshold}"
-        point_hold_move_posture="{shuttle_move_posture}"
-        point_hold_posture="{shuttle_hold_posture}"
-        point_hold_wait_duration="{shuttle_stay_duration}"
+        point_hold_goal_name="trapezoid_highland"
+        point_hold_arrive_threshold="0.25"
+        point_hold_exit_threshold="0.30"
+        point_hold_move_posture="3"
+        point_hold_posture="1"
+        point_hold_wait_duration="{uc_adaptive_stay_duration}"
         point_hold_log_throttle_ms="2000"
         point_hold_message="{shuttle_highland_message}"
-        rune_phase_key="{rune_phase_key}"
-        fortress_active_key="{fortress_active_key}"
-        nav_resend_interval="{nav_resend_interval}"
-        nav_response_timeout="{nav_response_timeout}"
-        nav_result_retry_delay="{nav_result_retry_delay}"
+        rune_phase_key="in_rune_phase"
+        fortress_active_key="uc_fortress_hold_active"
         _autoremap="true"/>
 
       <SubTree
         ID="PointHold"
-        point_hold_goal_name="{shuttle_fortress_goal_name}"
-        point_hold_arrive_threshold="{shuttle_reach_threshold}"
-        point_hold_exit_threshold="{shuttle_exit_threshold}"
-        point_hold_move_posture="{shuttle_move_posture}"
-        point_hold_posture="{shuttle_hold_posture}"
-        point_hold_wait_duration="{shuttle_stay_duration}"
+        point_hold_goal_name="fortress"
+        point_hold_arrive_threshold="0.25"
+        point_hold_exit_threshold="0.30"
+        point_hold_move_posture="3"
+        point_hold_posture="1"
+        point_hold_wait_duration="{uc_adaptive_stay_duration}"
         point_hold_log_throttle_ms="2000"
         point_hold_message="{shuttle_fortress_message}"
-        rune_phase_key="{rune_phase_key}"
-        fortress_active_key="{fortress_active_key}"
-        nav_resend_interval="{nav_resend_interval}"
-        nav_response_timeout="{nav_response_timeout}"
-        nav_result_retry_delay="{nav_result_retry_delay}"
+        rune_phase_key="in_rune_phase"
+        fortress_active_key="uc_fortress_hold_active"
         _autoremap="true"/>
     </Sequence>
   </BehaviorTree>

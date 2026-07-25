@@ -2,8 +2,9 @@
 #define SENTRY_NAV_BT_TEST_BLACKBOARD_UTILS_HPP_
 
 #include <algorithm>
-#include <rclcpp/logging.hpp>
 #include <cmath>
+#include <exception>
+#include <rclcpp/logging.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -27,19 +28,32 @@ namespace sentry_nav_bt_test
         template <typename T>
         bool getTypedValue(BT::Blackboard::Ptr blackboard, const std::string &key, double &result)
         {
-            T value;
-            if (blackboard->get(key, value))
+            if (!blackboard)
             {
-                if constexpr (std::is_same_v<T, bool>)
-                {
-                    result = value ? 1.0 : 0.0;
-                }
-                else
-                {
-                    result = static_cast<double>(value);
-                }
-                return true;
+                return false;
             }
+
+            try
+            {
+                T value;
+                if (blackboard->get(key, value))
+                {
+                    if constexpr (std::is_same_v<T, bool>)
+                    {
+                        result = value ? 1.0 : 0.0;
+                    }
+                    else
+                    {
+                        result = static_cast<double>(value);
+                    }
+                    return true;
+                }
+            }
+            catch (const std::exception &)
+            {
+                // 类型不兼容时继续尝试下一种受支持的数值类型。
+            }
+
             return false;
         }
 

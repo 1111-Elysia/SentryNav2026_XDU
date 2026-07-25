@@ -25,11 +25,10 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 
 ## 已知问题与解决方案
 
-### 1. `FakeLocation` 默认命名空间和行为树输入不一致
+### 1. `FakeLocation` 与行为树使用相同的裁判系统坐标和话题
 
-- 现状：`FakeLocation` 默认发布到 `/rm_referee/mock/*`
-- 影响：`sentry_nav_bt_test` 默认只订阅 `/rm_referee/robot_pos`，所以 TF 以外的裁判系统位置链路不会自动接上
-- 解决方案：联调 UC 树时把 `FakeLocation` 的话题前缀手动改成 `/rm_referee`
+- `FakeLocation` 使用裁判系统官方 28 m × 15 m 场地坐标：左下角为原点，X 向右、Y 向上。
+- 默认发布到 `/rm_referee/*`，可以直接连接 `sentry_nav_bt_test`。
 
 ### 2. `MatchControl` 按规则执行 5 秒姿态冷却
 
@@ -69,7 +68,10 @@ ros2 run rm_referee_mock rqt_clean_start plain --list-plugins
 
 模拟 UWB 定位数据。rqt 界面上每个小圆点代表一个机器人，拖动圆点可以改变机器人的位置，拖动圆点周围的小三角可以改变机器人的朝向。如果需要更精确的数值也可以直接输入位置和朝向数据。Fake Location 会根据以上数据构造发布 `rm_referee_msgs/RobotPos` 和 `rm_referee_msgs/GroundRobotPosition` 消息。另外，Fake Location 还支持给实际发布的假数据添加高斯噪声，以模拟真实环境下的定位误差。通过调整界面上的“位置噪声”参数可以控制噪声的大小。
 
-默认话题前缀是 `/rm_referee/mock`。如果是给 `sentry_nav_bt_test` 喂数据，记得手动改成 `/rm_referee`。
+默认话题前缀是 `/rm_referee`，位置坐标与裁判系统
+`GroundRobotPosition` 的 28 m × 15 m 官方场地坐标一致。
+“当前机器人”可选择红方哨兵（ID 7）或蓝方哨兵（ID 107）；
+联调时应在 Match Control 中选择相同的哨兵 ID。
 
 > [!NOTE]  
 > 根据裁判系统协议定义，只有“本机器人位置”(`rm_referee_msgs/RobotPos`)消息包含朝向信息。

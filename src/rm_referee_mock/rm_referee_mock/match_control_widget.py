@@ -196,8 +196,11 @@ class MatchControlWidget(
             self.spinBox_gold_coin = None
         if not hasattr(self, 'spinBox_ammo_fortress'):
             self.spinBox_ammo_fortress = None
-        if not hasattr(self, 'spinBox_robot_id'):
-            self.spinBox_robot_id = QtWidgets.QSpinBox()
+        if not hasattr(self, 'comboBox_robot_id'):
+            self.comboBox_robot_id = QtWidgets.QComboBox()
+        if self.comboBox_robot_id.count() == 0:
+            self.comboBox_robot_id.addItem("7 - 红方哨兵", 7)
+            self.comboBox_robot_id.addItem("107 - 蓝方哨兵", 107)
         self._setup_projectile_allowance_inputs()
         self._setup_sentry_info_inputs()
         self._setup_v2_game_hp_inputs()

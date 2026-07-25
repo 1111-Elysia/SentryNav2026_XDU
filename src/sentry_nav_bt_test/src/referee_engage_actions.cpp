@@ -301,6 +301,7 @@ BT::NodeStatus EngageRune::onStart()
     yaw_controller_triggered_ = false;
     auto_shoot_enabled_ = false;
     setRuneOutcome(false, "running");
+    activation_request_sent_ = false;
     if (config().blackboard) {
         config().blackboard->set("in_rune_phase", 1);
     }
@@ -386,6 +387,20 @@ BT::NodeStatus EngageRune::onRunning()
         return BT::NodeStatus::SUCCESS;
     }
 
+    if (requested_rune_status == 0 &&
+        have_can_activate &&
+        can_activate_rune != 1 &&
+        !saw_activating_state_ &&
+        !activation_request_sent_) {
+        RCLCPP_WARN(
+            node_->get_logger(),
+            "EngageRune: %s当前无可用激活机会，立即结束本次流程",
+            runeTypeName());
+        setRuneOutcome(false, "opportunity_unavailable");
+        cleanupOutputs();
+        return BT::NodeStatus::FAILURE;
+    }
+
     if (!have_can_activate || can_activate_rune != 1) {
         return BT::NodeStatus::RUNNING;
     }
@@ -449,6 +464,7 @@ BT::NodeStatus EngageRune::onRunning()
         feedback.remote_hp_exchange_count);
     last_request_time_ = now_tp;
     if (send_packet(packet)) {
+        activation_request_sent_ = true;
         RCLCPP_INFO(
             node_->get_logger(),
             "EngageRune: 已按顺序最后发送 0x0120 bit24，请求%s进入正在激活状态",

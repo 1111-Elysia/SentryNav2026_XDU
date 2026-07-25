@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="ConditionalTrapezoidHighlandHold">
+    <ReactiveSequence name="本时间窗触发后切换至梯形高地驻守">
+      <Fallback name="本时间窗已触发或出现新触发">
+        <CheckCondition key_name="uc_highland_hold_active" comparison="eq" threshold="1"/>
+        <Sequence name="检测并锁存本时间窗触发">
+          <Fallback name="英雄高地或本时间窗云台手指令触发">
+            <Sequence name="本时间窗0x0303触发">
+              <CheckCondition key_name="map_command_received" comparison="eq" threshold="1"/>
+              <CheckCondition
+                key_name="map_command_window_id"
+                comparison="eq"
+                threshold="{highland_hold_window_id}"/>
+            </Sequence>
+            <Sequence name="英雄连续停留梯形高地">
+              <CheckCondition key_name="ground_robot_position_received" comparison="eq" threshold="1"/>
+              <CheckCondition key_name="hero_position_fresh" comparison="eq" threshold="1"/>
+              <CheckCondition key_name="hero_highland_inside" comparison="eq" threshold="1"/>
+              <CheckCondition
+                key_name="hero_highland_elapsed_ms"
+                comparison="gte"
+                threshold="5000"/>
+            </Sequence>
+          </Fallback>
+          <SetBlackboardValue key="uc_highland_hold_active" value="1" type="int"/>
+        </Sequence>
+      </Fallback>
+      <SetBlackboardValue key="uc_chase_active" value="0" type="int"/>
+      <SubTree
+        ID="PointHold"
+        point_hold_goal_name="trapezoid_highland"
+        point_hold_arrive_threshold="0.25"
+        point_hold_exit_threshold="0.30"
+        point_hold_move_posture="3"
+        point_hold_posture="1"
+        point_hold_wait_duration="0.5"
+        point_hold_log_throttle_ms="10000"
+        point_hold_message="{highland_hold_trigger_message}"
+        rune_phase_key="in_rune_phase"
+        fortress_active_key="uc_fortress_hold_active"
+        _autoremap="true"/>
+    </ReactiveSequence>
+  </BehaviorTree>
+</root>
