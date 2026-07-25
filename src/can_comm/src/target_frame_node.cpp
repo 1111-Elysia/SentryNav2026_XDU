@@ -67,8 +67,9 @@ public:
       });
 
     // 监听 planner 切换
+    const auto planner_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
     planner_name_sub_ = this->create_subscription<std_msgs::msg::String>(
-      planner_name_topic_, 10,
+      planner_name_topic_, planner_qos,
       [this](const std_msgs::msg::String::SharedPtr m) {
         auto prev = current_planner_;
         current_planner_ = m->data;

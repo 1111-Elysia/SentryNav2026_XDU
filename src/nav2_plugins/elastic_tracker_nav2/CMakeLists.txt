@@ -32,6 +32,8 @@ include_directories(
 # Elastic Planner library (header-only core + compiled plugin)
 add_library(elastic_planner SHARED
   src/elastic_planner.cpp
+  src/corridor_2d.cpp
+  src/minco_optimizer.cpp
 )
 
 ament_target_dependencies(elastic_planner
@@ -53,6 +55,7 @@ target_link_libraries(elastic_planner Eigen3::Eigen)
 # Allow plugin to find itself
 target_include_directories(elastic_planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../GCOPTER/gcopter/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 

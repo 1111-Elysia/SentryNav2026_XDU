@@ -8,5 +8,7 @@ data/
 src/bringup/map/
 *.pcd
 *.pgm
+!src/elastic_tracker_sim/map.pgm
+src/elastic/
 *.ply.vscode/
 can_comm_start.sh
