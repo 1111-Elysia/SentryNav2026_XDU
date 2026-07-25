@@ -59,18 +59,6 @@
                          key_name="uc_fortress_hold_active"
                          comparison="eq"
                          threshold="0"/>
-              <Condition ID="CheckCondition"
-                         key_name="train_chase_active"
-                         comparison="eq"
-                         threshold="0"/>
-              <Condition ID="CheckCondition"
-                         key_name="train_chase_started"
-                         comparison="eq"
-                         threshold="0"/>
-              <Condition ID="CheckCondition"
-                         key_name="train_vw_active"
-                         comparison="eq"
-                         threshold="0"/>
             </Sequence>
             <Sequence name="执行赛前复位">
               <Action ID="PrintNode"
@@ -90,18 +78,6 @@
                       type="int"/>
               <Action ID="SetBlackboardValue"
                       key="uc_fortress_hold_active"
-                      value="0"
-                      type="int"/>
-              <Action ID="SetBlackboardValue"
-                      key="train_chase_active"
-                      value="0"
-                      type="int"/>
-              <Action ID="SetBlackboardValue"
-                      key="train_chase_started"
-                      value="0"
-                      type="int"/>
-              <Action ID="SetBlackboardValue"
-                      key="train_vw_active"
                       value="0"
                       type="int"/>
               <Action ID="SetBlackboardValue"
@@ -135,18 +111,6 @@
                     value="0"
                     type="int"/>
             <Action ID="SetBlackboardValue"
-                    key="train_chase_active"
-                    value="0"
-                    type="int"/>
-            <Action ID="SetBlackboardValue"
-                    key="train_chase_started"
-                    value="0"
-                    type="int"/>
-            <Action ID="SetBlackboardValue"
-                    key="train_vw_active"
-                    value="0"
-                    type="int"/>
-            <Action ID="SetBlackboardValue"
                     key="uc_fortress_goal_name"
                     value="fortress"
                     type="string"/>
@@ -168,41 +132,6 @@
                      comparison="eq"
                      threshold="4"/>
         </Sequence>
-        <ForceSuccess>
-          <MaintainSentryPosture mode="1"/>
-        </ForceSuccess>
-        <ForceSuccess>
-          <Fallback name="受击VW控制">
-            <Sequence name="受击期间持续发布VW1">
-              <CheckCondition key_name="is_under_attack"
-                              comparison="eq"
-                              threshold="1"/>
-              <SubTree ID="UnderAttackVw"
-                       high_hp_threshold="150"
-                       high_hp_vw="1.0"
-                       low_hp_threshold="150"
-                       low_hp_vw="1.0"
-                       republish_interval_ms="50"
-                       _autoremap="true"/>
-              <SetBlackboardValue key="train_vw_active"
-                                  value="1"
-                                  type="int"/>
-            </Sequence>
-            <Sequence name="受击结束只发布一次VW0">
-              <CheckCondition key_name="is_under_attack"
-                              comparison="eq"
-                              threshold="0"/>
-              <CheckCondition key_name="train_vw_active"
-                              comparison="eq"
-                              threshold="1"/>
-              <PublishVw value="0.0"
-                         republish_interval_ms="0"/>
-              <SetBlackboardValue key="train_vw_active"
-                                  value="0"
-                                  type="int"/>
-            </Sequence>
-          </Fallback>
-        </ForceSuccess>
         <ReactiveFallback name="主逻辑_MainLogic">
           <SubTree ID="Resurrection"
                    _autoremap="true"/>
@@ -210,56 +139,16 @@
             <Parallel failure_count="1"
                       success_count="-1">
               <ReactiveFallback name="全场策略机">
-                <ReactiveSequence name="发现目标后追击">
-                  <TargetDetected topic_name="/target/distance"
-                                  lost_timeout="1.0"/>
-                  <Sequence name="巡逻切换到追击">
-                    <Action ID="SetBlackboardValue"
-                            key="train_chase_active"
-                            value="1"
-                            type="int"/>
-                    <Action ID="SetBlackboardValue"
-                            key="train_chase_started"
-                            value="1"
-                            type="int"/>
-                    <Action ID="Wait"
-                            wait_duration="0.60"/>
-                    <SubTree ID="Chase"
-                             chase_active_key="train_chase_active"
-                             chase_message="[Train] 检测到目标，进入动态追击"
-                             chase_log_throttle_ms="2000"
-                             chase_posture="1"
-                             chase_planner="ElasticTracker"
-                             chase_fallback_planner="GridBased"
-                             chase_planner_topic="/planner_name"
-                             _autoremap="true"/>
-                  </Sequence>
-                </ReactiveSequence>
-                <Sequence name="无目标时随机巡逻">
-                  <Action ID="SetBlackboardValue"
-                          key="train_chase_active"
-                          value="0"
-                          type="int"/>
-                  <Fallback name="首次巡逻无需切换等待">
-                    <Condition ID="CheckCondition"
-                               key_name="train_chase_started"
-                               comparison="eq"
-                               threshold="0"/>
-                    <Action ID="Wait"
-                            wait_duration="0.60"/>
-                  </Fallback>
-                  <SubTree ID="RandomWaypointNavigate"
-                           random_goal_names="point1,point2,point3,point4,point5"
-                           random_avoid_repeat="true"
-                           random_patrol_posture="1"
-                           random_reach_threshold="0.25"
-                           random_patrol_wait_duration="3.0"
-                           random_wait_time_threshold="0"
-                           nav_resend_interval="0.30"
-                           nav_response_timeout="0.80"
-                           nav_result_retry_delay="0.30"
-                           _autoremap="true"/>
-                </Sequence>
+                <SubTree ID="RandomWaypointNavigate"
+                         random_goal_names="point1,point2,point3,point4,point5"
+                         random_avoid_repeat="true"
+                         random_reach_threshold="0.25"
+                         random_patrol_wait_duration="3.0"
+                         random_wait_time_threshold="0"
+                         nav_resend_interval="0.30"
+                         nav_response_timeout="0.80"
+                         nav_result_retry_delay="0.30"
+                         _autoremap="true"/>
               </ReactiveFallback>
             </Parallel>
           </Sequence>

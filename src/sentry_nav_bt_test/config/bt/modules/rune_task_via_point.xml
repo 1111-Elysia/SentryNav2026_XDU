@@ -37,7 +37,7 @@
         <ReliableNavigateToPose
           goal="{rune_goal}"
           goal_name="small_rune_point"
-          reach_threshold="0.35"/>
+          reach_threshold="0.15"/>
       </ReactiveSequence>
       <PrintNode message="[Phase 1 | 7:00-6:30] 到达小符点位，准备请求小能量机关"/>
       <ReactiveSequence name="打符并维持打符标志">
