@@ -4,9 +4,9 @@
 #include <iostream>
 #include <string>
 
-#include "gcopter/minco.hpp"
-#include "gcopter/trajectory.hpp"
-#include "gcopter/lbfgs.hpp"
+#include "elastic_tracker/3rdparty/gcopter/minco.hpp"
+#include "elastic_tracker/3rdparty/gcopter/trajectory.hpp"
+#include "elastic_tracker/3rdparty/gcopter/lbfgs.hpp"
 
 namespace elastic_tracker{
 

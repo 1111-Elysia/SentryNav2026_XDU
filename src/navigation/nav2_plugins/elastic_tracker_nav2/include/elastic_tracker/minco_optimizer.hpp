@@ -5,8 +5,8 @@
 #include <Eigen/Eigen>
 #include "nav_msgs/msg/path.hpp"
 #include "elastic_tracker/corridor_2d.hpp"
-#include "gcopter/trajectory.hpp"
-#include "gcopter/minco.hpp"
+#include "elastic_tracker/3rdparty/gcopter/trajectory.hpp"
+#include "elastic_tracker/3rdparty/gcopter/minco.hpp"
 
 namespace elastic_tracker{
 

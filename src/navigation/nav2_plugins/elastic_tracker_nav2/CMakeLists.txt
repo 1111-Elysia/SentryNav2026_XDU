@@ -18,7 +18,6 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(nav2_smac_planner REQUIRED)
-find_package(ompl REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -55,7 +54,6 @@ target_link_libraries(elastic_planner Eigen3::Eigen)
 # Allow plugin to find itself
 target_include_directories(elastic_planner PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../GCOPTER/gcopter/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 

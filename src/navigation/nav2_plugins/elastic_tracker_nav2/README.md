@@ -197,7 +197,7 @@ colcon build --packages-select elastic_tracker_nav2
 - `nav2_core` / `nav2_costmap_2d` / `nav2_smac_planner`
 - `tf2_ros` / `tf2_geometry_msgs`
 - `Eigen3`
-- **GCOPTER** (`gcopter/` 外部库，MINCO 求解器，位于 `../../GCOPTER/gcopter`)
+- 内置的 GCOPTER MINCO / L-BFGS 头文件（MIT 许可证），无需依赖外部 `gcopter` 包或源码目录
 
 ## 文件结构
 
@@ -211,7 +211,8 @@ elastic_tracker_nav2/
 │   │   └── elastic_planner.hpp          # 主规划器 (Nav2 GlobalPlanner)
 │   ├── elastic_tracker/
 │   │   ├── corridor_2d.hpp              # SFC 安全走廊生成
-│   │   └── minco_optimizer.hpp          # MINCO 轨迹优化 + L-BFGS
+│   │   ├── minco_optimizer.hpp          # MINCO 轨迹优化 + L-BFGS
+│   │   └── 3rdparty/gcopter/             # 内置 MINCO / L-BFGS 头文件（MIT）
 │   ├── env/
 │   │   ├── env_2d.hpp                   # costmap A* 搜索环境
 │   │   └── polygon_zone.hpp             # 多边形区域判定

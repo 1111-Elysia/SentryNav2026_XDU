@@ -117,9 +117,6 @@
 | [imu-calib](src/tools/imu-calib/README.md)             | IMU 静态安装倾角自动标定      |
 | [rosbag_record](src/tools/rosbag_record/README.md)       | Rosbag 录制工具               |
 
-### GCOPTER — 外部依赖
-
-MINCO 轨迹优化求解器，被 `elastic_tracker_nav2` 引用。
 
 ## 环境要求
 
@@ -263,7 +260,7 @@ CAN ←→ can_comm ←→ /cmd_vel, /vw, /target_yaw, /detected_target_pose, ..
 | -------------------------------------------------------------------------------------- | ---------------------------------------- | ---------- |
 | [Super-LIO](https://github.com/Liansheng-Wang/Super-LIO)                               | LiDAR-惯性里程计                         | GPL-3.0    |
 | [Elastic-Tracker](https://github.com/ZJU-FAST-Lab/Elastic-Tracker)                     | 弹性追踪算法 (ICRA 2022)，MINCO 轨迹优化 | —          |
-| [GCOPTER](https://github.com/ZJU-FAST-Lab/GCOPTER)                                     | MINCO 多项式轨迹求解器                   | GPL-3.0    |
+| [GCOPTER](https://github.com/ZJU-FAST-Lab/GCOPTER)                                     | MINCO 多项式轨迹求解器                   | MIT        |
 | [Lightning-LM](https://github.com/gaoxiang12/lightning-lm)                             | 激光重定位与回环检测                     | —          |
 | [rm_referee_ros2](https://github.com/XDU-IRobot/rm_referee_ros2)                       | 裁判系统 ROS 2 通信协议                  | Apache-2.0 |
 | [cod-rm2026-navigation](https://gitee.com/codnavgation/cod_-rm2026_-navigation)        | RM 哨兵导航参考                          | —          |
