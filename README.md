@@ -239,7 +239,7 @@ CAN ←→ can_comm ←→ /cmd_vel, /vw, /target_yaw, /detected_target_pose, ..
 | ------------------------------------- | --------------------- | ----------------------------------------------- |
 | `/cmd_vel`                            | `Twist`               | Nav2 输出速度指令                               |
 | `/odom`                               | `Odometry`            | 里程计 (由 tf_odom_publisher/tf_only_odom 发布) |
-| `/scan`                               | `LaserScan`           | LiDAR 转 LaserScan (由 livox_to_scan 发布)      |
+
 | `/livox/lidar_filtered`               | `PointCloud2`         | 过滤后 LiDAR 点云                               |
 | `/detected_target_pose`               | `PoseStamped`         | 目标位姿 (ElasticTracker 输入)                  |
 | `/target_yaw`                         | `Float32`             | 指令 yaw (大 yaw，NUC→MCU)                      |
