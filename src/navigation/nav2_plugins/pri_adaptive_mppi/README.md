@@ -2,6 +2,8 @@
 
 自适应 MPPI 控制器 Wrapper。根据全局规划路径与预定义直线的穿越方向，自动在 **普通 / 上坡 / 下坡** 三套 MPPI 参数之间切换。内部通过 pluginlib 动态加载 `nav2_mppi_controller::MPPIController`，切换模式时销毁旧实例并以新模式前缀重新配置。
 
+**Normal 模式** 内置三段式到点控制 — 接近目标时自动限速，极近距离 P 控制直驱防止画弧绕圈（与 `GoalApproachController` 逻辑一致）。
+
 与 `line_crossing_layer` 共享直线定义格式，实现"costmap 引导垂直穿越 + 控制器自适应参数切换"的完整跨越管线。
 
 ## 模式切换逻辑
@@ -48,6 +50,10 @@
 | `max_path_age` | float | 2.0 | 路径最大有效期 (s)，超时后不做穿越检测 |
 | `uphill_braking_distance` | float | 0.5 | 上坡急停距离 (m)，见下方上坡急停说明 |
 | `uphill_stuck_vw` | float | 0.5 | 上坡阶段持续输出的 Vw 值 (rad/s，发布到 `/vw`) |
+| `approach_distance` | float | 1.5 | 接近区距离 (m)，dist < 此值时合速度钳位到 approach_velocity（仅 normal 模式） |
+| `approach_velocity` | float | 0.5 | 接近阶段最大合速度 (m/s)（仅 normal 模式） |
+| `direct_approach_distance` | float | 0.5 | 直驱模式距离 (m)，dist < 此值时 P 控制器直驱，角速度归零（仅 normal 模式） |
+| `direct_approach_kp` | float | 1.0 | P 控制器增益（仅 normal 模式） |
 | `lines` | string[] | `[]` | 直线名称列表 |
 
 ### 直线定义（每条直线以 `<name>.*` 配置）
@@ -85,6 +91,28 @@
 
 线速度和角速度等比缩放，实现平滑停车。
 
+### Normal 模式三段式到点控制
+
+仅在 **Normal 模式**（未进入任何膨胀区，即常规平地导航）下生效。接近目标时自动干预速度指令，防止 MPPI 在目标点附近画弧绕圈或冲过头。
+
+```
+dist = 当前位置到目标点的欧氏距离
+
+dist > approach_distance (0.88m):
+  → 完全透传 MPPI 输出，不做任何干预
+
+direct_approach_distance (0.1m) < dist < approach_distance (0.88m):
+  → 合速度钳位到 approach_velocity (0.2 m/s)，角速度等比缩放
+
+dist < direct_approach_distance (0.1m):
+  → P 控制器直驱目标点 (Kp=direct_approach_kp)，角速度强制归零
+  → 目标距离 < 0.01m 时停止
+```
+
+**参数**：`approach_distance`、`approach_velocity`、`direct_approach_distance`、`direct_approach_kp`。均为 Wrapper 级参数，放在 `AdaptiveMppi.*` 顶层（非 `normal.*` 前缀下）。
+
+**注意**：Uphill / Downhill 模式下此逻辑不生效，保持坡道穿越的完整自由度。
+
 ## RViz 可视化
 
 本插件自动发布以下 Marker（话题：`<plugin_name>/adaptive_line_visualization`）：
@@ -120,6 +148,12 @@ controller_server:
       max_path_age: 2.0
       uphill_braking_distance: 0.5
       uphill_stuck_vw: 0.5
+
+      # ── 到点直接控制（仅 normal 模式）──
+      approach_distance: 0.88
+      approach_velocity: 0.2
+      direct_approach_distance: 0.1
+      direct_approach_kp: 10.0
 
       lines: ["ramp_a"]
 

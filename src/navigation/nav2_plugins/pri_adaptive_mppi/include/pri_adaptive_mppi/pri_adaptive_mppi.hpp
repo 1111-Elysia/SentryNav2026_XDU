@@ -296,6 +296,13 @@ private:
   rclcpp::Publisher<sentry_msgs::msg::Vw>::SharedPtr vw_pub_;
   double uphill_stuck_vw_{0.5};  // 膨胀区内持续输出 Vw
 
+  // ── 到点直接控制（normal模式三段式）──
+  double approach_distance_{1.5};           // 接近阶段距离阈值 (m)
+  double approach_velocity_{0.5};           // 接近阶段最大合速度 (m/s)
+  double direct_approach_distance_{0.5};    // 直接P控制驱动距离阈值 (m)
+  double direct_approach_kp_{1.0};          // 直接驱动P控制增益
+  geometry_msgs::msg::PoseStamped goal_;    // 缓存的目标点位姿
+
   // ── 当前状态 ──
   int active_line_index_{-1};        // -1 = 无活跃直线（使用 normal）
   CrossingMode active_crossing_{CrossingMode::NORMAL};

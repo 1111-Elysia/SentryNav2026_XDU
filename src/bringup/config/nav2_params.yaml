@@ -192,6 +192,15 @@ controller_server:
 
       uphill_stuck_vw: 0.2
 
+      # ── 到点直接控制（只适用于normal模式）──
+      #   dist > approach_distance:          透传 MPPI 输出
+      #   direct_approach_distance < dist < approach_distance:  合速度钳位到 approach_velocity
+      #   dist < direct_approach_distance:   P控制器直驱，绕过MPPI画弧，角速度归零
+      approach_distance: 0.88               # 进入限速阶段的距离阈值 (m)
+      approach_velocity: 0.2                # 接近阶段最大合速度 (m/s)
+      direct_approach_distance: 0.1         # 进入P控制器直驱的距离阈值 (m)
+      direct_approach_kp: 10.0              # P控制器增益
+
       # 单一直线 + 正六边形(中心3.0,0 边长1.13m)
       lines: ["ramp_a"]
 

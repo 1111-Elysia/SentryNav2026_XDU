@@ -47,6 +47,11 @@ void PriAdaptiveMppi::configure(
   uphill_stuck_vw_ = node->get_parameter(
     name + ".uphill_stuck_vw").as_double();
 
+  node->get_parameter(name + ".approach_distance", approach_distance_);
+  node->get_parameter(name + ".approach_velocity", approach_velocity_);
+  node->get_parameter(name + ".direct_approach_distance", direct_approach_distance_);
+  node->get_parameter(name + ".direct_approach_kp", direct_approach_kp_);
+
   // ── 2. 读取直线列表 ──
   std::vector<std::string> line_names;
   node->get_parameter(name + ".lines", line_names);
@@ -127,8 +132,11 @@ void PriAdaptiveMppi::configure(
     "/vw", rclcpp::QoS(10));
 
   RCLCPP_INFO(logger_,
-    "PriAdaptiveMppi 配置完成: %zu 条直线, 内部控制器=%s",
-    lines_.size(), inner_plugin_type_.c_str());
+    "PriAdaptiveMppi 配置完成: %zu 条直线, 内部控制器=%s, "
+    "接近控制: approach_dist=%.2f approach_vel=%.2f direct_dist=%.2f direct_kp=%.2f",
+    lines_.size(), inner_plugin_type_.c_str(),
+    approach_distance_, approach_velocity_,
+    direct_approach_distance_, direct_approach_kp_);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -160,6 +168,11 @@ void PriAdaptiveMppi::setPlan(const nav_msgs::msg::Path & path)
   current_path_ = path;
   last_path_time_ = rclcpp::Clock(RCL_ROS_TIME).now();
   path_received_ = true;
+
+  // 缓存目标点位姿（用于normal模式三段式到点控制）
+  if (!path.poses.empty()) {
+    goal_ = path.poses.back();
+  }
 
   if (inner_controller_) {
     inner_controller_->setPlan(path);
@@ -279,6 +292,36 @@ geometry_msgs::msg::TwistStamped PriAdaptiveMppi::computeVelocityCommands(
     }
   }
 
+  // ── 7.5. Normal模式三段式到点控制 ──
+  if (active_crossing_ == CrossingMode::NORMAL && path_received_ &&
+      !current_path_.poses.empty()) {
+    double dx = goal_.pose.position.x - pose.pose.position.x;
+    double dy = goal_.pose.position.y - pose.pose.position.y;
+    double dist = std::hypot(dx, dy);
+
+    if (dist < direct_approach_distance_) {
+      // 极近距离：绕过MPPI，P控制直驱目标点，防画弧
+      double target_speed = std::min(approach_velocity_, dist * direct_approach_kp_);
+      if (dist > 0.01) {
+        cmd_vel.twist.linear.x = target_speed * (dx / dist);
+        cmd_vel.twist.linear.y = target_speed * (dy / dist);
+      } else {
+        cmd_vel.twist.linear.x = 0.0;
+        cmd_vel.twist.linear.y = 0.0;
+      }
+      cmd_vel.twist.angular.z = 0.0;
+    } else if (dist < approach_distance_) {
+      // 中距离：合速度钳位，防冲过头
+      double speed = std::hypot(cmd_vel.twist.linear.x, cmd_vel.twist.linear.y);
+      if (speed > approach_velocity_) {
+        double scale = approach_velocity_ / speed;
+        cmd_vel.twist.linear.x *= scale;
+        cmd_vel.twist.linear.y *= scale;
+        cmd_vel.twist.angular.z *= scale;
+      }
+    }
+  }
+
   // ── 8. 仪表盘数据 ──
   if (dash_pub_) {
     const char * dm = "NORMAL";
@@ -381,6 +424,20 @@ void PriAdaptiveMppi::declareCommonParams()
   nav2_util::declare_parameter_if_not_declared(
     node, plugin_name_ + ".uphill_stuck_vw",
     rclcpp::ParameterValue(0.5));
+
+  // ── 到点直接控制参数（normal模式三段式）──
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".approach_distance",
+    rclcpp::ParameterValue(1.5));
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".approach_velocity",
+    rclcpp::ParameterValue(0.5));
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".direct_approach_distance",
+    rclcpp::ParameterValue(0.5));
+  nav2_util::declare_parameter_if_not_declared(
+    node, plugin_name_ + ".direct_approach_kp",
+    rclcpp::ParameterValue(1.0));
 
   // lines 列表 — 每条直线的名称
   nav2_util::declare_parameter_if_not_declared(
