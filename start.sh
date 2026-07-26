@@ -8,34 +8,59 @@ function nuclear_cleanup() {
     echo "---------------------------------------------------------"
     echo "[SYSTEM] 正在执行全系统强力清理 (Global Kill)..."
     
-    # 1. 杀掉 Python 监控与管理节点 (匹配完整命令行)
-    # pkill -f 会匹配整个命令行参数，不仅是进程名
+    # 1. 杀掉所有 ROS 2 节点 (通过 ros2 daemon 获取完整列表)
+    # 先尝试优雅 shutdown lifecycle 节点
+    for node in $(ros2 node list 2>/dev/null); do
+        ros2 lifecycle set "$node" shutdown 2>/dev/null
+    done
+
+    # 2. 杀掉 Python 节点 (pkill -f 匹配命令行)
     pkill -9 -f "tf_monitor.py"
-    pkill -9 -f "scan_monitor.py"
-    pkill -9 -f "costmap_monitor.py"
-    pkill -9 -f "map_monitor.py"
-    pkill -9 -f "nav_loc_monitor.py"
-    pkill -9 -f "restart_manager.py"
-    
-    # 2. 杀掉 Nav2 相关的 Lifecycle 节点和服务器
-    # killall 匹配进程可执行文件名
-    killall -9 nav2_lifecycle_manager lifecycle_manager map_server \
-               controller_server planner_server recoveries_server \
+    pkill -9 -f "ground_pos_simulator.py"
+
+    # 3. 杀掉 感知与SLAM
+    killall -9 livox_ros_driver2_node super_lio_Mapping \
+               lidar_filter_node depth_to_pcl_node \
+               livox_to_scan_node 2>/dev/null
+
+    # 4. 杀掉 TF 与里程计
+    killall -9 tf_only_odom tf_odom_publisher odin_tf 2>/dev/null
+
+    # 5. 杀掉 通信层 (CAN + 串口)
+    killall -9 can_comm_node can_receive_node \
+               target_frame_node yaw_controller_node \
+               serial_comm_node 2>/dev/null
+
+    # 6. 杀掉 裁判系统与位置中继
+    killall -9 ground_pos_relay_node ground_pos_relay_sim_node \
+               teammate_frame_converter_node 2>/dev/null
+
+    # 7. 杀掉 行为树与决策
+    killall -9 sentry_nav_bt_test 2>/dev/null
+
+    # 8. 杀掉 Nav2 栈 (lifecycle 节点)
+    killall -9 lifecycle_manager map_server map_saver \
+               controller_server planner_server \
                behavior_server smoother_server velocity_smoother \
-               bt_navigator waypoint_follower amcl 2>/dev/null
+               bt_navigator waypoint_follower 2>/dev/null
 
-    # 3. 杀掉 核心算法与驱动
-    killall -9 fast_lio_multi livox_ros_driver2_node serial_comm_node \
-               kiss_icp_node ekf_node point_cloud_transport 2>/dev/null
+    # 9. 杀掉 可视化与辅助工具
+    killall -9 rviz2 robot_state_publisher \
+               static_transform_publisher 2>/dev/null
 
-    # 4. 杀掉 可视化与辅助工具
-    killall -9 rviz2 static_transform_publisher robot_state_publisher \
-               joint_state_publisher component_container component_container_isolated 2>/dev/null
+    # 10. 兜底：按包名 pkill 残留进程
+    pkill -9 -f "rm_referee"
+    pkill -9 -f "sentry_nav"
+    pkill -9 -f "bringup"
+    pkill -9 -f "can_comm"
+    pkill -9 -f "cpp_lidar"
+    pkill -9 -f "super_lio"
+    pkill -9 -f "ground_pos_relay"
 
-    # 5. 清理 ROS 2 守护进程 (可选，有时候 daemon 会缓存旧参数)
-    # ros2 daemon stop
+    # 11. 清理 ROS 2 守护进程
+    ros2 daemon stop 2>/dev/null
     
-    echo "[SYSTEM] 清理完毕，内存已释放。"
+    echo "[SYSTEM] 再见，愿哨兵小姐一路顺风..."
     echo "---------------------------------------------------------"
 }
 
@@ -78,7 +103,7 @@ while true; do
     # 启动命令
     # 2>&1 | grep ... 用于过滤掉不想看的刷屏日志
     # ---------------------------------------------------------
-    ros2 launch bringup monitored_start.launch.py 2>&1 | \
+    ros2 launch bringup start.launch.py 2>&1 | \
     grep -v -E "\[(rviz2|controller_server|planner_server|global_costmap|local_costmap)\].*(Message Filter dropping message|Robot is out of bounds)"
 
     # 获取 ros2 launch 的退出码

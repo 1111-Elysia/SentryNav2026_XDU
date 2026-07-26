@@ -41,7 +41,7 @@ target_frame:
     target_frame: "target_frame"
     target_pose_topic: "/detected_target_pose"
 
-vyaw_tf_yaw_controller:
+yaw_controller:
   ros__parameters:
     target_yaw_topic: "/target_yaw"
     map_frame: "map"
