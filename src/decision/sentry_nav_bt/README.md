@@ -91,7 +91,7 @@ ros2 launch sentry_nav_bt simple_nav.launch.py
 | `bt_subtree_dir` | `config/bt/modules` | 子树目录 |
 | `validate_bt_only` | `false` | 只校验行为树 |
 | `save_terminal_log` | `true` | 保存完整 stdout/stderr |
-| `terminal_log_dir` | 启动目录下 `src/decision/sentry_nav_bt/logs` | 终端日志根目录 |
+| `terminal_log_dir` | 启动目录下 `data/sentry_nav_bt` | 终端日志根目录 |
 
 `terminal_log_dir` 使用启动 `start.sh` 或执行 `ros2 launch` 时的当前工作目录。默认情况下，每次启动会在该目录下建立带时间和 PID 的运行目录，并写入 `launch.log`。
 

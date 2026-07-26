@@ -60,7 +60,7 @@ class _TerminalLogWriter:
 def generate_launch_description():
     # 获取包的安装路径 
     pkg_dir = get_package_share_directory('sentry_nav_bt')
-    source_package_dir = Path.cwd() / 'src' / 'decision' / 'sentry_nav_bt'
+    launch_working_dir = Path.cwd()
     
     # 行为树XML文件路径
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_fortress.xml')
@@ -107,8 +107,8 @@ def generate_launch_description():
 
     terminal_log_dir_arg = DeclareLaunchArgument(
         'terminal_log_dir',
-        default_value=str(source_package_dir / 'logs'),
-        description='行为树包源码下的完整终端日志根目录；每次启动会创建独立子目录'
+        default_value=str(launch_working_dir / 'data' / 'sentry_nav_bt'),
+        description='启动目录下 data/sentry_nav_bt 终端日志根目录；每次启动会创建独立子目录'
     )
 
     bt_subtree_dir_arg = DeclareLaunchArgument(
@@ -149,7 +149,7 @@ def generate_launch_description():
                 LaunchConfiguration('terminal_log_dir').perform(context)
             ).expanduser()
             if not terminal_log_root.is_absolute():
-                terminal_log_root = source_package_dir / terminal_log_root
+                terminal_log_root = launch_working_dir / terminal_log_root
             session_name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + f'_pid{os.getpid()}'
             session_dir = terminal_log_root / session_name
             session_dir.mkdir(parents=True, exist_ok=False)
