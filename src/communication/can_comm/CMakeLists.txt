@@ -89,9 +89,9 @@ install(TARGETS target_frame_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# install(DIRECTORY config launch
-#   DESTINATION share/${PROJECT_NAME}
-# )
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 install(PROGRAMS scripts/can_debug_gui.py
   DESTINATION lib/${PROJECT_NAME}
