@@ -59,7 +59,7 @@ sequential_nodes:
   - label: Super-LIO
     type: execute
     cmd: ["ros2", "launch", "super_lio", "Livox_mid360.py"]
-    wait_after: 0
+    wait_after: 1
 
   # - label: TF-Odom-Publisher
   #   type: node

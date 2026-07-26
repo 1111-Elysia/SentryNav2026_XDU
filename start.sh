@@ -5,13 +5,16 @@
 # 作用：无论进程在哪个终端运行，只要匹配名字，全部强制杀死 (SIGKILL -9)
 # ==============================================================================
 function nuclear_cleanup() {
+    # 防止信号递归：清理期间忽略 SIGINT/SIGTERM
+    trap '' SIGINT SIGTERM
+
     echo "---------------------------------------------------------"
     echo "[SYSTEM] 正在执行全系统强力清理 (Global Kill)..."
-    
+
     # 1. 杀掉所有 ROS 2 节点 (通过 ros2 daemon 获取完整列表)
-    # 先尝试优雅 shutdown lifecycle 节点
-    for node in $(ros2 node list 2>/dev/null); do
-        ros2 lifecycle set "$node" shutdown 2>/dev/null
+    # 先尝试优雅 shutdown lifecycle 节点（带超时保护，防止 daemon 异常时卡死）
+    for node in $(timeout 5 ros2 node list 2>/dev/null); do
+        timeout 3 ros2 lifecycle set "$node" shutdown 2>/dev/null
     done
 
     # 2. 杀掉 Python 节点 (pkill -f 匹配命令行)
@@ -57,9 +60,10 @@ function nuclear_cleanup() {
     pkill -9 -f "super_lio"
     pkill -9 -f "ground_pos_relay"
 
-    # 11. 清理 ROS 2 守护进程
-    ros2 daemon stop 2>/dev/null
-    
+    # 11. 注意：不杀 ROS 2 daemon，ros2 launch 需要它
+    # ros2 daemon stop 会让后续 launch 卡死，残留 daemon 由 ros2 自行管理
+    # 如果确实需要重置 daemon，手动执行: ros2 daemon stop && ros2 daemon start
+
     echo "[SYSTEM] 再见，愿哨兵小姐一路顺风..."
     echo "---------------------------------------------------------"
 }
@@ -71,7 +75,7 @@ function nuclear_cleanup() {
 # ==============================================================================
 # 脚本自定位：确保无论从哪里调用，都以此为工作目录
 # ==============================================================================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+SCRIPT_DIR="/home/nuc/Desktop/SentryNav2026_XDU"
 cd "$SCRIPT_DIR" || exit 1
 
 # 源环境（强制使用本目录下的 install）
@@ -93,8 +97,10 @@ while true; do
     echo ">>> 赞美欧姆弥赛亚，愿哨兵小姐武运昌隆"
     
     # 每次启动前，先执行核弹以保平安
-    nuclear_cleanup
-    
+    # nuclear_cleanup
+    # 恢复信号捕获（nuclear_cleanup 内部屏蔽了信号，这里重新启用）
+    trap 'echo "[INFO] 收到终止信号，正在清理..."; nuclear_cleanup; exit 0' SIGINT SIGTERM
+
     # 稍微等待进程完全释放
     sleep 1
 
