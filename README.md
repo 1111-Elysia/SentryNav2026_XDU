@@ -51,7 +51,7 @@
    │   仿真与调试工具    │      │    中央启动编排    │
    │   sim / tracker   │      │    参数配置管理    │
    │   map / imu / pcd │      │    启动序列控制    │
-   │   referee mock    │      │                  │
+   │   referee mock    │      │     bringup      │
    └───────────────────┘      └──────────────────┘
 ```
 
@@ -144,7 +144,7 @@ bash script/build.sh
 
 > [!IMPORTANT]
 > 启动前请确认以下事项：
-> - 修改外参文件：`bringup/config/lidar.yaml`（LiDAR 外参）、`bringup/config/can_params.yaml`（CAN 通信参数）等
+> - 修改配置文件：`bringup/config/lidar.yaml`（LiDAR 外参）、`bringup/config/can_params.yaml`（CAN 通信参数）等
 > - 若使用重定位模式，请先建图并将 `map.pcd`、`map.pgm`、`map.yaml` 放入 `bringup/map/` 目录
 
 ### 切换定位模式
