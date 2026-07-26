@@ -1,6 +1,6 @@
 # teammate_cost_layer
 
-Nav2 costmap 插件层。订阅己方队友机器人位置（odom 系），在每个队友周围创建**圆形渐变代价区域**，让 MPPI 控制器通过梯度感知自然绕开友方单位，避免碰撞。
+Nav2 costmap 插件层。订阅己方队友机器人位置（map 系），在每个队友周围创建**圆形渐变代价区域**，让 MPPI 控制器通过梯度感知自然绕开友方单位，避免碰撞。
 
 配合 `ground_pos_relay` 包的 `teammate_frame_converter` 节点使用，构成完整的"裁判系统位置 → 坐标转换 → costmap 避让"管线。
 
@@ -35,7 +35,7 @@ MPPI 的 sampled trajectory 机制能感知衰减区的代价梯度，平滑绕�
      │
      ▼
 ground_pos_relay / teammate_frame_converter
-     │  (官方地图系 → odom 系转换)
+     │  (官方地图系 → map 系转换)
      ▼
 /ground_pos_relay/teammate_pos_odom  (GroundRobotPosition)
      │

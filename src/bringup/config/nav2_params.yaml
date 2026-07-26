@@ -578,13 +578,13 @@ local_costmap:
         enabled: true
         teammate_topic: "/ground_pos_relay/teammate_pos_odom"
         enable_hero: true
-        enable_engineer: true
+        enable_engineer: false
         enable_standard_3: false
         enable_standard_4: false
-        enable_sentry: true
+        enable_sentry: false
         core_radius: 0.5
         decay_radius: 0.5
-        core_cost_value: 254
+        core_cost_value: 253
         gradient_power: 1.5
         teammate_timeout: 2.0
       always_send_full_costmap: False
@@ -705,13 +705,13 @@ global_costmap:
         enabled: true
         teammate_topic: "/ground_pos_relay/teammate_pos_odom"
         enable_hero: true
-        enable_engineer: true
+        enable_engineer: false
         enable_standard_3: false
         enable_standard_4: false
-        enable_sentry: true
+        enable_sentry: false
         core_radius: 0.5
         decay_radius: 0.5
-        core_cost_value: 254
+        core_cost_value: 253
         gradient_power: 1.5
         teammate_timeout: 2.0
       always_send_full_costmap: False
@@ -775,17 +775,6 @@ planner_server:
       tracking_dist: 1.0        # 期望跟踪距离 (m)，弹簧平衡位置
       tracking_dur: 3.0         # 预测/规划时域 (s)
       tracking_dt: 0.2          # 预测时间步长 (s)
-
-      minco_enabled: true               # minco优化器开关
-      minco_sample_dt: 0.05             # 采样时间间隔
-      minco_nominal_speed: 1.0          # minco每段采样速度
-      minco_min_piece_duration: 0.15    # 每段最短时间
-      corridor_width: 0.8               # 安全走廊宽度
-      lbfgs_enabled: true               # 启用L-BFGS优化MINCO中间点
-      lbfgs_max_iterations: 50          # L-BFGS最大迭代次数
-      lbfgs_g_epsilon: 0.0001           # L-BFGS梯度收敛阈值
-      finite_diff_eps: 0.0001           # 当前有限差分梯度步长
-      corridor_weight: 50.0             # 轨迹跑出走廊的惩罚权重
 
       # ── 功能开关 ───────────────────────────────────
       use_tracking: true        # 启用目标追踪模式（内部10Hz重规划定时器）

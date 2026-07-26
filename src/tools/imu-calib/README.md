@@ -28,13 +28,6 @@ IMU 静态自动校准节点 — 通过卡尔曼滤波估计重力方向，计�
 # 在 ROS 2 工作空间中
 colcon build --packages-select imu-calib
 
-# 或单独 cmake 构建
-cd src/tools/imu-calib
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-```
-
 ## 使用
 
 ```bash
@@ -86,7 +79,7 @@ ros2 run imu-calib imu_calib_node
 
 ## 如何将校准结果用于其他工具
 
-校准得到的 roll / pitch 可直接填入 `pcd_to_nav_map` 的配置文件，用于点云旋转补偿：
+校准得到的 roll / pitch 可直接填入 `bringup/config/lidar.yaml` `pcd_to_nav_map` 的配置文件，用于点云旋转补偿：
 
 ```json
 {

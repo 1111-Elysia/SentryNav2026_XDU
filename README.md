@@ -1,7 +1,7 @@
 # SentryNav 2026 XDU
 
 > [!WARNING]
-> 本项目针对 **2026 赛季哨兵机器人** 进行了大量针对性设计（大小 yaw 双轴构型、正六边形高地斜坡越线、己方位置 relay 等），含有部分不通用功能，**并不适合零基础的导航新手学习**。若你是 Nav2 初学者，建议先参考 [Nav2 官方教程](https://navigation.ros.org/) 或下方开源参考中的项目。
+> 本项目针对 **2026 赛季哨兵机器人** 进行了大量针对性设计（大小 yaw 双轴构型、全向轮高地斜坡越线、己方位置 relay、能量机关与前哨站的特殊can通信协议 等），含有部分不通用功能，**并不适合零基础的导航新手学习**。若你是 Nav2 初学者，建议先参考 [Nav2 官方教程](https://navigation.ros.org/) 或下方开源参考中的项目。
 
 西安电子科技大学 RoboMaster 2026 赛季哨兵机器人导航决策系统。基于 ROS 2 Humble，集成 LiDAR-惯性里程计 (Super-LIO)、Nav2 导航栈 、裁判系统通信、CAN 总线底层控制和自主行为树决策。
 
@@ -138,7 +138,7 @@ bash script/depend_install.sh
 bash script/build.sh
 ```
 
-> `build.sh` 的编译顺序：Pangolin → 系统依赖 → lightning-lm（独立编译） → 全量 colcon build。其中 lightning-lm 建议单独先编译，不与其余包并行。
+> `build.sh` 的编译顺序：Pangolin → 系统依赖 → lightning-lm（独立编译） → 全量 colcon build。其中 lightning-lm 建议单独先编译，不要与其余包并行。
 
 ## 启动
 
@@ -239,7 +239,6 @@ CAN ←→ can_comm ←→ /cmd_vel, /vw, /target_yaw, /detected_target_pose, ..
 | ------------------------------------- | --------------------- | ----------------------------------------------- |
 | `/cmd_vel`                            | `Twist`               | Nav2 输出速度指令                               |
 | `/odom`                               | `Odometry`            | 里程计 (由 tf_odom_publisher/tf_only_odom 发布) |
-
 | `/livox/lidar_filtered`               | `PointCloud2`         | 过滤后 LiDAR 点云                               |
 | `/detected_target_pose`               | `PoseStamped`         | 目标位姿 (ElasticTracker 输入)                  |
 | `/target_yaw`                         | `Float32`             | 指令 yaw (大 yaw，NUC→MCU)                      |
@@ -276,4 +275,4 @@ CAN ←→ can_comm ←→ /cmd_vel, /vw, /target_yaw, /detected_target_pose, ..
 
 ## 联系
 
-如有疑问可提交 [Issue](https://github.com/1111-Elysia/SentryNav2026_XDU/issues) 或联系 [1361109760@qq.com](mailto:1361109760@qq.com)。不过作者已经退役，不保证回复时效。
+如有疑问可提交 [Issue](https://github.com/1111-Elysia/SentryNav2026_XDU/issues) 或联系 [1361109760@qq.com](mailto:1361109760@qq.com)。作者已经退役，不保证回复时效。
