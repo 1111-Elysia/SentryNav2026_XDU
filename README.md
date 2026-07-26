@@ -159,19 +159,14 @@ bash script/build.sh
 | **雷达纯里程计** | Super-LIO 里程计，无重定位 | `Super-LIO`、`tf_only_odom` | `Lightning-LM`（注释掉）、`tf_odom_publisher`（注释掉） |
 | **奥丁重定位** | Odin 内置 SLAM/重定位 | `Odin-Driver`（取消注释）、`Odin-TF`（取消注释）| `Super-LIO`（注释掉）、`Lidar-Filter`（注释掉）、`Lightning-LM`（注释掉）、`Livox-Driver`（注释掉） |
 
-> `tf_odom_publisher` 在启动时收集 Lightning-LM 的重定位变换 D 计算静态 `map→odom`，适用于雷达重定位。`tf_only_odom` 直接将 `map` 与 `odom` 对齐（单位变换），适用于纯里程计。`odin_tf` 从 Odin 的 `map→odin1_base_link` 反推 `odom→base_link`，适用于奥丁重定位。
 
-### 模式一：完整导航（竞赛模式）
+### 导航启动
 
 ```bash
 bash start.sh
 ```
 
-启动链路：Livox 驱动 → 裁判系统 → 己方位置中继 → LiDAR 过滤 → Super-LIO → TF + 里程计 → CAN 通信 → Nav2 导航栈 → 行为树
-
 ### 2. SLAM 建图
-
-需要先启动 LiDAR 驱动，再运行 Lightning-LM 建图：
 
 ```bash
 # 终端 1：启动 Livox MID360 驱动
