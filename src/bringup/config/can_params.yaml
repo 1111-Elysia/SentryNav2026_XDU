@@ -48,11 +48,11 @@ vyaw_tf_yaw_controller:
     base_frame: "base_link"
 
     # Pose of NLJG in map frame
-    NLJG_pose_x: 10.44
-    NLJG_pose_y: 0.0
+    NLJG_pose_x: 6.2
+    NLJG_pose_y: -1.23
 
     # Pose of outpost in map frame
-    outpost_pose_x: 13.48
-    outpost_pose_y: 3.92
+    outpost_pose_x: 6.2
+    outpost_pose_y: -3.35
 
     publish_rate_hz: 30.0

@@ -29,11 +29,6 @@ sequential_nodes:
     cmd: ["ros2", "launch", "ground_pos_relay", "ground_pos_relay.launch.py"]
     wait_after: 0
 
-  # - label: RM-messages-pos
-  #   type: execute
-  #   cmd: ["ros2", "launch", "rm_referee", "referee_node_pos.launch.py"]
-  #   wait_after: 0
-
   - label: Lidar-Filter
     type: node
     package: cpp_lidar_filter
@@ -59,11 +54,6 @@ sequential_nodes:
   #     "--config", "/home/nuc/Desktop/SentryNav2026_XDU/src/bringup/config/default_livox.yaml"
   #   ]
   #   use_config_dir_as_cwd: true
-  #   wait_after: 0
-
-  # - label: Fast-LIO
-  #   type: execute
-  #   cmd: ["ros2", "launch", "fast_lio", "mapping.launch.py"]
   #   wait_after: 0
 
   - label: Super-LIO
@@ -99,15 +89,6 @@ sequential_nodes:
   #   parameters:
   #     - odin.yaml
   #   arguments: ["--ros-args"]
-  #   wait_after: 0
-
-  # - label: Livox-to-Scan
-  #   type: node
-  #   package: livox_to_scan
-  #   executable: livox_to_scan_node
-  #   name: livox_to_scan_node
-  #   parameters:
-  #     - livox_to_scan.yaml
   #   wait_after: 0
 
   # - label: USB-Serial-Comm
