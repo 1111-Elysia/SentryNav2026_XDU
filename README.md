@@ -142,8 +142,6 @@ bash script/build.sh
 
 ## 启动
 
-### 1. 完整系统启动
-
 > [!IMPORTANT]
 > 启动前请确认以下事项：
 > - 修改外参文件：`bringup/config/lidar.yaml`（LiDAR 外参）、`bringup/config/can_params.yaml`（CAN 通信参数）等
@@ -160,7 +158,7 @@ bash script/build.sh
 | **奥丁重定位** | Odin 内置 SLAM/重定位 | `Odin-Driver`（取消注释）、`Odin-TF`（取消注释）| `Super-LIO`（注释掉）、`Lidar-Filter`（注释掉）、`Lightning-LM`（注释掉）、`Livox-Driver`（注释掉） |
 
 
-### 导航启动
+### 1. 导航启动
 
 ```bash
 bash start.sh
