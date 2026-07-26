@@ -10,9 +10,6 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
-  <build_depend>rqt_gui</build_depend>
-  <build_depend>rqt_gui_py</build_depend>
-
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
@@ -21,7 +18,7 @@
   <exec_depend>rqt_gui</exec_depend>
   <exec_depend>rqt_gui_py</exec_depend>
   <exec_depend>python_qt_binding</exec_depend>
-  <exec_depend>sentry_nav_bt_test</exec_depend>
+  <exec_depend>sentry_nav_bt</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
 

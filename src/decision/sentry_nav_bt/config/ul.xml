@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="Root">
+      <KeepRunningUntilFailure>
+        <Sequence name="裁判系统连接判定">
+          <Inverter>
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1.0"/>
+          </Inverter>
+        </Sequence>
+      </KeepRunningUntilFailure>
+      <ForceFailure>
+        <Fallback name="裁判系统连接成功日志">
+          <CheckCondition key_name="game_status_connected_logged"
+                          comparison="eq"
+                          threshold="1.0"/>
+          <Sequence name="首次裁判系统连接成功">
+            <CheckCondition key_name="game_status_received"
+                            comparison="eq"
+                            threshold="1.0"/>
+            <PrintNode message="裁判系统已连接，等待比赛开始"/>
+            <SetBlackboardValue key="game_status_connected_logged"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
+      </ForceFailure>
+      <KeepRunningUntilFailure>
+        <Sequence name="开始比赛检测">
+          <CheckCondition key_name="game_progress"
+                          comparison="lte"
+                          threshold="3.0"/>
+          <Fallback name="赛前状态复位">
+            <Sequence name="赛前状态已复位">
+              <CheckCondition key_name="ul_initialized"
+                              comparison="eq"
+                              threshold="0.0"/>
+              <CheckCondition key_name="ul_retreat_active"
+                              comparison="eq"
+                              threshold="0.0"/>
+              <CheckCondition key_name="ul_center_ready"
+                              comparison="eq"
+                              threshold="0.0"/>
+            </Sequence>
+            <Sequence name="执行赛前复位">
+              <PrintNode message="[UL] 比赛未开始，重置局内状态"/>
+              <SetBlackboardValue key="ul_initialized"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="ul_retreat_active"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="ul_center_ready"
+                                  value="0"
+                                  type="int"/>
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="center_point"
+                                  type="string"/>
+            </Sequence>
+          </Fallback>
+        </Sequence>
+      </KeepRunningUntilFailure>
+
+      <ForceFailure>
+        <Fallback name="初始化">
+          <CheckCondition key_name="ul_initialized"
+                          comparison="eq"
+                          threshold="1.0"/>
+          <Sequence name="初始化状态">
+            <PrintNode message="比赛开始，初始化黑板变量"/>
+            <SetBlackboardValue key="aim_id"
+                                value="0"
+                                type="uint8"/>
+            <SetBlackboardValue key="hurt_armor"
+                                value="5"
+                                type="uint8"/>
+            <SetBlackboardValue key="ul_center_ready"
+                                value="0"
+                                type="int"/>
+            <SetBlackboardValue key="ul_retreat_active"
+                                value="0"
+                                type="int"/>
+            <SetBlackboardValue key="ul_center_goal_name"
+                                value="center_point"
+                                type="string"/>
+            <SetBlackboardValue key="ul_initialized"
+                                value="1"
+                                type="int"/>
+          </Sequence>
+        </Fallback>
+      </ForceFailure>
+
+      <ReactiveSequence name="局内响应循环">
+        <ForceSuccess>
+          <SubTree
+            ID="UnderAttackVw"
+            high_hp_threshold="150"
+            high_hp_vw="1.0"
+            low_hp_threshold="150"
+            low_hp_vw="0.3"
+            republish_interval_ms="50"
+            _autoremap="1"/>
+        </ForceSuccess>
+
+        <ReactiveFallback name="比赛开始">
+        <!-- <Sequence name="复活机制">
+          <CheckCondition key_name="current_hp"
+                          comparison="eq"
+                          threshold="0.0"/>
+          <PrintNode message="[UL] 检测到当前血量为0，进入复活等待态"/>
+          <Inverter>
+            <KeepRunningUntilFailure>
+              <Sequence name="持续确认复活">
+                <CheckCondition key_name="current_hp"
+                                comparison="eq"
+                                threshold="0.0"/>
+                <ConfirmResurrection posture="0"
+                                    burst_count="3"
+                                    burst_interval_ms="20"/>
+                <Wait wait_duration="0.10"/>
+              </Sequence>
+            </KeepRunningUntilFailure>
+          </Inverter>
+          <PrintNode message="[UL] 当前血量恢复，结束复活等待"/>
+        </Sequence> -->
+
+        <Sequence name="低血量回补">
+          <Fallback name="回补触发或保持">
+            <CheckCondition key_name="ul_retreat_active"
+                            comparison="eq"
+                            threshold="1.0"/>
+            <Sequence name="触发回补模式">
+              <CheckCondition name="低血量判定"
+                              key_name="current_hp"
+                              comparison="lt"
+                              threshold="150.0"/>
+              <PrintNode message="[UL] 血量低于150，触发回补模式"/>
+              <PrintBlackboardValue key="current_hp"
+                                    prefix="[UL] 触发回补时血量"/>
+              <SetBlackboardValue key="ul_retreat_active"
+                                  value="1"
+                                  type="int"/>
+              <SetBlackboardValue key="ul_center_ready"
+                                  value="0"
+                                  type="int"/>
+            </Sequence>
+          </Fallback>
+          <GoalSelector goal_name="supply_point"
+                        goal="{goal}"/>
+          <ReliableNavigateToPose goal="{goal}"
+                                  goal_name="supply_point"
+                                  reach_threshold="0.25"
+                                  resend_interval="0.30"
+                                  response_timeout="0.80"
+                                  result_retry_delay="0.30"/>
+          <Inverter>
+            <KeepRunningUntilFailure>
+              <Sequence name="等待回血完成">
+                <Inverter>
+                  <CheckCondition name="回补结束判定"
+                                  key_name="current_hp"
+                                  comparison="gte"
+                                  threshold="400.0"/>
+                </Inverter>
+                <Wait wait_duration="0.2"/>
+              </Sequence>
+            </KeepRunningUntilFailure>
+          </Inverter>
+          <PrintBlackboardValue key="current_hp"
+                                prefix="[UL] 回补结束时血量"/>
+          <PrintNode message="[UL] 回补完成，准备重新前往中心"/>
+          <SetBlackboardValue key="ul_retreat_active"
+                              value="0"
+                              type="int"/>
+        </Sequence>
+
+        <ReactiveSequence name="前往中心相关点位">
+          <CheckCondition key_name="ul_retreat_active"
+                          comparison="eq"
+                          threshold="0.0"/>
+          <CheckCondition key_name="ul_center_ready"
+                          comparison="eq"
+                          threshold="0.0"/>
+          <Fallback name="选择前往目标点">
+            <Sequence name="前往FallbackPoint">
+              <CheckCondition key_name="center_gain_point_occupancy_status"
+                              comparison="eq"
+                              threshold="2.0"/>
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="fallback_point"
+                                  type="string"/>
+              <GoalSelector goal_name="fallback_point"
+                            goal="{goal}"/>
+            </Sequence>
+            <Sequence name="前往CenterPoint">
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="center_point"
+                                  type="string"/>
+              <GoalSelector goal_name="center_point"
+                            goal="{goal}"/>
+            </Sequence>
+          </Fallback>
+          <Fallback name="已到中心或前往中心">
+            <CheckGoalReached goal="{goal}"
+                              threshold="{ul_center_arrive_distance_threshold}"/>
+            <ReliableNavigateToPose goal="{goal}"
+                                    goal_name="{ul_center_goal_name}"
+                                    reach_threshold="{ul_center_arrive_distance_threshold}"
+                                    resend_interval="0.30"
+                                    response_timeout="0.80"
+                                    result_retry_delay="0.30"/>
+          </Fallback>
+          <SetBlackboardValue key="ul_center_ready"
+                              value="1"
+                              type="int"/>
+          <PrintNode message="[UL] 已到达中心相关点位，进入驻守态"/>
+        </ReactiveSequence>
+
+        <ReactiveSequence name="中心驻守">
+          <CheckCondition key_name="ul_retreat_active"
+                          comparison="eq"
+                          threshold="0.0"/>
+          <CheckCondition key_name="ul_center_ready"
+                          comparison="eq"
+                          threshold="1.0"/>
+          <CheckCondition key_name="current_hp"
+                          comparison="gte"
+                          threshold="150.0"/>
+          <Fallback name="选择驻守目标点">
+            <Sequence name="驻守FallbackPoint">
+              <CheckCondition key_name="center_gain_point_occupancy_status"
+                              comparison="eq"
+                              threshold="2.0"/>
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="fallback_point"
+                                  type="string"/>
+              <GoalSelector goal_name="fallback_point"
+                            goal="{goal}"/>
+            </Sequence>
+            <Sequence name="驻守CenterPoint">
+              <SetBlackboardValue key="ul_center_goal_name"
+                                  value="center_point"
+                                  type="string"/>
+              <GoalSelector goal_name="center_point"
+                            goal="{goal}"/>
+            </Sequence>
+          </Fallback>
+          <Fallback name="中心相关位置维持">
+            <Sequence name="已在目标附近">
+              <CheckGoalReached goal="{goal}"
+                                threshold="{ul_center_hold_distance_threshold}"/>
+              <Wait wait_duration="0.5"/>
+            </Sequence>
+            <Sequence name="偏离驻守半径，重新回中">
+              <PrintNode message="[UL] 已偏离中心驻守半径，重新回到中心相关点位"/>
+              <SetBlackboardValue key="ul_center_ready"
+                                  value="0"
+                                  type="int"/>
+            </Sequence>
+          </Fallback>
+        </ReactiveSequence>
+        </ReactiveFallback>
+      </ReactiveSequence>
+    </Fallback>
+  </BehaviorTree>
+
+  <!-- =========================
+       TreeNodesModel
+       ========================= -->
+  <TreeNodesModel>
+
+    <Condition ID="CheckCondition" editable="true">
+      <input_port name="key_name"/>
+      <input_port name="comparison"/>
+      <input_port name="threshold"/>
+    </Condition>
+
+    <Action ID="GoalSelector" editable="true">
+      <input_port name="goal_name"/>
+      <output_port name="goal"/>
+    </Action>
+
+    <Action ID="PatrolGoalSelector" editable="true">
+      <input_port name="goal_names"/>
+      <input_port name="index_key"/>
+      <output_port name="goal"/>
+      <output_port name="goal_name"/>
+    </Action>
+
+    <Action ID="ReliableNavigateToPose" editable="true">
+      <input_port name="goal"/>
+      <input_port name="goal_name"/>
+      <input_port name="reach_threshold"/>
+      <input_port name="resend_interval"/>
+      <input_port name="response_timeout"/>
+      <input_port name="result_retry_delay"/>
+      <input_port name="cancel_confirm_timeout"/>
+      <input_port name="log_throttle_ms"/>
+      <input_port name="success_condition_key"/>
+      <input_port name="success_condition_comparison"/>
+      <input_port name="success_condition_threshold"/>
+    </Action>
+
+    <Condition ID="CheckGoalReached" editable="true">
+      <input_port name="goal"/>
+      <input_port name="threshold"/>
+    </Condition>
+
+    <Action ID="PrintBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="prefix"/>
+    </Action>
+
+    <Action ID="PrintNode" editable="true">
+      <input_port name="message"/>
+      <input_port name="throttle_ms"/>
+    </Action>
+
+    <Action ID="SetBlackboardValue" editable="true">
+      <input_port name="key"/>
+      <input_port name="value"/>
+      <input_port name="type"/>
+    </Action>
+
+    <Action ID="ConfirmResurrection" editable="true">
+      <input_port name="posture"/>
+      <input_port name="burst_count"/>
+      <input_port name="burst_interval_ms"/>
+    </Action>
+
+    <Action ID="Wait" editable="true">
+      <input_port name="wait_duration"/>
+    </Action>
+
+    <Decorator ID="RetryUntilSuccessful">
+      <input_port name="num_attempts"/>
+    </Decorator>
+    <Decorator ID="KeepRunningUntilFailure"/>
+    <Decorator ID="ForceSuccess"/>
+    <Decorator ID="ForceFailure"/>
+    <Decorator ID="Inverter"/>
+    <Control ID="Parallel"/>
+
+  </TreeNodesModel>
+</root>

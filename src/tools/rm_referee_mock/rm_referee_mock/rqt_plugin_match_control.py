@@ -108,7 +108,7 @@ class MatchControlPlugin(Plugin):
     def _load_supply_points(self):
         try:
             waypoint_path = path.join(
-                get_package_share_directory("sentry_nav_bt_test"),
+                get_package_share_directory("sentry_nav_bt"),
                 "config",
                 "waypoints.json",
             )
@@ -129,7 +129,7 @@ class MatchControlPlugin(Plugin):
                 )
         except Exception as exc:
             self._node.get_logger().warn(
-                f"[Supply] 未能从 sentry_nav_bt_test 加载补给点，使用 mock 默认值: {exc}"
+                f"[Supply] 未能从 sentry_nav_bt 加载补给点，使用 mock 默认值: {exc}"
             )
 
     def _init_tf_listener(self):

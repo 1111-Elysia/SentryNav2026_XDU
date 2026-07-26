@@ -34,7 +34,7 @@
            │
 ┌──────────▼─────────────────────────────────────────┐
 │    decision                                        │
-│          sentry_nav_bt_test (行为树决策)             │
+│          sentry_nav_bt (行为树决策)             │
 │          sentry_nav_bt_gui  (调试 GUI)              │
 └──────────┬─────────────────────────────────────────┘
            │
@@ -98,7 +98,7 @@
 
 | 包                   | 说明                             |
 | -------------------- | ------------------------------- |
-| [sentry_nav_bt_test](src/decision/sentry_nav_bt_test/README.md) | 哨兵自主行为树 (导航+射击+策略)      |
+| [sentry_nav_bt](src/decision/sentry_nav_bt/README.md) | 哨兵自主行为树 (导航+射击+策略)      |
 | `sentry_nav_bt_gui`                                               | 行为树调试 GUI                  |
 
 ### bringup — 中央编排
@@ -209,7 +209,7 @@ CAN ←→ can_comm ←→ /cmd_vel, /vw, /target_yaw, /detected_target_pose, ..
                   ↕
           Nav2 (ElasticTracker + MPPI)
                   ↕
-          sentry_nav_bt_test (行为树)
+          sentry_nav_bt (行为树)
 
 裁判系统 ──→ rm_referee_ros2 ──→ ground_pos_relay ──→ teammate_cost_layer
 ```

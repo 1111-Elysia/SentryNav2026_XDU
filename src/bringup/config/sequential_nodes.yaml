@@ -122,9 +122,8 @@ sequential_nodes:
   - label: Sentry-BT
     type: execute
     cmd: [
-      "ros2", "launch", "sentry_nav_bt_test", "sentry_nav_bt_test.launch.py",
-      "save_terminal_log:=true",
-      "terminal_log_dir:=../../sentry_nav_bt_test/logs"
+      "ros2", "launch", "sentry_nav_bt", "sentry_nav_bt.launch.py",
+      "save_terminal_log:=true"
     ]
     wait_after: 0
 

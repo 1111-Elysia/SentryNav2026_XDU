@@ -9,7 +9,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     bt_launch = os.path.join(
-        get_package_share_directory("sentry_nav_bt_test"),
+        get_package_share_directory("sentry_nav_bt"),
         "launch",
         "simple_nav.launch.py",
     )

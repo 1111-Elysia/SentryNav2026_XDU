@@ -39,7 +39,7 @@ function nuclear_cleanup() {
                teammate_frame_converter_node 2>/dev/null
 
     # 7. 杀掉 行为树与决策
-    killall -9 sentry_nav_bt_test 2>/dev/null
+    killall -9 navigate_bt_node 2>/dev/null
 
     # 8. 杀掉 Nav2 栈 (lifecycle 节点)
     killall -9 lifecycle_manager map_server map_saver \

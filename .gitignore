@@ -1,7 +1,6 @@
 build/
 install/
 log/
-src/sentry_nav_bt_test/logs/
 docs/
 .cache/
 data/

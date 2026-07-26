@@ -41,7 +41,7 @@ class SimpleNavControlPlugin(Plugin):
         super().__init__(context)
         self.setObjectName("SimpleNavControlPlugin")
         self._node = context.node
-        self._target_node = "/sentry_nav_bt_test"
+        self._target_node = "/sentry_nav_bt"
         self._waypoints = self._read_waypoints()
         self._loading_ui = False
         self._pending_get = None
@@ -68,7 +68,7 @@ class SimpleNavControlPlugin(Plugin):
 
     def _read_waypoints(self):
         waypoint_path = os.path.join(
-            get_package_share_directory("sentry_nav_bt_test"),
+            get_package_share_directory("sentry_nav_bt"),
             "config",
             "waypoints.json",
         )
