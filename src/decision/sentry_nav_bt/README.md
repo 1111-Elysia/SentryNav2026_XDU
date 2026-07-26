@@ -121,7 +121,7 @@ ros2 launch sentry_nav_bt sentry_nav_bt.launch.py \
 |---|---|
 | `uc_adaptive_training.xml` | 默认适应性训练流程；在打符、回补等阶段之间执行 `myhero` 与梯形高地往返巡逻 |
 | `uc_myhero.xml` | 英雄高地驻守策略 |
-| `uc_fortress.xml` | 堡垒驻守策略 |
+| `uc_highland_hold.xml` | 梯形高地驻守策略 |
 | `uc_chase.xml` | 高地追击策略 |
 | `uc_patrol.xml` | 五个命名点的随机巡逻 |
 | `simple_nav.xml` | GUI 动态配置的一次性单点任务 |

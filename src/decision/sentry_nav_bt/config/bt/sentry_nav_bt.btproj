@@ -18,11 +18,12 @@
     <include path="modules/rune_task_via_point.xml"/>
     <include path="modules/shooter_power_recovery.xml"/>
     <include path="modules/supply_return.xml"/>
+    <include path="modules/trapezoid_highland_hold.xml"/>
     <include path="modules/under_attack_vw.xml"/>
     <include path="simple_nav.xml"/>
     <include path="train.xml"/>
     <include path="uc_chase.xml"/>
-    <include path="uc_fortress.xml"/>
+    <include path="uc_highland_hold.xml"/>
     <include path="uc_patrol.xml"/>
     <include path="uc_myhero.xml"/>
     <include path="uc_adaptive_training.xml"/>

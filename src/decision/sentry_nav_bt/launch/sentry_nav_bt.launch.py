@@ -63,7 +63,7 @@ def generate_launch_description():
     launch_working_dir = Path.cwd()
     
     # 行为树XML文件路径
-    # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_fortress.xml')
+    # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_highland_hold.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_myhero.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_patrol.xml')  
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_chase.xml')

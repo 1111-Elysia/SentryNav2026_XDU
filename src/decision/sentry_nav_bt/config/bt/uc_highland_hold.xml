@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- UC 梯形高地驻守策略 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <Fallback name="Root">
@@ -141,20 +142,12 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_堡垒_Phase4">
+                <ReactiveSequence name="中期_梯形高地驻守_Phase4">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="240"/>
-                  <ReactiveFallback name="Phase4_英雄或云台手触发梯形高地驻守优先">
-                    <SubTree
-                      ID="ConditionalTrapezoidHighlandHold"
-                      highland_hold_window_id="4"
-                      highland_hold_trigger_message="[Phase 4] 英雄驻留梯形高地或收到本时间窗0x0303，切换至trapezoid_highland驻守"
-                      _autoremap="1"/>
-                    <SubTree
-                      ID="FortressHold"
-                      fortress_move_message="[Phase 4 | 5:00-4:00] 不需要打符，回堡垒点位持续驻守"
-                      fortress_enemy_move_message="[Phase 4 | 5:00-4:00] 堡垒被敌方占领，转守基地前点位"
-                      _autoremap="1"/>
-                  </ReactiveFallback>
+                  <SubTree
+                    ID="TrapezoidHighlandHold"
+                    highland_hold_message="[Phase 4 | 5:00-4:00] 前往梯形高地持续驻守"
+                    _autoremap="1"/>
                 </ReactiveSequence>
 
                 <Sequence name="中期_大符_Phase5">
@@ -179,20 +172,12 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="中期_堡垒_Phase6">
+                <ReactiveSequence name="中期_梯形高地驻守_Phase6">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="165"/>
-                  <ReactiveFallback name="Phase6_英雄或云台手触发梯形高地驻守优先">
-                    <SubTree
-                      ID="ConditionalTrapezoidHighlandHold"
-                      highland_hold_window_id="6"
-                      highland_hold_trigger_message="[Phase 6] 英雄驻留梯形高地或收到本时间窗0x0303，切换至trapezoid_highland驻守"
-                      _autoremap="1"/>
-                    <SubTree
-                      ID="FortressHold"
-                      fortress_move_message="[Phase 6 | 3:30-2:45] 前往堡垒点位并进入驻守"
-                      fortress_enemy_move_message="[Phase 6 | 3:30-2:45] 堡垒被敌方占领，转守基地前点位"
-                      _autoremap="1"/>
-                  </ReactiveFallback>
+                  <SubTree
+                    ID="TrapezoidHighlandHold"
+                    highland_hold_message="[Phase 6 | 3:30-2:45] 前往梯形高地持续驻守"
+                    _autoremap="1"/>
                 </ReactiveSequence>
 
                 <Sequence name="中期_大符_Phase7">
@@ -217,20 +202,12 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="后期_堡垒_Phase8">
+                <ReactiveSequence name="后期_梯形高地驻守_Phase8">
                   <CheckCondition key_name="stage_remain_time" comparison="gt" threshold="90"/>
-                  <ReactiveFallback name="Phase8_英雄或云台手触发梯形高地驻守优先">
-                    <SubTree
-                      ID="ConditionalTrapezoidHighlandHold"
-                      highland_hold_window_id="8"
-                      highland_hold_trigger_message="[Phase 8] 英雄驻留梯形高地或收到本时间窗0x0303，切换至trapezoid_highland驻守"
-                      _autoremap="1"/>
-                    <SubTree
-                      ID="FortressHold"
-                      fortress_move_message="[Phase 8 | 2:15-1:30] 后期回到堡垒点位持续驻守"
-                      fortress_enemy_move_message="[Phase 8 | 2:15-1:30] 堡垒被敌方占领，转守基地前点位"
-                      _autoremap="1"/>
-                  </ReactiveFallback>
+                  <SubTree
+                    ID="TrapezoidHighlandHold"
+                    highland_hold_message="[Phase 8 | 2:15-1:30] 回到梯形高地持续驻守"
+                    _autoremap="1"/>
                 </ReactiveSequence>
 
                 <Sequence name="后期_大符_Phase9">
@@ -254,19 +231,11 @@
                     _autoremap="1"/>
                 </Sequence>
 
-                <ReactiveSequence name="全局_堡垒驻守">
-                  <ReactiveFallback name="Phase10_英雄或云台手触发梯形高地驻守优先">
-                    <SubTree
-                      ID="ConditionalTrapezoidHighlandHold"
-                      highland_hold_window_id="10"
-                      highland_hold_trigger_message="[Phase 10 | 1:00-结束] 英雄驻留梯形高地或收到本时间窗0x0303，切换至trapezoid_highland驻守"
-                      _autoremap="1"/>
-                    <SubTree
-                      ID="FortressHold"
-                      fortress_move_message="[Fallback] 不需要打符，回堡垒点位持续驻守"
-                      fortress_enemy_move_message="[Fallback] 堡垒被敌方占领，转守基地前点位"
-                      _autoremap="1"/>
-                  </ReactiveFallback>
+                <ReactiveSequence name="全局_梯形高地驻守">
+                  <SubTree
+                    ID="TrapezoidHighlandHold"
+                    highland_hold_message="[Fallback] 回到梯形高地持续驻守"
+                    _autoremap="1"/>
                 </ReactiveSequence>
               </ReactiveFallback>
 
@@ -274,6 +243,7 @@
                 <Sequence name="普通姿态维持">
                   <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
                   <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
+                  <CheckCondition key_name="uc_highland_hold_active" comparison="eq" threshold="0"/>
                   <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
                   <MaintainSentryPosture mode="{uc_normal_posture}"/>
                 </Sequence>

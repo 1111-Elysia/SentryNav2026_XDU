@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="TrapezoidHighlandHold">
+    <Sequence name="梯形高地驻守">
+      <SetBlackboardValue key="uc_highland_hold_active" value="1" type="int"/>
+      <SubTree
+        ID="PointHold"
+        point_hold_goal_name="trapezoid_highland"
+        point_hold_arrive_threshold="0.25"
+        point_hold_exit_threshold="0.30"
+        point_hold_move_posture="3"
+        point_hold_posture="1"
+        point_hold_wait_duration="0.5"
+        point_hold_log_throttle_ms="10000"
+        point_hold_message="{highland_hold_message}"
+        rune_phase_key="in_rune_phase"
+        fortress_active_key="uc_fortress_hold_active"
+        _autoremap="true"/>
+    </Sequence>
+  </BehaviorTree>
+</root>
