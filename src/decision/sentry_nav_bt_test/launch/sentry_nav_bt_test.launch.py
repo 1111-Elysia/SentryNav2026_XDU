@@ -63,11 +63,11 @@ def generate_launch_description():
     source_package_dir = Path(__file__).resolve().parents[1]
     
     # 行为树XML文件路径
-    bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_fortress.xml')
+    # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_fortress.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_myhero.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_patrol.xml')  
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_chase.xml')
-    # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_adaptive_training.xml')
+    bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'uc_adaptive_training.xml')
     # bt_xml_path = os.path.join(pkg_dir, 'config', 'bt', 'train.xml')
     bt_subtree_dir = os.path.join(pkg_dir, 'config', 'bt', 'modules')
 

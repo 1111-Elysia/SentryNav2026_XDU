@@ -193,49 +193,13 @@ controller_server:
       uphill_stuck_vw: 0.2
 
       # 单一直线 + 正六边形(中心3.0,0 边长1.13m)
-      lines: ["ramp_a", "h0", "h1", "h2", "h3", "h4", "h5"]
+      lines: ["ramp_a"]
 
       ramp_a.point_1: [4.01, 2.59]
       ramp_a.point_2: [1.29, 2.18]
       ramp_a.inflation_radius_uphill: 2.0
       ramp_a.inflation_radius_downhill: 2.5
       ramp_a.enable_braking: false
-
-      h0.point_1: [3.653, 0.000]
-      h0.point_2: [3.327, -0.566]
-      h0.inflation_radius_uphill: 1.0
-      h0.inflation_radius_downhill: 1.5
-      h0.enable_braking: false
-
-      h1.point_1: [3.327, -0.566]
-      h1.point_2: [2.674, -0.566]
-      h1.inflation_radius_uphill: 1.0
-      h1.inflation_radius_downhill: 1.5
-      h1.enable_braking: false
-
-      h2.point_1: [2.674, -0.566]
-      h2.point_2: [2.347, 0.000]
-      h2.inflation_radius_uphill: 1.0
-      h2.inflation_radius_downhill: 1.5
-      h2.enable_braking: false
-
-      h3.point_1: [2.347, 0.000]
-      h3.point_2: [2.674, 0.566]
-      h3.inflation_radius_uphill: 1.0
-      h3.inflation_radius_downhill: 1.5
-      h3.enable_braking: false
-
-      h4.point_1: [2.674, 0.566]
-      h4.point_2: [3.327, 0.566]
-      h4.inflation_radius_uphill: 1.0
-      h4.inflation_radius_downhill: 1.5
-      h4.enable_braking: false
-
-      h5.point_1: [3.327, 0.566]
-      h5.point_2: [3.653, 0.000]
-      h5.inflation_radius_uphill: 1.0
-      h5.inflation_radius_downhill: 1.5
-      h5.enable_braking: false
 
       # ═══════════════════════════════════════════════
       #  普通模式 MPPI 参数（未穿越任何直线时使用）
@@ -558,21 +522,9 @@ local_costmap:
         corner_radius: 0.5
         corner_cost_value: 252
         corner_gradient_power: 1.5
-        lines: ["ramp_a", "h0", "h1", "h2", "h3", "h4", "h5"]
+        lines: ["ramp_a"]
         ramp_a.point_1: [4.01, 2.59]
         ramp_a.point_2: [1.29, 2.18]
-        h0.point_1: [3.653, 0.000]
-        h0.point_2: [3.327, -0.566]
-        h1.point_1: [3.327, -0.566]
-        h1.point_2: [2.674, -0.566]
-        h2.point_1: [2.674, -0.566]
-        h2.point_2: [2.347, 0.000]
-        h3.point_1: [2.347, 0.000]
-        h3.point_2: [2.674, 0.566]
-        h4.point_1: [2.674, 0.566]
-        h4.point_2: [3.327, 0.566]
-        h5.point_1: [3.327, 0.566]
-        h5.point_2: [3.653, 0.000]
       teammate_cost_layer:
         plugin: "teammate_cost_layer::TeammateCostLayer"
         enabled: false
@@ -685,26 +637,14 @@ global_costmap:
         corner_radius: 0.5
         corner_cost_value: 253
         corner_gradient_power: 0.5
-        lines: ["ramp_a", "h0", "h1", "h2", "h3", "h4", "h5"]
+        lines: ["ramp_a"]
         ramp_a.point_1: [4.01, 2.59]
         ramp_a.point_2: [1.29, 2.18]
-        h0.point_1: [3.653, 0.000]
-        h0.point_2: [3.327, -0.566]
-        h1.point_1: [3.327, -0.566]
-        h1.point_2: [2.674, -0.566]
-        h2.point_1: [2.674, -0.566]
-        h2.point_2: [2.347, 0.000]
-        h3.point_1: [2.347, 0.000]
-        h3.point_2: [2.674, 0.566]
-        h4.point_1: [2.674, 0.566]
-        h4.point_2: [3.327, 0.566]
-        h5.point_1: [3.327, 0.566]
-        h5.point_2: [3.653, 0.000]
       teammate_cost_layer:
         plugin: "teammate_cost_layer::TeammateCostLayer"
-        enabled: true
+        enabled: false
         teammate_topic: "/ground_pos_relay/teammate_pos_odom"
-        enable_hero: true
+        enable_hero: false
         enable_engineer: false
         enable_standard_3: false
         enable_standard_4: false
