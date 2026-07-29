@@ -264,7 +264,7 @@
                   <CheckCondition key_name="in_rune_phase" comparison="eq" threshold="0"/>
                   <CheckCondition key_name="uc_fortress_hold_active" comparison="eq" threshold="0"/>
                   <CheckCondition key_name="uc_outpost_active" comparison="eq" threshold="0"/>
-                  <MaintainSentryPosture mode="{uc_normal_posture}"/>
+                  <MaintainSentryPosture mode="1"/>
                 </Sequence>
               </ForceSuccess>
             </Parallel>
