@@ -109,7 +109,7 @@
                         highland_hold_message="[Phase 1 | 7:00-5:30] 前哨站已击毁，前往梯形高地持续驻守"
                         _autoremap="1"/>
                     </Sequence>
-                    <SubTree ID="OutpostTask" _autoremap="1"/>
+                    <SubTree ID="OutpostTaskViaPoint" _autoremap="1"/>
                   </ReactiveFallback>
                 </ReactiveSequence>
 

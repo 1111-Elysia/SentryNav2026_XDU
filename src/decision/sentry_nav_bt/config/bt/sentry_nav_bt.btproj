@@ -10,6 +10,7 @@
     <include path="modules/highland_chase.xml"/>
     <include path="modules/myhero_hold.xml"/>
     <include path="modules/outpost_task.xml"/>
+    <include path="modules/outpost_task_via_point.xml"/>
     <include path="modules/point_hold.xml"/>
     <include path="modules/prestart_init_return.xml"/>
     <include path="modules/random_waypoint_navigate.xml"/>

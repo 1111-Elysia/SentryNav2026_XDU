@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="OutpostTaskViaPoint">
+    <Sequence name="经由myhero的前哨站任务">
+      <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
+      <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
+      <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
+      <PrintNode message="[Phase 1 | 7:00-5:30] 先经由 myhero，再前往前哨站点位" throttle_ms="10000"/>
+      <GoalSelector goal_name="myhero" goal="{outpost_via_goal}"/>
+      <ReactiveSequence name="前往myhero途径点并维持对应姿态">
+        <MaintainSentryPosture mode="1"/>
+        <ReliableNavigateToPose
+          goal="{outpost_via_goal}"
+          goal_name="myhero"
+          reach_threshold="0.25"/>
+      </ReactiveSequence>
+      <SubTree ID="OutpostTask" _autoremap="true"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

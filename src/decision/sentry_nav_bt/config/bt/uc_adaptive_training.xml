@@ -128,7 +128,7 @@
                         shuttle_myhero_message="[Phase 1 | 7:00-5:30] 前哨站已击毁，前往myhero并停留"
                         _autoremap="1"/>
                     </Sequence>
-                    <SubTree ID="OutpostTask" _autoremap="1"/>
+                    <SubTree ID="OutpostTaskViaPoint" _autoremap="1"/>
                   </ReactiveFallback>
                 </ReactiveSequence>
 
