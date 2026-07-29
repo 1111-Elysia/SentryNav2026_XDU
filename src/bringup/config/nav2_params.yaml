@@ -489,7 +489,7 @@ local_costmap:
           obstacle_range: 8.0
           raytrace_range: 9.0
 
-          min_obstacle_height: -0.05     #default 0, meters
+          min_obstacle_height: -0.15     #default 0, meters
           max_obstacle_height: 1.0     #defaule 3, meters
           expected_update_rate: 0.0    #default 0, if not updating at this rate at least, remove from buffer
           observation_persistence: 0.0 #default 0, use all measurements taken during now-value, 0=latest
@@ -604,7 +604,7 @@ global_costmap:
           obstacle_range: 8.0
           raytrace_range: 9.0
 
-          min_obstacle_height: -0.05     #default 0, meters
+          min_obstacle_height: -0.15     #default 0, meters
           max_obstacle_height: 1.0     #defaule 3, meters
           expected_update_rate: 0.0    #default 0, if not updating at this rate at least, remove from buffer
           observation_persistence: 0.0 #default 0, use all measurements taken during now-value, 0=latest
