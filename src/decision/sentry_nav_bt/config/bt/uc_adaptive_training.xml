@@ -55,7 +55,7 @@
             <SetBlackboardValue key="uc_hero_trigger_logged" value="0" type="int"/>
             <SetBlackboardValue key="uc_highland_hold_active" value="0" type="int"/>
             <!-- myhero 和梯形高地各自的停留时间（秒）；往返巡逻子树从主树读取此值。 -->
-            <SetBlackboardValue key="uc_adaptive_stay_duration" value="5.0" type="double"/>
+            <SetBlackboardValue key="uc_adaptive_stay_duration" value="10.0" type="double"/>
             <SetBlackboardValue key="uc_initialized" value="1" type="int"/>
           </Sequence>
         </Fallback>

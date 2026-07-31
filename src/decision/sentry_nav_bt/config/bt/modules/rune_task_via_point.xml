@@ -28,7 +28,7 @@
         <ReliableNavigateToPose
           goal="{rune_via_goal}"
           goal_name="myhero"
-          reach_threshold="0.25"/>
+          reach_threshold="1.0"/>
       </ReactiveSequence>
       <PrintNode message="[Phase 1 | 7:00-6:30] 前往小符点位，准备激活小能量机关"/>
       <GoalSelector goal_name="small_rune_point" goal="{rune_goal}"/>
