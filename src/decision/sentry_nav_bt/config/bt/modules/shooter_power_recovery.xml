@@ -1,41 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4">
   <BehaviorTree ID="ShooterPowerRecovery">
-    <ReactiveSequence name="发射机构断电回补">
+    <ReactiveSequence name="发射机构锁定后梯形高地驻守">
       <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="0"/>
-      <PrintNode message="[回补] 发射机构电源输出关闭，攻击姿态回补给点等待恢复" throttle_ms="2000"/>
+      <PrintNode message="[发射机构] 电源输出关闭，切移动姿态前往梯形高地" throttle_ms="2000"/>
       <Inverter>
         <KeepRunningUntilFailure>
-          <Sequence name="断电期间持续回补">
+          <Sequence name="锁定期间持续驻守梯形高地">
             <CheckCondition key_name="power_management_shooter_output" comparison="eq" threshold="0"/>
-            <SetBlackboardValue key="uc_supply_active" value="1" type="int"/>
+            <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
             <SetBlackboardValue key="in_rune_phase" value="0" type="int"/>
             <SetBlackboardValue key="uc_fortress_hold_active" value="0" type="int"/>
             <SetBlackboardValue key="uc_outpost_active" value="0" type="int"/>
-            <MaintainSentryPosture mode="1" force="true"/>
-            <ReactiveFallback name="断电回补_RFID保持或重发补给点">
-              <Sequence name="断电回补_已在补给区">
-                <CheckCondition key_name="rfid_supply_zone_detected" comparison="eq" threshold="1"/>
-                <PrintNode message="[回补] 发射机构电源输出关闭，已在补给区保持攻击姿态" throttle_ms="2000"/>
-                <Wait wait_duration="0.20"/>
-              </Sequence>
-              <Sequence name="断电回补_攻击姿态回补给点">
-                <PatrolGoalSelector
-                  goal_names="supply_point,supply_point_2"
-                  index_key="uc_shooter_power_recovery_goal_index"
-                  goal="{supply_goal}"
-                  goal_name="{supply_selected_goal_name}"/>
-                <ReliableNavigateToPose
-                  goal="{supply_goal}"
-                  goal_name="{supply_selected_goal_name}"
-                  reach_threshold="0.25"/>
-              </Sequence>
-            </ReactiveFallback>
+            <SubTree
+              ID="PointHold"
+              point_hold_goal_name="trapezoid_highland"
+              point_hold_arrive_threshold="0.25"
+              point_hold_exit_threshold="0.30"
+              point_hold_move_posture="3"
+              point_hold_posture="1"
+              point_hold_wait_duration="0.20"
+              point_hold_log_throttle_ms="2000"
+              point_hold_message="[发射机构] 锁定期间前往梯形高地，到点后保持攻击姿态"
+              rune_phase_key="in_rune_phase"
+              fortress_active_key="uc_fortress_hold_active"
+              _autoremap="true"/>
           </Sequence>
         </KeepRunningUntilFailure>
       </Inverter>
       <PrintNode message="{recovery_done_message}"/>
-      <SetBlackboardValue key="uc_shooter_power_recovery_goal_index" value="0" type="int"/>
       <SetBlackboardValue key="uc_supply_active" value="0" type="int"/>
     </ReactiveSequence>
   </BehaviorTree>

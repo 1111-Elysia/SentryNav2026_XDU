@@ -74,13 +74,13 @@
           <SubTree ID="Resurrection" _autoremap="1"/>
 
           <SubTree
-            ID="ShooterPowerRecovery"
-            recovery_done_message="[回补] 发射机构电源输出恢复，继续执行全场策略"
+            ID="SupplyReturn"
+            supply_done_message="[回补] 血量已满且允许发弹量不低于100，退出回补状态"
             _autoremap="1"/>
 
           <SubTree
-            ID="SupplyReturn"
-            supply_done_message="[回补] 血量已满且允许发弹量不低于100，退出回补状态"
+            ID="ShooterPowerRecovery"
+            recovery_done_message="[发射机构] 电源输出恢复，继续执行全场策略"
             _autoremap="1"/>
 
           <Sequence name="作战模式">
