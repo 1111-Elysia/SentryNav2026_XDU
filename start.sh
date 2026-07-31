@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 全局清理函数 
+# 全局清理函数
 # 作用：无论进程在哪个终端运行，只要匹配名字，全部强制杀死 (SIGKILL -9)
 # ==============================================================================
 function nuclear_cleanup() {
@@ -95,7 +95,7 @@ trap 'echo "[INFO] 收到终止信号，正在清理..."; nuclear_cleanup; exit 
 while true; do
     echo "=========================================="
     echo ">>> 赞美欧姆弥赛亚，愿哨兵小姐武运昌隆"
-    
+
     # 每次启动前，先执行核弹以保平安
     # nuclear_cleanup
     # 恢复信号捕获（nuclear_cleanup 内部屏蔽了信号，这里重新启用）
@@ -107,9 +107,10 @@ while true; do
     echo ">>> 启动 Launch 文件..."
     # ---------------------------------------------------------
     # 启动命令
-    # 2>&1 | grep ... 用于过滤掉不想看的刷屏日志
+    # 使用 tee 捕获完整日志到临时文件，同时 grep 过滤终端显示
     # ---------------------------------------------------------
-    ros2 launch bringup start.launch.py 2>&1 | \
+    FULL_LOG=$(mktemp)
+    ros2 launch bringup start.launch.py 2>&1 | tee "$FULL_LOG" | \
     grep -v -E "\[(rviz2|controller_server|planner_server|global_costmap|local_costmap)\].*(Message Filter dropping message|Robot is out of bounds)"
 
     # 获取 ros2 launch 的退出码
@@ -122,9 +123,30 @@ while true; do
     if [ "$EXIT_CODE" -eq 0 ]; then
         echo "[INFO] 正常退出。"
         nuclear_cleanup
+        rm -f "$FULL_LOG"
         break
     else
         echo "[WARN] 检测到异常退出/监控触发重启，2秒后重新拉起..."
+
+        # ---------------------------------------------------------
+        # 异常信息记录：输出到项目目录下的 crash_reports.txt
+        # 包含：时间戳、退出码、关键错误行、完整日志尾部
+        # ---------------------------------------------------------
+        CRASH_LOG="$SCRIPT_DIR/crash_reports.txt"
+        {
+            echo "========================================"
+            echo "[异常] 时间: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "[异常] 退出码: $EXIT_CODE"
+            echo "[异常] 错误/异常节点与内容:"
+            # 提取关键错误行：ERROR / FATAL / 异常 / traceback / signal / killed
+            grep -iE "error|fatal|exception|traceback|signal|killed|segfault|abort" "$FULL_LOG" 2>/dev/null || echo "  (无匹配的关键错误行，请查看下方完整日志)"
+            echo "[异常] --- 完整日志（最近 300 行）---"
+            tail -n 300 "$FULL_LOG" 2>/dev/null
+            echo ""
+        } >> "$CRASH_LOG"
+
+        echo "[INFO] 异常信息已追加到: $CRASH_LOG"
+        rm -f "$FULL_LOG"
         sleep 2
     fi
 done
