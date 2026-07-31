@@ -205,6 +205,11 @@ private:
             if (!vw_fresh) {
                 vw = 0.0f;
             }
+
+            // game_progress 不为 4 时，强制 scan_mod_type_ 发送为 1
+            if (game_progress_ != 4) {
+                scan = true;
+            }
         }
 
         // 限幅 lambda
