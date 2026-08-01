@@ -1,0 +1,129 @@
+[INFO] [navigate_bt_node-1]: process started with pid [2297]
+[navigate_bt_node-1] [0m[INFO] [1785495984.042978451] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/adaptive_training_shuttle.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.043250556] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/chase.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.043483027] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/conditional_trapezoid_highland_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.043702800] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/fortress_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.043897447] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/go_wait_until_time_above.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.044073739] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/hero_highland_trigger.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.044260926] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/highland_chase.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.044450349] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/myhero_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.044685132] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/outpost_task.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.044859827] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/outpost_task_via_point.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.045107186] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/point_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.045310798] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/prestart_init_return.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.045513425] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/random_waypoint_navigate.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.045719895] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/resurrection.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.046062131] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/rune_task.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.046348693] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/rune_task_via_point.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.046579432] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/shooter_power_recovery.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.046865309] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/supply_return.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.047057764] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/trapezoid_highland_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.047272108] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/under_attack_vw.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.047311791] [sentry_nav_bt]: 可用的行为树节点:[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.047654774] [sentry_nav_bt]: 初始化黑板管理器[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.071123754] [sentry_nav_bt]: 已启动 TF 监听，将定期更新当前位置到黑板 'waypoint_now'[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.071160468] [sentry_nav_bt]: 加载路径点: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/waypoints.json[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.073129433] [sentry_nav_bt]: 成功加载 18 个目标点[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.074088380] [sentry_nav_bt]: 运行配置已更新: goal=init, move_posture=3, wait_posture=1, reach=0.250, wait_time=5.0[0m
+[navigate_bt_node-1] [0m[INFO] [1785495984.074130798] [sentry_nav_bt]: 等待导航服务器启动...[0m
+[navigate_bt_node-1] [0m[INFO] [1785495985.077348605] [sentry_nav_bt]: 等待导航服务器...[0m
+[navigate_bt_node-1] [0m[INFO] [1785495986.078251766] [sentry_nav_bt]: 当前位姿恢复，重新启用中心相关点位判定[0m
+[navigate_bt_node-1] [0m[INFO] [1785495987.081198229] [sentry_nav_bt]: 等待导航服务器...[0m
+[navigate_bt_node-1] [0m[INFO] [1785495989.082399663] [sentry_nav_bt]: 等待导航服务器...[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.083632709] [sentry_nav_bt]: 导航服务器已可用[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.084665103] [sentry_nav_bt]: 找到指定的初始位姿 'waypoint_init'[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.084743791] [sentry_nav_bt]: 发布初始位姿 (标准格式): [0.00, 0.00, 0.00][0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.541723255] [sentry_nav_bt]: Groot2 Publisher started. Port: 1667[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.541787465] [sentry_nav_bt]: 运行导航行为树[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.543190944] [sentry_nav_bt]: [UC适应性训练] 裁判系统已连接，等待比赛开始[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.543298139] [sentry_nav_bt]: [UC适应性训练] 比赛开始，初始化局内状态[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.548201829] [sentry_nav_bt]: [ScanMode] 发布 /scan_mod_type = 0[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.548528863] [sentry_nav_bt]: [回补] 低血或没弹，回补给区休整[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.548594090] [sentry_nav_bt]: [回补] 未读到补给区 RFID，按两个补给点往返寻找[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.550257009] [sentry_nav_bt]: MaintainSentryPosture 已发送姿态 3，将继续观察回显并按冷却重试[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.550477578] [PatrolGoalSelector]: 巡逻目标切换到 'supply_point'，位置(-0.87, -5.04)[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.550601022] [sentry_nav_bt]: [ReliableNavigate] 开始导航[supply_point] -> (-0.87, -5.04), threshold=0.25[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.550626987] [sentry_nav_bt]: [ReliableNavigate] 目标名称: supply_point[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.561525512] [sentry_nav_bt]: [ReliableNavigate] 导航中[supply_point], 当前距离 6.991 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785495990.562240699] [sentry_nav_bt]: [ReliableNavigate] 发送目标[supply_point] -> (-0.87, -5.04), attempt=1, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785495991.568507476] [sentry_nav_bt]: [ReliableNavigate] 导航中[supply_point], 当前距离 6.857 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785495992.067366474] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[supply_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785495992.573120621] [sentry_nav_bt]: [ReliableNavigate] 导航中[supply_point], 当前距离 8.027 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785495993.578473934] [sentry_nav_bt]: [ReliableNavigate] 导航中[supply_point], 当前距离 10.869 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785495994.082558794] [sentry_nav_bt]: [回补] 已读到补给区 RFID，保持防御姿态等待恢复[0m
+[navigate_bt_node-1] [0m[INFO] [1785495994.082897709] [sentry_nav_bt]: [ReliableNavigate] 标记当前目标取消[supply_point], 等待后续回调处理, reason=tree_halted[0m
+[navigate_bt_node-1] [0m[INFO] [1785495994.904751967] [sentry_nav_bt]: [ReliableNavigate] 目标已接收但当前请求已取消[supply_point], reason=tree_halted[0m
+[navigate_bt_node-1] [33m[WARN] [1785495994.916762669] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[supply_point], retry_count=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.391164831] [sentry_nav_bt]: [回补] 血量已满且允许发弹量不低于100，继续适应性训练[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.402028418] [sentry_nav_bt]: [Phase 3 Carry | 5:00-4:00] 若小符仍可进入激活窗口，优先补打小能量机关[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.402111700] [GoalSelector]: 已选择目标点 'small_rune_point'，位置(6.33, 3.93)[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.402174020] [sentry_nav_bt]: MaintainSentryPosture 已确认当前姿态为目标值: 3[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.402238036] [sentry_nav_bt]: [ReliableNavigate] 开始导航[small_rune_point] -> (6.33, 3.93), threshold=0.15[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.402250334] [sentry_nav_bt]: [ReliableNavigate] 目标名称: small_rune_point[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.413686513] [sentry_nav_bt]: [ReliableNavigate] 导航中[small_rune_point], 当前距离 15.167 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785495995.414104151] [sentry_nav_bt]: [ReliableNavigate] 发送目标[small_rune_point] -> (6.33, 3.93), attempt=1, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785495996.420313408] [sentry_nav_bt]: [ReliableNavigate] 导航中[small_rune_point], 当前距离 19.983 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785495996.921151303] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[small_rune_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.420774359] [sentry_nav_bt]: [ReliableNavigate] 导航中[small_rune_point], 当前距离 23.881 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.589199751] [sentry_nav_bt]: [ReliableNavigate] 标记当前目标取消[small_rune_point], 等待后续回调处理, reason=tree_halted[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.589356604] [GoalSelector]: 已选择目标点 'trapezoid_highland'，位置(3.98, 6.16)[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.589404429] [sentry_nav_bt]: [Phase 4] 前往梯形高地并停留[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.589458389] [sentry_nav_bt]: MaintainSentryPosture 已确认当前姿态为目标值: 3[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.589523753] [sentry_nav_bt]: [ReliableNavigate] 开始导航[trapezoid_highland] -> (3.98, 6.16), threshold=0.25[0m
+[navigate_bt_node-1] [0m[INFO] [1785495997.589561279] [sentry_nav_bt]: [ReliableNavigate] 目标名称: trapezoid_highland[0m
+[navigate_bt_node-1] [33m[WARN] [1785495999.092924873] [sentry_nav_bt]: [ReliableNavigate] 跨实例等待旧导航取消确认超时(1.50s, token=2)，解除门控[0m
+[navigate_bt_node-1] [0m[INFO] [1785495999.093013887] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 28.108 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785495999.093402896] [sentry_nav_bt]: [ReliableNavigate] 发送目标[trapezoid_highland] -> (3.98, 6.16), attempt=1, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496000.101818459] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 28.303 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496000.604417277] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[trapezoid_highland]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496001.108403867] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 27.999 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496001.334431503] [sentry_nav_bt]: [ReliableNavigate] 目标已接收但当前请求已取消[small_rune_point], reason=tree_halted[0m
+[navigate_bt_node-1] [0m[INFO] [1785496001.334708105] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[trapezoid_highland], send_attempt=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496001.335599975] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[trapezoid_highland]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496001.346260562] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[trapezoid_highland], retry_count=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496001.347160186] [sentry_nav_bt]: [ReliableNavigate] 发送目标[trapezoid_highland] -> (3.98, 6.16), attempt=2, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496002.118962773] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 26.597 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496002.856791059] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[trapezoid_highland]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496003.119051545] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 23.917 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496004.127558991] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 21.971 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496005.128619554] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 21.903 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496006.130015802] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 24.346 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496007.141182569] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 24.312 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496008.143229833] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 23.716 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496008.345988521] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[trapezoid_highland], send_attempt=2[0m
+[navigate_bt_node-1] [0m[INFO] [1785496008.346794007] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[trapezoid_highland]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496008.357892217] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[small_rune_point], retry_count=1[0m
+[navigate_bt_node-1] [33m[WARN] [1785496008.358125903] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[trapezoid_highland], retry_count=2[0m
+[navigate_bt_node-1] [0m[INFO] [1785496008.359327287] [sentry_nav_bt]: [ReliableNavigate] 发送目标[trapezoid_highland] -> (3.98, 6.16), attempt=3, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496009.144069639] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 23.159 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496009.860359207] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[trapezoid_highland]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496010.154335094] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 23.188 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496011.164021223] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 23.167 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496012.171238445] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 24.114 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496013.172022844] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 25.791 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496014.182270846] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 27.180 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496015.183923224] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 29.237 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496015.670684127] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[trapezoid_highland], send_attempt=3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496015.671558645] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[trapezoid_highland]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496015.682234561] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[trapezoid_highland], retry_count=3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496015.683534274] [sentry_nav_bt]: [ReliableNavigate] 发送目标[trapezoid_highland] -> (3.98, 6.16), attempt=4, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496016.184831262] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 32.525 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496017.185472214] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 36.412 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496017.185782308] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[trapezoid_highland]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496018.194091655] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 41.875 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496019.194159532] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 48.650 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496020.203284578] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 51.625 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496021.214055890] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 51.725 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496022.215434919] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 50.962 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496023.217152180] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 48.932 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496023.453749700] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[trapezoid_highland], send_attempt=4[0m
+[navigate_bt_node-1] [0m[INFO] [1785496023.454711737] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[trapezoid_highland]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496023.465216712] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[trapezoid_highland], retry_count=4[0m
+[navigate_bt_node-1] [0m[INFO] [1785496023.466095549] [sentry_nav_bt]: [ReliableNavigate] 发送目标[trapezoid_highland] -> (3.98, 6.16), attempt=5, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496024.218563938] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 44.874 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496024.969779362] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[trapezoid_highland]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496025.219133891] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 38.132 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496026.221057963] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 30.520 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496027.231189990] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 24.694 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496028.231257224] [sentry_nav_bt]: [ReliableNavigate] 导航中[trapezoid_highland], 当前距离 20.329 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496029.233076371] 

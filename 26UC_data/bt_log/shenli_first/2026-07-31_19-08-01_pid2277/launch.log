@@ -1,0 +1,185 @@
+[INFO] [navigate_bt_node-1]: process started with pid [2303]
+[navigate_bt_node-1] [0m[INFO] [1785496082.022065862] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/adaptive_training_shuttle.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.022283130] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/chase.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.022454028] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/conditional_trapezoid_highland_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.022610532] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/fortress_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.022755570] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/go_wait_until_time_above.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.022938083] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/hero_highland_trigger.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.023179005] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/highland_chase.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.023405905] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/myhero_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.023655719] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/outpost_task.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.023820736] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/outpost_task_via_point.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.024002616] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/point_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.024162282] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/prestart_init_return.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.024336027] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/random_waypoint_navigate.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.024505977] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/resurrection.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.024755672] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/rune_task.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.024936420] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/rune_task_via_point.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.025135894] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/shooter_power_recovery.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.025404934] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/supply_return.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.025543648] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/trapezoid_highland_hold.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.025681305] [sentry_nav_bt]: 已注册行为树子树: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/bt/modules/under_attack_vw.xml[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.025696413] [sentry_nav_bt]: 可用的行为树节点:[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.026028993] [sentry_nav_bt]: 初始化黑板管理器[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.044745728] [sentry_nav_bt]: 已启动 TF 监听，将定期更新当前位置到黑板 'waypoint_now'[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.044783579] [sentry_nav_bt]: 加载路径点: /home/nuc/Desktop/SentryNav2026_XDU/install/sentry_nav_bt/share/sentry_nav_bt/config/waypoints.json[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.046078252] [sentry_nav_bt]: 成功加载 18 个目标点[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.046716245] [sentry_nav_bt]: 运行配置已更新: goal=init, move_posture=3, wait_posture=1, reach=0.250, wait_time=5.0[0m
+[navigate_bt_node-1] [0m[INFO] [1785496082.046745943] [sentry_nav_bt]: 等待导航服务器启动...[0m
+[navigate_bt_node-1] [0m[INFO] [1785496083.049051180] [sentry_nav_bt]: 等待导航服务器...[0m
+[navigate_bt_node-1] [33m[WARN] [1785496084.100967984] [sentry_nav_bt]: 无法获取当前位置: Could not find a connection between 'map' and 'base_link' because they are not part of the same tree.Tf has two or more unconnected trees.[0m
+[navigate_bt_node-1] [0m[INFO] [1785496085.103594892] [sentry_nav_bt]: 等待导航服务器...[0m
+[navigate_bt_node-1] [0m[INFO] [1785496086.103899147] [sentry_nav_bt]: 当前位姿恢复，重新启用中心相关点位判定[0m
+[navigate_bt_node-1] [0m[INFO] [1785496087.104653207] [sentry_nav_bt]: 等待导航服务器...[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.105661501] [sentry_nav_bt]: 导航服务器已可用[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.106241734] [sentry_nav_bt]: 找到指定的初始位姿 'waypoint_init'[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.106295237] [sentry_nav_bt]: 发布初始位姿 (标准格式): [0.00, 0.00, 0.00][0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.562636590] [sentry_nav_bt]: Groot2 Publisher started. Port: 1667[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.562727876] [sentry_nav_bt]: 运行导航行为树[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.564354419] [sentry_nav_bt]: [UC适应性训练] 裁判系统已连接，等待比赛开始[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.564434498] [sentry_nav_bt]: [UC适应性训练] 比赛开始，初始化局内状态[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.570109420] [sentry_nav_bt]: [ScanMode] 发布 /scan_mod_type = 0[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.570760310] [sentry_nav_bt]: [Phase 5 Carry | 3:30-2:45] 若大符仍可进入激活窗口，优先补打大能量机关[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.570928996] [GoalSelector]: 已选择目标点 'large_rune_point'，位置(6.33, 3.93)[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.571126695] [sentry_nav_bt]: MaintainSentryPosture 已确认当前姿态为目标值: 3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.571314953] [sentry_nav_bt]: [ReliableNavigate] 开始导航[large_rune_point] -> (6.33, 3.93), threshold=0.15[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.571361283] [sentry_nav_bt]: [ReliableNavigate] 目标名称: large_rune_point[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.573621000] [sentry_nav_bt]: MaintainSentryPosture 已发送姿态 1，将继续观察回显并按冷却重试[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.584544248] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 3.567 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496088.585779479] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=1, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496089.595000279] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 2.264 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496090.089052924] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[large_rune_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496090.597945833] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 0.949 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496091.605884485] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 0.742 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496092.616191744] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 1.243 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496093.616568303] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 0.813 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496094.086426049] [sentry_nav_bt]: MaintainSentryPosture 已发送姿态 3，将继续观察回显并按冷却重试[0m
+[navigate_bt_node-1] [0m[INFO] [1785496094.622146475] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 1.053 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496095.092509858] [sentry_nav_bt]: MaintainSentryPosture 已发送姿态 3，将继续观察回显并按冷却重试[0m
+[navigate_bt_node-1] [0m[INFO] [1785496095.626735674] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 1.603 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496096.093194538] [sentry_nav_bt]: MaintainSentryPosture 已发送姿态 3，将继续观察回显并按冷却重试[0m
+[navigate_bt_node-1] [0m[INFO] [1785496096.637851832] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 0.541 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496097.092524040] [sentry_nav_bt]: MaintainSentryPosture 已确认当前姿态为目标值: 3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496097.638198081] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 1.147 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496098.639851771] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 3.103 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496099.650620724] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 6.704 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496100.651132878] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 9.194 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496101.659700650] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 10.423 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496102.659909693] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 11.359 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496103.669211829] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 11.899 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496104.670375176] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 12.195 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496105.678666280] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 12.054 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496106.336690287] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496106.337634968] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[large_rune_point]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496106.348963477] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496106.350108653] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=2, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496106.678932463] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 11.554 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496107.006748271] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=2[0m
+[navigate_bt_node-1] [33m[WARN] [1785496107.018742543] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=2[0m
+[navigate_bt_node-1] [0m[INFO] [1785496107.019669718] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=3, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496107.680303723] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 10.873 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496108.178136737] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=3[0m
+[navigate_bt_node-1] [33m[WARN] [1785496108.189788646] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496108.190613899] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=4, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496108.686639936] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 10.112 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496109.424014281] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=4[0m
+[navigate_bt_node-1] [33m[WARN] [1785496109.435884475] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=4[0m
+[navigate_bt_node-1] [0m[INFO] [1785496109.437385151] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=5, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496109.686838406] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 8.693 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496110.671616748] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=5[0m
+[navigate_bt_node-1] [33m[WARN] [1785496110.683246741] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=5[0m
+[navigate_bt_node-1] [0m[INFO] [1785496110.684467901] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=6, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496110.695413345] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 7.778 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496111.706386280] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 7.579 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496112.091726538] [sentry_nav_bt]: [ReliableNavigate] 标记当前目标取消[large_rune_point], 等待后续回调处理, reason=tree_halted[0m
+[navigate_bt_node-1] [0m[INFO] [1785496112.091980452] [GoalSelector]: 已选择目标点 'trapezoid_highland'，位置(3.98, 6.16)[0m
+[navigate_bt_node-1] [0m[INFO] [1785496112.092053330] [sentry_nav_bt]: [Phase 8] 前往梯形高地并停留[0m
+[navigate_bt_node-1] [0m[INFO] [1785496112.092112412] [sentry_nav_bt]: MaintainSentryPosture 已确认当前姿态为目标值: 3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496112.092182499] [sentry_nav_bt]: [ReliableNavigate] 开始导航[trapezoid_highland] -> (3.98, 6.16), threshold=0.25[0m
+[navigate_bt_node-1] [0m[INFO] [1785496112.092201580] [sentry_nav_bt]: [ReliableNavigate] 目标名称: trapezoid_highland[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.076035627] [sentry_nav_bt]: [Phase 7 | 2:45-2:15] 再次前往大符点位，尝试激活大能量机关[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.076116680] [GoalSelector]: 已选择目标点 'large_rune_point'，位置(6.33, 3.93)[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.076192354] [sentry_nav_bt]: MaintainSentryPosture 已确认当前姿态为目标值: 3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.076259891] [sentry_nav_bt]: [ReliableNavigate] 开始导航[large_rune_point] -> (6.33, 3.93), threshold=0.15[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.076272100] [sentry_nav_bt]: [ReliableNavigate] 目标名称: large_rune_point[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.076300004] [sentry_nav_bt]: [ReliableNavigate] 标记当前目标取消[trapezoid_highland], 等待后续回调处理, reason=tree_halted[0m
+[navigate_bt_node-1] [33m[WARN] [1785496113.598596762] [sentry_nav_bt]: [ReliableNavigate] 跨实例等待旧导航取消确认超时(1.51s, token=6)，解除门控[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.598690517] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 7.614 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496113.599020644] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=1, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496114.607654531] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 9.748 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496115.108765646] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[large_rune_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496115.552016549] [sentry_nav_bt]: [ReliableNavigate] 目标已接收但当前请求已取消[large_rune_point], reason=tree_halted[0m
+[navigate_bt_node-1] [0m[INFO] [1785496115.552327049] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=1[0m
+[navigate_bt_node-1] [33m[WARN] [1785496115.564388957] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496115.565359602] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=2, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496115.610581502] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 11.687 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496116.612586236] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 13.415 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496117.068681840] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[large_rune_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496117.613178038] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 13.792 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496118.622936368] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 13.531 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496119.624588781] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 11.572 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496120.626330420] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 7.529 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496121.506247295] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=2[0m
+[navigate_bt_node-1] [0m[INFO] [1785496121.507360483] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[large_rune_point]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496121.518010753] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=6[0m
+[navigate_bt_node-1] [33m[WARN] [1785496121.518121345] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=2[0m
+[navigate_bt_node-1] [0m[INFO] [1785496121.519102075] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=3, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496121.631615843] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 3.752 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496122.632075799] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 0.309 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496123.019364116] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[large_rune_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496123.632859192] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 3.837 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496123.700449890] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496123.701262457] [sentry_nav_bt]: [ReliableNavigate] 目标已受理[large_rune_point]，继续等待到点/结果[0m
+[navigate_bt_node-1] [33m[WARN] [1785496123.711844201] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=3[0m
+[navigate_bt_node-1] [0m[INFO] [1785496123.712586814] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=4, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496124.564413758] [sentry_nav_bt]: [ReliableNavigate] Nav2 已接收目标[large_rune_point], send_attempt=4[0m
+[navigate_bt_node-1] [33m[WARN] [1785496124.576316259] [sentry_nav_bt]: [ReliableNavigate] Nav2 aborted[large_rune_point], retry_count=4[0m
+[navigate_bt_node-1] [0m[INFO] [1785496124.577444149] [sentry_nav_bt]: [ReliableNavigate] 发送目标[large_rune_point] -> (6.33, 3.93), attempt=5, goal_id=1[0m
+[navigate_bt_node-1] [0m[INFO] [1785496124.633871371] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 7.070 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496125.636174132] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 10.550 m[0m
+[navigate_bt_node-1] [33m[WARN] [1785496126.081798044] [sentry_nav_bt]: [ReliableNavigate] 等待 Nav2 接收超过 1.50s[large_rune_point]；为避免产生 preemption，保持等待且不重发[0m
+[navigate_bt_node-1] [0m[INFO] [1785496126.637357759] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 13.667 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496127.643890858] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 15.116 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496128.645542672] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 15.688 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496129.648240296] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 16.168 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496130.654916304] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 17.388 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496131.659765054] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 17.974 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496132.661516702] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 19.417 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496133.672903837] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 22.365 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496134.682272252] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 26.357 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496135.689743043] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 30.544 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496136.691743676] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 33.679 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496137.694031714] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 35.236 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496138.698995581] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 35.866 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496139.706252824] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 35.379 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496140.707127914] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 36.049 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496141.709321978] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 38.167 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496142.713145706] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 40.367 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496143.718251330] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 43.509 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496144.719536998] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 46.760 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496145.720454655] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 47.721 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496146.720879398] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 47.119 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496147.726012981] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 45.083 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496148.730140555] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 44.442 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496149.733245353] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 45.925 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496150.742521674] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 47.825 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496151.754229888] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 50.885 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496152.764039808] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 52.805 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496153.771777423] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 55.435 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496154.777202206] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 57.206 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496155.778212182] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 58.965 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496156.783219915] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 60.012 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496157.787700614] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 59.802 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496158.788633432] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 58.462 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496159.792710478] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 56.272 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496160.794598263] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 53.797 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496161.799719737] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 51.443 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496162.804609602] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 49.694 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496163.815326877] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 49.408 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496164.825578409] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 50.086 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496165.827835088] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 49.854 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496166.828471106] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 51.095 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496167.839004712] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 53.108 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496168.850530230] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 55.150 m[0m
+[navigate_bt_node-1] [0m[INFO] [1785496169.859432940] [sentry_nav_bt]: [ReliableNavigate] 导航中[large_rune_point], 当前距离 57.983 m[0m
+[navigate_bt_node-1] [0m[INFO] [
